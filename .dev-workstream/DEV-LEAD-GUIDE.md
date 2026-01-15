@@ -399,6 +399,14 @@ When developer submits `.dev-workstream/reports/BATCH-XX-REPORT.md`:
 
 **YOUR PRIMARY JOB: Verify tests check ACTUAL CORRECTNESS, not just string presence or compilation.**
 
+**🚨 MANDATORY: ACTUALLY VIEW THE TEST CODE - DO NOT TRUST TEST NAMES**
+
+**You MUST use `view_file` on test files and READ the actual test code.**
+- ❌ **WRONG:** "I see test names, assume they're good"
+- ✅ **RIGHT:** "Let me view_file the test and see what it actually checks"
+
+**Test names lie. Always view the actual assertions.**
+
 **Focus: Do tests verify WHAT MATTERS?**
 
 **🚨 COMMON TEST QUALITY FAILURES (REJECT THESE):**
@@ -413,6 +421,14 @@ public void GeneratesCode() {
 }
 ```
 **Why it's bad:** Code could be completely broken but test passes.
+
+**Example from BATCH-09 (FAILED review):**
+```csharp
+// BATCH-09 - BAD TEST (should have been rejected)
+Assert.Contains("Marshal array Numbers", marshallerCode);
+Assert.Contains("AllocHGlobal", marshallerCode);
+// Checks strings present - NOT that it actually works!
+```
 
 ❌ **Shallow Tests** - Tests that verify nothing meaningful:
 ```csharp
@@ -448,18 +464,31 @@ public void GeneratedStruct_FieldOffsetsMatchLayout() {
 }
 ```
 
+**BATCH-07/08 EXAMPLES (GOOD):**
+```csharp
+// Compiles code, invokes method, checks ACTUAL behavior
+var assembly = CompileToAssembly(code, nativeCode);
+var marshaller = Activator.CreateInstance(marshallerType);
+method.Invoke(marshaller, args);
+Assert.Equal(42, actualValue); // ACTUAL runtime value
+```
+
 **CRITICAL QUESTIONS TO ASK YOURSELF:**
-1. **If I broke the implementation, would these tests catch it?**
-2. **Do tests verify ACTUAL BEHAVIOR (values, offsets, sizes)?**
-3. **Or do they just check string presence or compilation?**
-4. **Are the tests from the spec requirements actually implemented?**
-5. **Could the code be completely wrong but tests still pass?**
 
-**⚠️ REPEAT: DO NOT APPROVE based on "tests passing" alone. CHECK WHAT THEY TEST.**
+1. **Did I ACTUALLY VIEW the test file code?** (use view_file)
+2. **If I broke the implementation, would these tests catch it?**
+3. **Do tests verify ACTUAL BEHAVIOR (values, offsets, sizes)?**
+4. **Or do they just check string presence or compilation?**
+5. **Are the tests from the spec requirements actually implemented?**
+6. **Could the code be completely wrong but tests still pass?**
 
-**⚠️ REPEAT: String presence tests (Assert.Contains) are almost always INSUFFICIENT.**
+**⚠️ REPEAT: ALWAYS VIEW ACTUAL TEST CODE - DO NOT TRUST TEST NAMES OR COUNTS**
 
-**⚠️ REPEAT: Tests must verify CORRECTNESS, not just code existence.**
+**⚠️ REPEAT: Assert.Contains on generated code is INSUFFICIENT (unless checking syntax errors)**
+
+**⚠️ REPEAT: Tests must verify CORRECTNESS, not just code existence**
+
+**⚠️ REPEAT: Compilation + runtime validation is the GOLD STANDARD (BATCH-07/08 quality)**
 
 #### Step 4: Check Completeness (5-10 minutes)
 

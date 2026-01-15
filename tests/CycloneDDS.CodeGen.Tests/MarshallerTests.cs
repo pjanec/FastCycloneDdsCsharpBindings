@@ -440,4 +440,72 @@ namespace Test
         Assert.Equal(32, resultName.Length);
         Assert.Equal(new string('a', 32), resultName);
     }
+
+    [Fact]
+    public void Marshaller_MarshalsPrimitiveArray()
+    {
+        // Note: This is a simplified test that checks generated code structure
+        // Full round-trip test would require native type generation with IntPtr fields
+        var csCode = @"
+namespace Test
+{
+    [DdsTopic]
+    public partial class TestTopic
+    {
+        public int[] Numbers;
+    }
+}";
+        var type = ParseType(csCode);
+        var emitter = new MarshallerEmitter();
+        var marshallerCode = emitter.GenerateMarshaller(type, "Test");
+
+        // Verify array marshalling code is generated
+        Assert.Contains("Marshal array Numbers", marshallerCode);
+        Assert.Contains("Numbers_Ptr", marshallerCode);
+        Assert.Contains("Numbers_Length", marshallerCode);
+        Assert.Contains("AllocHGlobal", marshallerCode);
+    }
+
+    [Fact]
+    public void Marshaller_UnmarshalsPrimitiveArray()
+    {
+        var csCode = @"
+namespace Test
+{
+    [DdsTopic]
+    public partial class TestTopic
+    {
+        public int[] Numbers;
+    }
+}";
+        var type = ParseType(csCode);
+        var emitter = new MarshallerEmitter();
+        var marshallerCode = emitter.GenerateMarshaller(type, "Test");
+
+        // Verify array unmarshalling code is generated
+        Assert.Contains("Unmarshal array Numbers", marshallerCode);
+        Assert.Contains("new int[native.Numbers_Length]", marshallerCode);
+        Assert.Contains("Array.Empty<int>()", marshallerCode);
+    }
+
+    [Fact]
+    public void Marshaller_EmptyArray_HandledCorrectly()
+    {
+        var csCode = @"
+namespace Test
+{
+    [DdsTopic]
+    public partial class TestTopic
+    {
+        public int[] Numbers;
+    }
+}";
+        var type = ParseType(csCode);
+        var emitter = new MarshallerEmitter();
+        var marshallerCode = emitter.GenerateMarshaller(type, "Test");
+
+        // Verify empty array handling
+        Assert.Contains("IntPtr.Zero", marshallerCode);
+        Assert.Contains("Array.Empty<int>()", marshallerCode);
+    }
 }

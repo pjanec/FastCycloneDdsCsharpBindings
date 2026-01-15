@@ -209,6 +209,7 @@ public class CodeGenerator
                     Console.WriteLine($"[CodeGen]   Generated Marshaller: {marshallerFile}");
                 }
 
+
                 foreach (var type in unionTypes)
                 {
                     var ns = GetNamespace(type);
@@ -216,9 +217,30 @@ public class CodeGenerator
                     var managedFile = Path.Combine(generatedDir, $"{type.Identifier.Text}Managed.g.cs");
                     File.WriteAllText(managedFile, managedCode);
                     Console.WriteLine($"[CodeGen]   Generated Managed Union View: {managedFile}");
+                    
+                    // Generate union marshaller
+                    var unionMarshallerCode = marshallerEmitter.GenerateUnionMarshaller(type, ns);
+                    var unionMarshallerFile = Path.Combine(generatedDir, $"{type.Identifier.Text}Marshaller.g.cs");
+                    File.WriteAllText(unionMarshallerFile, unionMarshallerCode);
+                    Console.WriteLine($"[CodeGen]   Generated Union Marshaller: {unionMarshallerFile}");
+                }
+
+                // Generate MetadataRegistry
+                if (topicTypes.Any())
+                {
+                    var ns = GetNamespace(topicTypes.First());
+                    var metadataEmitter = new MetadataRegistryEmitter();
+                    var topicsWithNames = topicTypes
+                        .Select(t => (t, ExtractTopicName(t)))
+                        .ToList();
+                    var registryCode = metadataEmitter.GenerateRegistry(topicsWithNames, ns);
+                    var registryFile = Path.Combine(generatedDir, "MetadataRegistry.g.cs");
+                    File.WriteAllText(registryFile, registryCode);
+                    Console.WriteLine($"[CodeGen]   Generated Metadata Registry: {registryFile}");
                 }
 
                 // Enums (Generate IDL for all public enums found)
+
                 var enumTypes = root.DescendantNodes()
                     .OfType<EnumDeclarationSyntax>()
                     .Where(e => e.Modifiers.Any(m => m.Text == "public"))
