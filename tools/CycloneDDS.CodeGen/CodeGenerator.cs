@@ -154,6 +154,18 @@ public class CodeGenerator
                     Console.WriteLine($"[CodeGen]   Generated IDL: {idlFile}");
                 }
 
+                // Generate Native Types
+                var nativeEmitter = new NativeTypeEmitter();
+                
+                foreach (var type in topicTypes)
+                {
+                    var ns = GetNamespace(type);
+                    var nativeCode = nativeEmitter.GenerateNativeStruct(type, ns);
+                    var nativeFile = Path.Combine(generatedDir, $"{type.Identifier.Text}Native.g.cs");
+                    File.WriteAllText(nativeFile, nativeCode);
+                    Console.WriteLine($"[CodeGen]   Generated Native Type: {nativeFile}");
+                }
+
                 // Unions
                 var unionTypes = root.DescendantNodes()
                     .OfType<TypeDeclarationSyntax>()

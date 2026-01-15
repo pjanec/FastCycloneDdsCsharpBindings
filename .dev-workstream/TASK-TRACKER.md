@@ -17,7 +17,7 @@
 - [x] **FCDC-005** Generator Infrastructure (CLI tool) → [details](../docs/FCDC-TASK-MASTER.md#fcdc-005-generator-infrastructure)
 - [x] **FCDC-006** Schema Validation Logic → [details](../docs/FCDC-TASK-MASTER.md#fcdc-006-schema-validation-logic)
 - [x] **FCDC-007** IDL Code Emitter → [details](../docs/FCDC-TASK-MASTER.md#fcdc-007-idl-code-emitter)
-- [ ] **FCDC-008** Alignment and Layout Calculator → [details](../docs/FCDC-TASK-MASTER.md#fcdc-008-alignment-and-layout-calculator)
+- [x] **FCDC-008** Alignment and Layout Calculator → [details](../docs/FCDC-TASK-MASTER.md#fcdc-008-alignment-and-layout-calculator)
 - [ ] **FCDC-009** Native Type Code Emitter → [details](../docs/FCDC-TASK-MASTER.md#fcdc-009-native-type-code-emitter)
 - [ ] **FCDC-010** Managed View Type Code Emitter → [details](../docs/FCDC-TASK-MASTER.md#fcdc-010-managed-view-type-code-emitter)
 - [ ] **FCDC-011** Marshaller Code Emitter → [details](../docs/FCDC-TASK-MASTER.md#fcdc-011-marshaller-code-emitter)
@@ -59,10 +59,10 @@
 
 **Total Tasks:** 33  
 **Phase 1:** 4/4 complete ✅  
-**Phase 2:** 3/9 complete (CLI tool approach)  
+**Phase 2:** 4/9 complete (CLI tool approach)  
 **Phase 3:** 0/9 complete  
 **Phase 4:** 0/4 complete  
 **Phase 5:** 0/7 complete  
 
-**Overall:** 7/33 tasks complete (21%)
+**Overall:** 8/33 tasks complete (24%)
 
