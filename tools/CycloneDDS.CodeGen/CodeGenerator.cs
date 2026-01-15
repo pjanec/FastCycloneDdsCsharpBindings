@@ -178,6 +178,24 @@ public class CodeGenerator
                     var idlFile = Path.Combine(generatedDir, $"{type.Identifier.Text}.idl");
                     File.WriteAllText(idlFile, idlCode);
                     Console.WriteLine($"[CodeGen]   Generated Union IDL: {idlFile}");
+                    
+                    var ns = GetNamespace(type);
+                    var nativeCode = nativeEmitter.GenerateNativeUnion(type, ns);
+                    var nativeFile = Path.Combine(generatedDir, $"{type.Identifier.Text}Native.g.cs");
+                    File.WriteAllText(nativeFile, nativeCode);
+                    Console.WriteLine($"[CodeGen]   Generated Native Union: {nativeFile}");
+                }
+
+                // Generate Managed Views (structs only for now)
+                var managedEmitter = new ManagedViewEmitter();
+
+                foreach (var type in topicTypes)
+                {
+                    var ns = GetNamespace(type);
+                    var managedCode = managedEmitter.GenerateManagedView(type, ns);
+                    var managedFile = Path.Combine(generatedDir, $"{type.Identifier.Text}Managed.g.cs");
+                    File.WriteAllText(managedFile, managedCode);
+                    Console.WriteLine($"[CodeGen]   Generated Managed View: {managedFile}");
                 }
 
                 // Enums (Generate IDL for all public enums found)

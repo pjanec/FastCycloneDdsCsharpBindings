@@ -264,11 +264,33 @@ This batch is DONE when:
 
 **Why:** Smaller batches = faster feedback cycles, easier reviews, clearer progress
 
-#### 2. **Scope: One Clear Goal Per Batch**
-- ✅ Good: "Implement Ghost entity lifecycle state"
-- ❌ Bad: "Implement Ghost entities and network synchronization and ownership transfer"
+#### 2. **Scope: One Clear Goal Per Batch (Or Combined for Fast Developers)**
+- ✅ Good Single Task: "Implement Ghost entity lifecycle state"
+- ✅ Good Combined Batch: "Fix BATCH-X issues + Implement feature Y + Start feature Z"
+- ❌ Bad: "Implement Ghost entities and network synchronization and ownership transfer" (unclear boundaries)
 
-**Why:** Single focus makes reviews easier and allows parallel work
+**Why:** Single focus makes reviews easier. Combined batches allowed for fast developers BUT require strict workflow.
+
+**For Combined Batches - MANDATORY WORKFLOW:**
+
+```markdown
+## 🔄 MANDATORY WORKFLOW: Test-Driven Task Progression
+
+**CRITICAL: You MUST complete tasks in sequence with passing tests:**
+
+1. **Task 1:** Implement → Write tests → **ALL tests pass** ✅
+2. **Task 2:** Implement → Write tests → **ALL tests pass** ✅  
+3. **Task 3:** Implement → Write tests → **ALL tests pass** ✅
+
+**DO NOT** move to the next task until:
+- ✅ Current task implementation complete
+- ✅ Current task tests written
+- ✅ **ALL tests passing** (including previous batch tests)
+
+**Why:** Ensures each component is solid before building on top of it. Prevents cascading failures.
+```
+
+**Include this section verbatim in every combined batch.**
 
 #### 3. **Dependencies: Explicit and Minimal**
 - State which batches must complete first
@@ -373,9 +395,24 @@ When developer submits `.dev-workstream/reports/BATCH-XX-REPORT.md`:
 
 #### Step 3: Review Tests (15-20 minutes)
 
+**⚠️ CRITICAL: TEST QUALITY IS AS IMPORTANT AS CODE QUALITY**
+
+**YOUR PRIMARY JOB: Verify tests check ACTUAL CORRECTNESS, not just string presence or compilation.**
+
 **Focus: Do tests verify WHAT MATTERS?**
 
-**Look for Problems:**
+**🚨 COMMON TEST QUALITY FAILURES (REJECT THESE):**
+
+❌ **String Presence Tests** - The most common mistake:
+```csharp
+[Fact]
+public void GeneratesCode() {
+    var code = generator.Generate();
+    Assert.Contains("public int Id;", code); // WRONG - just checks string exists!
+    // This passes even if field is at wrong offset, wrong order, etc.
+}
+```
+**Why it's bad:** Code could be completely broken but test passes.
 
 ❌ **Shallow Tests** - Tests that verify nothing meaningful:
 ```csharp
@@ -393,10 +430,36 @@ public void ComponentExists() {
 
 ❌ **Wrong Abstraction** - Testing implementation details instead of behavior
 
-**Ask yourself:**
-1. If I broke the implementation, would these tests catch it?
-2. Are the tests from the spec requirements actually implemented?
-3. Do tests verify behavior, or just that code compiles?
+**✅ WHAT GOOD TESTS LOOK LIKE:**
+
+```csharp
+// GOOD: Verifies actual layout correctness
+[Fact]
+public void GeneratedStruct_FieldOffsetsMatchLayout() {
+    var code = generator.Generate(type);
+    var layout = calculator.CalculateLayout(type);
+    
+    // Compile and get ACTUAL offsets
+    var actualOffsets = CompileAndGetOffsets(code);
+    
+    // Verify ACTUAL values match expected
+    Assert.Equal(layout.Fields[0].Offset, actualOffsets["Field1"]);
+    Assert.Equal(layout.TotalSize, actualOffsets.StructSize);
+}
+```
+
+**CRITICAL QUESTIONS TO ASK YOURSELF:**
+1. **If I broke the implementation, would these tests catch it?**
+2. **Do tests verify ACTUAL BEHAVIOR (values, offsets, sizes)?**
+3. **Or do they just check string presence or compilation?**
+4. **Are the tests from the spec requirements actually implemented?**
+5. **Could the code be completely wrong but tests still pass?**
+
+**⚠️ REPEAT: DO NOT APPROVE based on "tests passing" alone. CHECK WHAT THEY TEST.**
+
+**⚠️ REPEAT: String presence tests (Assert.Contains) are almost always INSUFFICIENT.**
+
+**⚠️ REPEAT: Tests must verify CORRECTNESS, not just code existence.**
 
 #### Step 4: Check Completeness (5-10 minutes)
 
@@ -529,6 +592,22 @@ Tests: [X tests, covering Y scenarios]
 - **Specific:** Point to exact files, lines, test gaps
 - **Brief:** Skip fluff, get to the point
 - **Actionable:** Developer knows exactly what to fix
+- **⚠️ TEST QUALITY FOCUSED:** Spend 50% of review time on test quality analysis
+
+**⚠️ CRITICAL: TEST QUALITY CHECKLIST FOR EVERY REVIEW:**
+
+- [ ] Tests verify ACTUAL values, not just string presence
+- [ ] Tests would catch broken implementation
+- [ ] Tests check edge cases from spec
+- [ ] Tests verify behavior, not implementation details
+- [ ] No shallow "object exists" tests
+- [ ] No Assert.Contains without verifying actual correctness
+- [ ] Tests compile generated code (if applicable)
+- [ ] Tests check actual sizes, offsets, values (if applicable)
+
+**IF TEST QUALITY IS POOR: REJECT THE BATCH IMMEDIATELY.**
+
+**Better to reject and demand better tests than approve poor quality.**
 
 **Examples:**
 
