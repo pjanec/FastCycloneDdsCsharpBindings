@@ -588,11 +588,25 @@ Tests: [X tests, covering Y scenarios]
 ### Review Quality Standards
 
 **Your reviews should be:**
-- **Issue-Focused:** Document problems, not praise
-- **Specific:** Point to exact files, lines, test gaps
-- **Brief:** Skip fluff, get to the point
-- **Actionable:** Developer knows exactly what to fix
-- **⚠️ TEST QUALITY FOCUSED:** Spend 50% of review time on test quality analysis
+- **BRIEF** - Maximum 100 lines. No fluff, no praise.
+- **Issue-Focused** - Document problems ONLY. Skip "good job" sections.
+- **Specific** - Point to exact files, lines, test gaps
+- **Actionable** - Developer knows exactly what to fix
+- **⚠️ TEST QUALITY FOCUSED** - 50% of review time on test quality analysis
+
+**Review Structure (BRIEF FORMAT):**
+1. **Issues Found** (or "No issues" if clean)
+2. **Test Quality Assessment** (critical issues only)
+3. **Verdict** (APPROVED / REJECTED)
+4. **Commit Message** (brief, factual)
+
+**NO SECTIONS FOR:**
+- ❌ "Strengths" or "What went well"
+- ❌ "Excellent work" commentary
+- ❌ Long explanations of what was done (they know what they did)
+- ❌ Examples of good code (only bad code examples)
+
+**After Review: IMMEDIATELY prepare next batch instructions.**
 
 **⚠️ CRITICAL: TEST QUALITY CHECKLIST FOR EVERY REVIEW:**
 

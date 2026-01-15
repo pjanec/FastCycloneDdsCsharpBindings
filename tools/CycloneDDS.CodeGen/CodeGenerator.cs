@@ -198,6 +198,26 @@ public class CodeGenerator
                     Console.WriteLine($"[CodeGen]   Generated Managed View: {managedFile}");
                 }
 
+                // Generate Marshallers
+                var marshallerEmitter = new MarshallerEmitter();
+                foreach (var type in topicTypes)
+                {
+                    var ns = GetNamespace(type);
+                    var marshallerCode = marshallerEmitter.GenerateMarshaller(type, ns);
+                    var marshallerFile = Path.Combine(generatedDir, $"{type.Identifier.Text}Marshaller.g.cs");
+                    File.WriteAllText(marshallerFile, marshallerCode);
+                    Console.WriteLine($"[CodeGen]   Generated Marshaller: {marshallerFile}");
+                }
+
+                foreach (var type in unionTypes)
+                {
+                    var ns = GetNamespace(type);
+                    var managedCode = managedEmitter.GenerateManagedUnion(type, ns);
+                    var managedFile = Path.Combine(generatedDir, $"{type.Identifier.Text}Managed.g.cs");
+                    File.WriteAllText(managedFile, managedCode);
+                    Console.WriteLine($"[CodeGen]   Generated Managed Union View: {managedFile}");
+                }
+
                 // Enums (Generate IDL for all public enums found)
                 var enumTypes = root.DescendantNodes()
                     .OfType<EnumDeclarationSyntax>()

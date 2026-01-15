@@ -19,8 +19,8 @@
 - [x] **FCDC-007** IDL Code Emitter → [details](../docs/FCDC-TASK-MASTER.md#fcdc-007-idl-code-emitter)
 - [x] **FCDC-008** Alignment and Layout Calculator → [details](../docs/FCDC-TASK-MASTER.md#fcdc-008-alignment-and-layout-calculator)
 - [x] **FCDC-009** Native Type Code Emitter → [details](../docs/FCDC-TASK-MASTER.md#fcdc-009-native-type-code-emitter)
-- [~] **FCDC-010** Managed View Type Code Emitter (structs done, unions pending) → [details](../docs/FCDC-TASK-MASTER.md#fcdc-010-managed-view-type-code-emitter)
-- [ ] **FCDC-011** Marshaller Code Emitter → [details](../docs/FCDC-TASK-MASTER.md#fcdc-011-marshaller-code-emitter)
+- [x] **FCDC-010** Managed View Type Code Emitter → [details](../docs/FCDC-TASK-MASTER.md#fcdc-010-managed-view-type-code-emitter)
+- [~] **FCDC-011** Marshaller Code Emitter (foundation done, arrays/unions pending) → [details](../docs/FCDC-TASK-MASTER.md#fcdc-011-marshaller-code-emitter)
 - [ ] **FCDC-012** Metadata Registry Code Emitter → [details](../docs/FCDC-TASK-MASTER.md#fcdc-012-metadata-registry-code-emitter)
 - [ ] **FCDC-013** Generator Testing Suite → [details](../docs/FCDC-TASK-MASTER.md#fcdc-013-generator-testing-suite)
 
@@ -59,10 +59,10 @@
 
 **Total Tasks:** 33  
 **Phase 1:** 4/4 complete ✅  
-**Phase 2:** 5/9 complete (CLI tool approach)  
+**Phase 2:** 6/9 complete (CLI tool approach)  
 **Phase 3:** 0/9 complete  
 **Phase 4:** 0/4 complete  
 **Phase 5:** 0/7 complete  
 
-**Overall:** 9/33 tasks complete (27%)
+**Overall:** 10/33 tasks complete (30%)
 
