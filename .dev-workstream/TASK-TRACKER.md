@@ -31,10 +31,11 @@
 - [ ] **FCDC-016** DdsParticipant Implementation → [details](../docs/FCDC-TASK-MASTER.md#fcdc-016-ddsparticipant-implementation)
 - [ ] **FCDC-017** DdsWriter<TNative> (Inline-Only) → [details](../docs/FCDC-TASK-MASTER.md#fcdc-017-ddswritertnative-inline-only)
 - [ ] **FCDC-018** DdsReader<TNative> (Inline-Only) → [details](../docs/FCDC-TASK-MASTER.md#fcdc-018-ddsreadertnative-inline-only)
+- [ ] **FCDC-018A** ⚠️ **DDS Integration Validation Suite (CRITICAL - BLOCKING)** → [details](../docs/FCDC-TASK-MASTER.md#fcdc-018a-dds-integration-validation-suite-critical)
 - [ ] **FCDC-019** TakeScope Implementation → [details](../docs/FCDC-TASK-MASTER.md#fcdc-019-takescope-implementation)
 - [ ] **FCDC-020** DdsWriter<TManaged> (Variable-Size) → [details](../docs/FCDC-TASK-MASTER.md#fcdc-020-ddswritertmanaged-variable-size)
 - [ ] **FCDC-021** DdsReader<TManaged> (Variable-Size) → [details](../docs/FCDC-TASK-MASTER.md#fcdc-021-ddsreadertmanaged-variable-size)
-- [ ] **FCDC-022** Runtime Testing Suite → [details](../docs/FCDC-TASK-MASTER.md#fcdc-022-runtime-testing-suite)
+- [ ] **FCDC-022** Comprehensive Runtime Testing Suite → [details](../docs/FCDC-TASK-MASTER.md#fcdc-022-comprehensive-runtime-testing-suite)
 
 ## Phase 4: Native Shim & Build Integration
 
@@ -57,12 +58,15 @@
 
 ## Progress Summary
 
-**Total Tasks:** 33  
+**Total Tasks:** 34 (added FCDC-018A)  
 **Phase 1:** 4/4 complete ✅  
 **Phase 2:** 9/9 complete ✅  
-**Phase 3:** 2/9 complete  
+**Phase 3:** 2/10 complete (added integration validation)  
 **Phase 4:** 0/4 complete  
 **Phase 5:** 0/7 complete  
 
-**Overall:** 15/33 tasks complete (45%)
+**Overall:** 15/34 tasks complete (44%)
+
+**⚠️ NEXT CRITICAL TASK:** FCDC-018A - DDS Integration Validation  
+**Blocks:** FCDC-019, FCDC-020, FCDC-021 (variable-size types depend on proven infrastructure)
 

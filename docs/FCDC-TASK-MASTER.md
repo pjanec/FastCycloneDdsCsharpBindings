@@ -275,15 +275,60 @@ Implement DdsReader<TNative> for inline-only types. Auto-discover topic metadata
 
 ---
 
+### FCDC-018A: DDS Integration Validation Suite (CRITICAL)
+**Status:** 🔴 Not Started  
+**Priority:** **CRITICAL - BLOCKING**  
+**Estimated Effort:** 5-7 days  
+**Dependencies:** FCDC-016, FCDC-017, FCDC-018, BATCH-13.1  
+**Design Reference:** [DDS-INTEGRATION-TEST-DESIGN.md](./DDS-INTEGRATION-TEST-DESIGN.md)
+
+**Description:**  
+**PROVE THE INFRASTRUCTURE WORKS before building more features!**
+
+Implement 32 integration tests validating the complete C# → Native DDS pipeline:
+
+**Test Categories:**
+- Data Type Coverage (10 tests) - Primitives, arrays, sequences, nested structs, keyed topics
+- Marshalling Correctness (5 tests) - Byte-perfect round-trips, UTF-8, deep equality
+- Keyed Topics (4 tests) - Multiple instances, dispose, unregister
+- QoS Settings (6 tests) - Reliable, best-effort, durability, history, deadline, lifespan
+- Partitions (3 tests) - Isolation, multiple partitions, wildcards
+- Error Handling (4 tests) - Invalid descriptors, type mismatch, disposal
+
+**What This Validates:**
+- ✅ Topic descriptors built correctly (BATCH-13.1)
+- ✅ Marshalling accurate (byte-level verification)
+- ✅ Native calls succeed (actual DDS pub/sub)
+- ✅ Data sent == Data received (end-to-end)
+- ✅ QoS, partitions, keys functional
+
+**Critical Success Criteria:**
+- 100% pass rate (32/32 tests)
+- No data corruption
+- No data loss (reliable QoS)
+- Proper isolation (partitions/keys)
+
+**Why Critical:**
+This is the FIRST TIME actual data flows end-to-end through the entire stack. Must pass before proceeding to advanced features (variable-size types, unions, etc.).
+
+**Test Pattern:** Single-process tests (writer + reader in same test) for determinism.
+
+**Detailed Task File:** [tasks/FCDC-018A.md](../tasks/FCDC-018A.md)  
+**Design Document:** [docs/DDS-INTEGRATION-TEST-DESIGN.md](./DDS-INTEGRATION-TEST-DESIGN.md)
+
+---
+
 ### FCDC-019: TakeScope Implementation
 **Status:** 🔴 Not Started  
-**Priority:** Critical  
+**Priority:** High  
 **Estimated Effort:** 3-4 days  
-**Dependencies:** FCDC-014, FCDC-015  
+**Dependencies:** FCDC-014, FCDC-015, **FCDC-018A**  
 **Design Reference:** §6.5 TakeScope, §11.3 Loan Management
 
 **Description:**  
 Implement TakeScope<TManaged> ref struct. Wrap dds_take loan with managed views over native samples. Expose ReadOnlySpan<TManaged> and ReadOnlySpan<DdsSampleInfo>. Dispose returns loan and resets arena. Ensure ref struct lifetime safety.
+
+**Note:** Deferred until after integration validation (FCDC-018A) proves basic infrastructure.
 
 **Detailed Task File:** [tasks/FCDC-019.md](../tasks/FCDC-019.md)
 
@@ -293,11 +338,13 @@ Implement TakeScope<TManaged> ref struct. Wrap dds_take loan with managed views 
 **Status:** 🔴 Not Started  
 **Priority:** High  
 **Estimated Effort:** 3-4 days  
-**Dependencies:** FCDC-017, FCDC-014  
+**Dependencies:** FCDC-017, FCDC-014, **FCDC-018A**  
 **Design Reference:** §6.4 DdsWriter<TManaged, TNative, TMarshaller>
 
 **Description:**  
 Implement DdsWriter<TManaged, TNative, TMarshaller> for variable-size capable types. Require arena parameter in Write/WriteDispose methods. Use marshaller to convert managed to native with arena-backed allocations. Handle disposal correctly.
+
+**Note:** Build on confidence from FCDC-018A (infrastructure proven working).
 
 **Detailed Task File:** [tasks/FCDC-020.md](../tasks/FCDC-020.md)
 
@@ -317,15 +364,22 @@ Implement DdsReader<TManaged, TNative, TMarshaller> returning TakeScope. Use mar
 
 ---
 
-### FCDC-022: Runtime Testing Suite
+### FCDC-022: Comprehensive Runtime Testing Suite
 **Status:** 🔴 Not Started  
 **Priority:** High  
-**Estimated Effort:** 6-8 days  
-**Dependencies:** FCDC-016 through FCDC-021  
+**Estimated Effort:** 4-6 days  
+**Dependencies:** FCDC-016 through FCDC-021, **FCDC-018A**  
 **Design Reference:** §12.2 Integration Tests
 
 **Description:**  
-Create end-to-end integration tests: Writer → Reader for inline and variable types, disposal samples, multiple participants/partitions, evolution scenarios (v1 ↔ v2 readers/writers). Verify zero allocations in steady state.
+Expand on FCDC-018A validation with comprehensive tests for advanced features:
+- Variable-size types (TManaged) with TakeScope
+- Schema evolution (v1 ↔ v2 readers/writers)
+- Multiple participants/partitions
+- Performance validation (zero allocations in steady state)
+- Stress testing (10K+ samples)
+
+**Note:** FCDC-018A already validated basic infrastructure. This extends coverage to advanced features.
 
 **Detailed Task File:** [tasks/FCDC-022.md](../tasks/FCDC-022.md)
 
