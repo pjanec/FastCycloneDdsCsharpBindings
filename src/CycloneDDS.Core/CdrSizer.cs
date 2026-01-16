@@ -1,0 +1,81 @@
+using System;
+using System.Text;
+
+namespace CycloneDDS.Core
+{
+    /// <summary>
+    /// Shadow writer that calculates sizes without writing bytes.
+    /// MUST mirror CdrWriter API exactly for symmetric code generation.
+    /// </summary>
+    public ref struct CdrSizer
+    {
+        private int _cursor;
+        
+        public CdrSizer(int initialOffset)
+        {
+            _cursor = initialOffset;
+        }
+        
+        public int Position => _cursor;
+        
+        // Primitives (mirrors CdrWriter)
+        public void WriteByte(byte value)
+        {
+            _cursor += 1;
+        }
+        
+        public void WriteInt32(int value)
+        {
+            _cursor = AlignmentMath.Align(_cursor, 4);
+            _cursor += 4;
+        }
+        
+        public void WriteUInt32(uint value)
+        {
+            _cursor = AlignmentMath.Align(_cursor, 4);
+            _cursor += 4;
+        }
+        
+        public void WriteInt64(long value)
+        {
+            _cursor = AlignmentMath.Align(_cursor, 8);
+            _cursor += 8;
+        }
+        
+        public void WriteUInt64(ulong value)
+        {
+            _cursor = AlignmentMath.Align(_cursor, 8);
+            _cursor += 8;
+        }
+        
+        public void WriteFloat(float value)
+        {
+            _cursor = AlignmentMath.Align(_cursor, 4);
+            _cursor += 4;
+        }
+        
+        public void WriteDouble(double value)
+        {
+            _cursor = AlignmentMath.Align(_cursor, 8);
+            _cursor += 8;
+        }
+        
+        public void WriteString(ReadOnlySpan<char> value)
+        {
+            _cursor = AlignmentMath.Align(_cursor, 4); // Length header
+            _cursor += 4; // Length (Int32)
+            _cursor += Encoding.UTF8.GetByteCount(value);
+            _cursor += 1; // NUL terminator
+        }
+        
+        public void WriteFixedString(ReadOnlySpan<byte> utf8Bytes, int fixedSize)
+        {
+            _cursor += fixedSize;
+        }
+        
+        /// <summary>
+        /// Returns size delta from initial offset.
+        /// </summary>
+        public int GetSizeDelta(int startOffset) => _cursor - startOffset;
+    }
+}

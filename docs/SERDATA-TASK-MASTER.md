@@ -30,10 +30,10 @@ This document provides the master task list for the **serdata-based** implementa
 **Goal:** Build and validate the foundational CDR serialization primitives **before** any code generation.
 
 **Duration:** 12-16 days  
-**Status:** 🔴 Not Started
+**Status:** 🟢 Completed
 
 ### FCDC-S001: CycloneDDS.Core Package Setup
-**Status:** 🔴 Not Started  
+**Status:** 🟢 Completed  
 **Priority:** Critical  
 **Estimated Effort:** 1 day  
 **Dependencies:** None
@@ -49,7 +49,7 @@ Create the `CycloneDDS.Core` package (`net8.0` target) with project structure, b
 ---
 
 ### FCDC-S002: CdrWriter Implementation
-**Status:** 🔴 Not Started  
+**Status:** 🟢 Completed  
 **Priority:** Critical  
 **Estimated Effort:** 3-4 days  
 **Dependencies:** FCDC-S001
@@ -78,7 +78,7 @@ Implement the core `CdrWriter ref struct` that wraps `IBufferWriter<byte>` and p
 ---
 
 ### FCDC-S003: CdrReader Implementation
-**Status:** 🔴 Not Started  
+**Status:** 🟢 Completed  
 **Priority:** Critical  
 **Estimated Effort:** 3-4 days  
 **Dependencies:** FCDC-S001
@@ -106,7 +106,7 @@ Implement the core `CdrReader ref struct` that wraps `ReadOnlySpan<byte>` and pr
 ---
 
 ### FCDC-S004: CdrSizeCalculator Utilities
-**Status:** 🔴 Not Started  
+**Status:** 🟢 Completed  
 **Priority:** Critical  
 **Estimated Effort:** 2 days  
 **Dependencies:** FCDC-S001
@@ -131,7 +131,7 @@ Implement static utility methods for calculating serialized sizes with alignment
 ---
 
 ### FCDC-S005: Golden Rig Integration Test (VALIDATION GATE)
-**Status:** 🔴 Not Started  
+**Status:** 🟢 Completed  
 **Priority:** **CRITICAL - BLOCKING**  
 **Estimated Effort:** 3-5 days  
 **Dependencies:** FCDC-S002, FCDC-S003, FCDC-S004

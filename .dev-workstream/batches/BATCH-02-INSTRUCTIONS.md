@@ -83,50 +83,186 @@ This batch completes **Stage 1 Foundation** and opens the gate to Stage 2 (Code 
 
 ## ✅ Tasks
 
-### Task 1: CdrSizeCalculator Utilities (FCDC-S004)
+### Task 1: AlignmentMath and CdrSizer Utilities (FCDC-S004)
 
-**File:** `Src/CycloneDDS.Core/CdrSizeCalculator.cs` (NEW)  
+**Files:**  
+- `Src/CycloneDDS.Core/AlignmentMath.cs` (NEW)
+- `Src/CycloneDDS.Core/CdrSizer.cs` (NEW)
+
 **Task Definition:** See [SERDATA-TASK-MASTER.md](../docs/SERDATA-TASK-MASTER.md#fcdc-s004-cdrsizecalculator-utilities)
 
 **Description:**  
-Static utility class for calculating serialized sizes with alignment. **Critical for DHEADER generation** in Stage 2.
+Implement the core alignment helper and the "shadow writer" for size calculation. These are **critical for the two-pass XCDR2 serialization** in Stage 2.
 
-**Design Reference:** [design-talk.md lines 2991-3021](../docs/design-talk.md)
+**Design Reference:** [XCDR2-IMPLEMENTATION-DETAILS.md](../docs/XCDR2-IMPLEMENTATION-DETAILS.md), design-talk.md §3638-3741
 
-**Must Implement:**
+**Part A: AlignmentMath (Single Source of Truth)**
+
+Create `Src/CycloneDDS.Core/AlignmentMath.cs`:
+
 ```csharp
-public static class CdrSizeCalculator
+using System.Runtime.CompilerServices;
+
+namespace CycloneDDS.Core
 {
-    public static int Align(int currentOffset, int alignment);
-    
-    public static int GetInt32Size(int currentOffset);      // Align(4) + 4
-    public static int GetDoubleSize(int currentOffset);     // Align(8) + 8
-    public static int GetStringSize(string value, int currentOffset);
-    public static int GetStringSize(ReadOnlySpan<char> value, int currentOffset);
-    
-    // String: Align(offset, 4) + 4 (length) + UTF8ByteCount + 1 (NUL)
+    /// <summary>
+    /// Single source of truth for XCDR2 alignment calculations.
+    /// </summary>
+    public static class AlignmentMath
+    {
+        /// <summary>
+        /// Calculate next aligned position for given alignment.
+        /// </summary>
+        /// <param name="currentPosition">Current absolute position in stream</param>
+        /// <param name="alignment">Required alignment (must be power of 2: 1, 2, 4, 8)</param>
+        /// <returns>Next position aligned to boundary</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static int Align(int currentPosition, int alignment)
+        {
+            int mask = alignment - 1;
+            int padding = (alignment - (currentPosition & mask)) & mask;
+            return currentPosition + padding;
+        }
+    }
+}
+```
+
+**Part B: CdrSizer (Shadow Writer for Sizing)**
+
+Create `Src/CycloneDDS.Core/CdrSizer.cs`:
+
+```csharp
+using System;
+using System.Text;
+
+namespace CycloneDDS.Core
+{
+    /// <summary>
+    /// Shadow writer that calculates sizes without writing bytes.
+    /// MUST mirror CdrWriter API exactly for symmetric code generation.
+    /// </summary>
+    public ref struct CdrSizer
+    {
+        private int _cursor;
+        
+        public CdrSizer(int initialOffset)
+        {
+            _cursor = initialOffset;
+        }
+        
+        public int Position => _cursor;
+        
+        // Primitives (mirrors CdrWriter)
+        public void WriteByte(byte value)
+        {
+            _cursor += 1;
+        }
+        
+        public void WriteInt32(int value)
+        {
+            _cursor = AlignmentMath.Align(_cursor, 4);
+            _cursor += 4;
+        }
+        
+        public void WriteUInt32(uint value)
+        {
+            _cursor = AlignmentMath.Align(_cursor, 4);
+            _cursor += 4;
+        }
+        
+        public void WriteInt64(long value)
+        {
+            _cursor = AlignmentMath.Align(_cursor, 8);
+            _cursor += 8;
+        }
+        
+        public void WriteUInt64(ulong value)
+        {
+            _cursor = AlignmentMath.Align(_cursor, 8);
+            _cursor += 8;
+        }
+        
+        public void WriteFloat(float value)
+        {
+            _cursor = AlignmentMath.Align(_cursor, 4);
+            _cursor += 4;
+        }
+        
+        public void WriteDouble(double value)
+        {
+            _cursor = AlignmentMath.Align(_cursor, 8);
+            _cursor += 8;
+        }
+        
+        public void WriteString(ReadOnlySpan<char> value)
+        {
+            _cursor = AlignmentMath.Align(_cursor, 4); // Length header
+            _cursor += 4; // Length (Int32)
+            _cursor += Encoding.UTF8.GetByteCount(value);
+            _cursor += 1; // NUL terminator
+        }
+        
+        public void WriteFixedString(ReadOnlySpan<byte> utf8Bytes, int fixedSize)
+        {
+            _cursor += fixedSize;
+        }
+        
+        /// <summary>
+        /// Returns size delta from initial offset.
+        /// </summary>
+        public int GetSizeDelta(int startOffset) => _cursor - startOffset;
+    }
 }
 ```
 
 **Implementation Notes:**
-- All size methods take `currentOffset` (absolute position in stream)
-- Return **delta size**, not absolute offset
-- String size = Align(offset, 4) + 4 (length) + UTF8ByteCount + 1 (NUL)
+- `AlignmentMath.Align`: MUST use exact formula `(alignment - (pos & mask)) & mask`
+- `CdrSizer`: MUST mirror every `CdrWriter` method signature
+- All alignment uses `AlignmentMath.Align` - single source of truth
+- Returns delta size, not absolute offset
 
-**Tests Required:** (Create `CdrSizeCalculatorTests.cs`)
+**Tests Required:** (Create `AlignmentMathTests.cs` and `CdrSizerTests.cs`)
 
-**Minimum 10-12 tests:**
-1. ✅ Align formula (offset 0,1,2,3 with alignment 4 → 0,4,4,4)
-2. ✅ Int32 size at various offsets (offset 0 → 4, offset 1 → 7, offset 2 → 6, offset 3 → 5)
-3. ✅ Double size at various offsets (8-byte alignment)
-4. ✅ String size ("Hello" at offset 0 → 4 + 5 + 1 = 10)
-5. ✅ String size with alignment (offset 1 → pad 3, then 10 = 13 total)
-6. ✅ Empty string (offset 0 → 4 + 0 + 1 = 5)
-7. ✅ Verify size matches actual CdrWriter output (critical validation)
+**AlignmentMathTests - Minimum 8 tests:**
+1. ✅ Align(0, 4) → 0 (already aligned)
+2. ✅ Align(1, 4) → 4 (pad 3 bytes)
+3. ✅ Align(2, 4) → 4 (pad 2 bytes)
+4. ✅ Align(3, 4) → 4 (pad 1 byte)
+5. ✅ Align(5, 8) → 8 (8-byte boundary)
+6. ✅ Align(7, 2) → 8 (2-byte boundary)
+7. ✅ Align(100, 1) → 100 (1-byte aligned = no change)
+8. ✅ Edge: Align(0, 8) → 0
 
-**Quality: Compare calculated size with actual serialized bytes from CdrWriter.**
+**CdrSizerTests - Minimum 10 tests:**
+1. ✅ WriteByte advances by 1
+2. ✅ WriteInt32 from offset 0 → size 4
+3. ✅ WriteInt32 from offset 1 → align to 4, then +4 = size 7 total
+4. ✅ WriteDouble from offset 0 → size 8
+5. ✅ WriteDouble from offset 5 → align to 8, then +8 = size 11 total
+6. ✅ WriteString("Hello") from offset 0 → 4 (len) + 5 (bytes) + 1 (NUL) = 10
+7. ✅ WriteString("") from offset 0 → 4 + 0 + 1 = 5
+8. ✅ Multiple writes: Byte + Int32 + Double (verify cumulative size)
+9. ✅ GetSizeDelta returns correct delta, not absolute
+10. ✅ **CRITICAL:** CdrSizer size matches actual CdrWriter output
 
-**Estimated Time:** 2 hours
+**Quality Check:**
+For test #10, serialize same data with both `CdrSizer` and `CdrWriter`, verify sizes match:
+```csharp
+var sizer = new CdrSizer(0);
+sizer.WriteInt32(42);
+sizer.WriteString("Test");
+int expectedSize = sizer.GetSizeDelta(0);
+
+var writer = new ArrayBufferWriter<byte>();
+var cdr = new CdrWriter(writer);
+cdr.WriteInt32(42);
+cdr.WriteString("Test");
+cdr.Complete();
+
+Assert.Equal(expectedSize, writer.WrittenCount);
+```
+
+**Estimated Time:** 2-3 hours
 
 ---
 
@@ -285,10 +421,11 @@ public class GoldenConsistencyTests
 
 ## 🧪 Testing Requirements
 
-**Minimum Total Tests:** 18-20 tests
+**Minimum Total Tests:** 26 tests
 
 **Test Distribution:**
-- CdrSizeCalculatorTests: 10-12 tests
+- AlignmentMathTests: 8 tests
+- CdrSizerTests: 10 tests
 - GoldenConsistencyTests: 8 tests (MANDATORY - all must pass)
 
 **Test Quality Standards:**
@@ -346,9 +483,9 @@ Use template: `.dev-workstream/templates/BATCH-REPORT-TEMPLATE.md`
 
 This batch is DONE when:
 
-- ✅ **FCDC-S004** Complete: CdrSizeCalculator implemented, 10-12 tests pass
+- ✅ **FCDC-S004** Complete: AlignmentMath and CdrSizer implemented, 18 tests pass (8 + 10)
 - ✅ **FCDC-S005** Complete: **Golden Rig 100% byte-perfect match (8/8 test cases)**
-- ✅ All 18-20 tests passing
+- ✅ All 26 tests passing
 - ✅ No compiler warnings
 - ✅ Report submitted to `.dev-workstream/reports/BATCH-02-REPORT.md`
 
