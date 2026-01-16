@@ -46,13 +46,20 @@ namespace CycloneDDS.CodeGen
             sb.AppendLine("            uint dheader = reader.ReadUInt32();");
             sb.AppendLine("            int endPos = reader.Position + (int)dheader;");
             
-            foreach(var field in type.Fields)
+            if (type.HasAttribute("DdsUnion"))
             {
-                sb.AppendLine($"            if (reader.Position < endPos)");
-                sb.AppendLine("            {");
-                string readCall = GetReadCall(field);
-                sb.AppendLine($"                {readCall};");
-                sb.AppendLine("            }");
+                EmitUnionDeserializeBody(sb, type);
+            }
+            else
+            {
+                foreach(var field in type.Fields)
+                {
+                    sb.AppendLine($"            if (reader.Position < endPos)");
+                    sb.AppendLine("            {");
+                    string readCall = GetReadCall(field);
+                    sb.AppendLine($"                {readCall};");
+                    sb.AppendLine("            }");
+                }
             }
             
             sb.AppendLine();
@@ -64,6 +71,61 @@ namespace CycloneDDS.CodeGen
             sb.AppendLine("            return view;");
             sb.AppendLine("        }");
             sb.AppendLine("    }");
+        }
+
+        private void EmitUnionDeserializeBody(StringBuilder sb, TypeInfo type)
+        {
+            var discriminator = type.Fields.FirstOrDefault(f => f.HasAttribute("DdsDiscriminator"));
+            if (discriminator == null) throw new Exception($"Union {type.Name} missing [DdsDiscriminator] field");
+            
+            // Read Discriminator
+            sb.AppendLine($"            if (reader.Position < endPos)");
+            sb.AppendLine("            {");
+            sb.AppendLine($"                {GetReadCall(discriminator)};");
+            sb.AppendLine("            }");
+
+            sb.AppendLine($"            switch (({GetDiscriminatorCastType(discriminator.TypeName)})view.{discriminator.Name})");
+            sb.AppendLine("            {");
+            
+            foreach (var field in type.Fields)
+            {
+                var caseAttr = field.GetAttribute("DdsCase");
+                if (caseAttr != null)
+                {
+                    foreach (var val in caseAttr.CaseValues)
+                    {
+                        sb.AppendLine($"                case {val}:");
+                    }
+                    sb.AppendLine($"                    if (reader.Position < endPos) {{ {GetReadCall(field)}; }}");
+                    sb.AppendLine("                    break;");
+                }
+            }
+            
+            var defaultField = type.Fields.FirstOrDefault(f => f.HasAttribute("DdsDefaultCase"));
+            if (defaultField != null)
+            {
+                sb.AppendLine("                default:");
+                sb.AppendLine($"                    if (reader.Position < endPos) {{ {GetReadCall(defaultField)}; }}");
+                sb.AppendLine("                    break;");
+            }
+            else
+            {
+                sb.AppendLine("                default:");
+                // Unknown case: handled by the generic seek(endPos) outside.
+                // But DHEADER logic says "Seek(EndPos)" for unknown cases.
+                // The outer generic code `if (reader.Position < endPos) reader.Seek(endPos);` handles this!
+                // So checking `switch` logic, it executes one branch. If that branch consumes data, `reader.Position` advances.
+                // If unknown branch (default empty), `reader.Position` stays at discriminator end.
+                // Outer code sees `Position < endPos` and skips remainder. Correct.
+                sb.AppendLine("                    break;");
+            }
+            
+            sb.AppendLine("            }");
+        }
+
+        private string GetDiscriminatorCastType(string typeName)
+        {
+             return "int";
         }
 
         private void EmitViewStruct(StringBuilder sb, TypeInfo type)
@@ -85,10 +147,54 @@ namespace CycloneDDS.CodeGen
              sb.AppendLine($"        public {type.Name} ToOwned()");
              sb.AppendLine("        {");
              sb.AppendLine($"            var instance = new {type.Name}();");
-             foreach(var field in type.Fields)
+             
+             if (type.HasAttribute("DdsUnion"))
              {
-                 sb.AppendLine($"            instance.{field.Name} = {MapToOwnedConversion(field)};");
+                 var discriminator = type.Fields.FirstOrDefault(f => f.HasAttribute("DdsDiscriminator"));
+                 if (discriminator != null)
+                 {
+                     sb.AppendLine($"            instance.{discriminator.Name} = {MapToOwnedConversion(discriminator)};");
+                     
+                     sb.AppendLine($"            switch (({GetDiscriminatorCastType(discriminator.TypeName)})instance.{discriminator.Name})");
+                     sb.AppendLine("            {");
+                     
+                     foreach (var field in type.Fields)
+                     {
+                         var caseAttr = field.GetAttribute("DdsCase");
+                         if (caseAttr != null)
+                         {
+                             foreach (var val in caseAttr.CaseValues)
+                             {
+                                 sb.AppendLine($"                case {val}:");
+                             }
+                             sb.AppendLine($"                    instance.{field.Name} = {MapToOwnedConversion(field)};");
+                             sb.AppendLine("                    break;");
+                         }
+                     }
+                     
+                     var defaultField = type.Fields.FirstOrDefault(f => f.HasAttribute("DdsDefaultCase"));
+                     if (defaultField != null)
+                     {
+                         sb.AppendLine("                default:");
+                         sb.AppendLine($"                    instance.{defaultField.Name} = {MapToOwnedConversion(defaultField)};");
+                         sb.AppendLine("                    break;");
+                     }
+                     else
+                     {
+                         sb.AppendLine("                default: break;");
+                     }
+                     
+                     sb.AppendLine("            }");
+                 }
              }
+             else
+             {
+                 foreach(var field in type.Fields)
+                 {
+                     sb.AppendLine($"            instance.{field.Name} = {MapToOwnedConversion(field)};");
+                 }
+             }
+             
              sb.AppendLine("            return instance;");
              sb.AppendLine("        }");
              

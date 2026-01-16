@@ -1,0 +1,11 @@
+module GoldenUnion {
+    @appendable
+    union MyUnion switch(long) {
+        case 1: long valueA;
+        case 2: double valueB;
+    };
+    
+    struct Container {
+        MyUnion u;
+    };
+};

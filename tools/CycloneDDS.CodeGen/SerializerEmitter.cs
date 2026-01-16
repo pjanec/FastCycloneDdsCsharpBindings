@@ -51,22 +51,84 @@ namespace CycloneDDS.CodeGen
             sb.AppendLine("        {");
             sb.AppendLine("            var sizer = new CdrSizer(currentOffset);");
             sb.AppendLine();
-            sb.AppendLine("            // DHEADER (required for @appendable)");
+            
+            // DHEADER (required for @appendable)
+            sb.AppendLine("            // DHEADER");
             sb.AppendLine("            sizer.Align(4);");
             sb.AppendLine("            sizer.WriteUInt32(0);");
             sb.AppendLine();
-            sb.AppendLine("            // Struct body");
-            
-            foreach (var field in type.Fields)
+
+            if (type.HasAttribute("DdsUnion"))
             {
-                string sizerCall = GetSizerCall(field);
-                sb.AppendLine($"            {sizerCall}; // {field.Name}");
+                EmitUnionGetSerializedSizeBody(sb, type);
+            }
+            else
+            {
+                sb.AppendLine("            // Struct body");
+                
+                foreach (var field in type.Fields)
+                {
+                    string sizerCall = GetSizerCall(field);
+                    sb.AppendLine($"            {sizerCall}; // {field.Name}");
+                }
             }
             
             sb.AppendLine();
             sb.AppendLine("            return sizer.GetSizeDelta(currentOffset);");
             sb.AppendLine("        }");
             sb.AppendLine();
+        }
+        
+        private void EmitUnionGetSerializedSizeBody(StringBuilder sb, TypeInfo type)
+        {
+            var discriminator = type.Fields.FirstOrDefault(f => f.HasAttribute("DdsDiscriminator"));
+            if (discriminator == null) throw new Exception($"Union {type.Name} missing [DdsDiscriminator] field");
+
+            // Write Discriminator
+            string discSizer = GetSizerCall(discriminator);
+            sb.AppendLine($"            {discSizer}; // Discriminator {discriminator.Name}");
+            
+            sb.AppendLine($"            switch (({GetDiscriminatorCastType(discriminator.TypeName)})this.{ToPascalCase(discriminator.Name)})");
+            sb.AppendLine("            {");
+
+            foreach (var field in type.Fields)
+            {
+                var caseAttr = field.GetAttribute("DdsCase");
+                if (caseAttr != null)
+                {
+                    foreach (var val in caseAttr.CaseValues)
+                    {
+                        sb.AppendLine($"                case {val}:");
+                    }
+                    sb.AppendLine($"                    {GetSizerCall(field)};");
+                    sb.AppendLine("                    break;");
+                }
+            }
+            
+            var defaultField = type.Fields.FirstOrDefault(f => f.HasAttribute("DdsDefaultCase"));
+            if (defaultField != null)
+            {
+                sb.AppendLine("                default:");
+                sb.AppendLine($"                    {GetSizerCall(defaultField)};");
+                sb.AppendLine("                    break;");
+            }
+            else
+            {
+               // If no default case, and unknown discriminator value, nothing extra is written?
+               // But usually we should at least break.
+               sb.AppendLine("                default:");
+               sb.AppendLine("                    break;");
+            }
+
+            sb.AppendLine("            }");
+        }
+
+        private string GetDiscriminatorCastType(string typeName)
+        {
+             // If enum simplify to int, assuming 32-bit discriminator for now as per instructions (Write int32)
+             // But if it's long, we might need long.
+             // Instructions: "Discriminator: Write int32."
+             return "int";
         }
         
         private void EmitSerialize(StringBuilder sb, TypeInfo type)
@@ -80,12 +142,20 @@ namespace CycloneDDS.CodeGen
             sb.AppendLine();
             sb.AppendLine("            int bodyStart = writer.Position;");
             sb.AppendLine();
-            sb.AppendLine("            // Struct body");
-            
-            foreach (var field in type.Fields)
+
+            if (type.HasAttribute("DdsUnion"))
             {
-                string writerCall = GetWriterCall(field);
-                sb.AppendLine($"            {writerCall}; // {field.Name}");
+                EmitUnionSerializeBody(sb, type);
+            }
+            else
+            {
+                sb.AppendLine("            // Struct body");
+                
+                foreach (var field in type.Fields)
+                {
+                    string writerCall = GetWriterCall(field);
+                    sb.AppendLine($"            {writerCall}; // {field.Name}");
+                }
             }
             
             sb.AppendLine();
@@ -93,6 +163,48 @@ namespace CycloneDDS.CodeGen
             sb.AppendLine("            int bodySize = writer.Position - bodyStart;");
             sb.AppendLine("            writer.PatchUInt32(dheaderPos, (uint)bodySize);");
             sb.AppendLine("        }");
+        }
+
+        private void EmitUnionSerializeBody(StringBuilder sb, TypeInfo type)
+        {
+            var discriminator = type.Fields.FirstOrDefault(f => f.HasAttribute("DdsDiscriminator"));
+            if (discriminator == null) throw new Exception($"Union {type.Name} missing [DdsDiscriminator] field");
+
+            // Write Discriminator
+            string discWriter = GetWriterCall(discriminator);
+            sb.AppendLine($"            {discWriter}; // Discriminator {discriminator.Name}");
+            
+            sb.AppendLine($"            switch (({GetDiscriminatorCastType(discriminator.TypeName)})this.{ToPascalCase(discriminator.Name)})");
+            sb.AppendLine("            {");
+
+            foreach (var field in type.Fields)
+            {
+                var caseAttr = field.GetAttribute("DdsCase");
+                if (caseAttr != null)
+                {
+                    foreach (var val in caseAttr.CaseValues)
+                    {
+                        sb.AppendLine($"                case {val}:");
+                    }
+                    sb.AppendLine($"                    {GetWriterCall(field)};");
+                    sb.AppendLine("                    break;");
+                }
+            }
+            
+            var defaultField = type.Fields.FirstOrDefault(f => f.HasAttribute("DdsDefaultCase"));
+            if (defaultField != null)
+            {
+                sb.AppendLine("                default:");
+                sb.AppendLine($"                    {GetWriterCall(defaultField)};");
+                sb.AppendLine("                    break;");
+            }
+            else
+            {
+                sb.AppendLine("                default:");
+                sb.AppendLine("                    break;");
+            }
+
+            sb.AppendLine("            }");
         }
         
         private string GetSizerCall(FieldInfo field)
