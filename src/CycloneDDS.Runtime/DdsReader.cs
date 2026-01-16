@@ -4,6 +4,8 @@ using System.Runtime.InteropServices;
 using CycloneDDS.Runtime.Interop;
 using CycloneDDS.CodeGen.Runtime;
 
+using CycloneDDS.Runtime.Descriptors;
+
 namespace CycloneDDS.Runtime;
 
 public sealed class DdsReader<TNative> : IDisposable where TNative : unmanaged
@@ -11,6 +13,7 @@ public sealed class DdsReader<TNative> : IDisposable where TNative : unmanaged
     private DdsEntityHandle? _readerHandle;
     private readonly DdsParticipant _participant;
     private readonly TopicMetadata _metadata;
+    private NativeDescriptor? _nativeDescriptor;
     
     public DdsReader(DdsParticipant participant)
     {
@@ -36,16 +39,27 @@ public sealed class DdsReader<TNative> : IDisposable where TNative : unmanaged
         }
         else
         {
+            IntPtr descPtr = IntPtr.Zero;
+            if (_metadata.TopicDescriptor != null)
+            {
+                _nativeDescriptor = new NativeDescriptor(_metadata.TopicDescriptor);
+                descPtr = _nativeDescriptor.Ptr;
+            }
+
             topic = DdsApi.dds_create_topic(
                 participant.Entity,
-                IntPtr.Zero, // descriptor
+                descPtr, // descriptor
                 _metadata.TopicName,
                 IntPtr.Zero, // QoS
                 IntPtr.Zero); // listener
                 
             if (!topic.IsValid)
+            {
+                _nativeDescriptor?.Dispose();
+                _nativeDescriptor = null;
                 throw new DdsException($"Failed to create topic {_metadata.TopicName}", 
                     DdsReturnCode.Error);
+            }
             createdTopic = true;
         }
         
@@ -121,5 +135,7 @@ public sealed class DdsReader<TNative> : IDisposable where TNative : unmanaged
     {
         _readerHandle?.Dispose();
         _readerHandle = null;
+        _nativeDescriptor?.Dispose();
+        _nativeDescriptor = null;
     }
 }

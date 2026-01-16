@@ -52,7 +52,8 @@ public class MetadataRegistryEmitter
             EmitLine($"            ManagedType = typeof({typeName}),");
             EmitLine($"            NativeType = typeof({typeName}Native),");
             EmitLine($"            MarshallerType = typeof({typeName}Marshaller),");
-            EmitLine($"            KeyFieldIndices = {keyIndicesStr}");
+            EmitLine($"            KeyFieldIndices = {keyIndicesStr},");
+            EmitLine($"            TopicDescriptor = {typeName}DescriptorData.Data");
             EmitLine("        }},");
         }
         
