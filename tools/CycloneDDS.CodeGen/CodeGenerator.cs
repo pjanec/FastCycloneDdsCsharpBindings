@@ -6,6 +6,8 @@ namespace CycloneDDS.CodeGen
     public class CodeGenerator
     {
         private readonly SchemaDiscovery _discovery = new SchemaDiscovery();
+        private readonly SchemaValidator _validator = new SchemaValidator();
+        private readonly IdlEmitter _idlEmitter = new IdlEmitter();
         
         public void Generate(string sourceDir, string outputDir)
         {
@@ -21,10 +23,22 @@ namespace CycloneDDS.CodeGen
 
             foreach (var topic in topics)
             {
+                var validationResult = _validator.Validate(topic);
+                if (!validationResult.IsValid)
+                {
+                    Console.Error.WriteLine($"Validation failed for {topic.FullName}:");
+                    foreach (var error in validationResult.Errors)
+                    {
+                        Console.Error.WriteLine($"  - {error}");
+                    }
+                    continue; // Skip invalid topics
+                }
+
                 Console.WriteLine($"  - {topic.FullName}");
-                // Code generation in next batch
-                // For now, let's write a dummy file to prove we can write to output
-                File.WriteAllText(Path.Combine(outputDir, $"{topic.Name}.txt"), $"Discovered {topic.FullName}");
+                
+                var idl = _idlEmitter.EmitIdl(topic);
+                File.WriteAllText(Path.Combine(outputDir, $"{topic.Name}.idl"), idl);
+                Console.WriteLine($"    Generated {topic.Name}.idl");
             }
             
             Console.WriteLine($"Output will go to: {outputDir}");

@@ -29,38 +29,98 @@ namespace CycloneDDS.CodeGen
             var syntaxTrees = files.Select(f => 
                 CSharpSyntaxTree.ParseText(File.ReadAllText(f), path: f)).ToList();
             
-            // 3. Create compilation (not strictly used for simple syntax check but good practice)
+            // 3. Create compilation
+            var references = new List<MetadataReference>
+            {
+                MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
+                MetadataReference.CreateFromFile(typeof(CycloneDDS.Schema.DdsTopicAttribute).Assembly.Location)
+            };
+            
+            // Add System.Runtime for net8.0 if needed, but object might be enough for basic types
+            // If running on .NET Core, we might need more refs.
+            // For now, let's trust the environment or add basic refs.
+            var trustedAssemblies = AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") as string;
+            if (trustedAssemblies != null)
+            {
+                foreach (var path in trustedAssemblies.Split(Path.PathSeparator))
+                {
+                    references.Add(MetadataReference.CreateFromFile(path));
+                }
+            }
+
             var compilation = CSharpCompilation.Create("Discovery")
-                .AddReferences(MetadataReference.CreateFromFile(typeof(object).Assembly.Location))
+                .AddReferences(references)
                 .AddSyntaxTrees(syntaxTrees);
             
             var topics = new List<TypeInfo>();
             
             foreach (var tree in syntaxTrees)
             {
+                var semanticModel = compilation.GetSemanticModel(tree);
                 var root = tree.GetRoot();
-                var typeDecls = root.DescendantNodes().OfType<TypeDeclarationSyntax>();
+                var typeDecls = root.DescendantNodes().OfType<BaseTypeDeclarationSyntax>();
                 
                 foreach (var typeDecl in typeDecls)
                 {
-                    // Check attributes
-                    foreach (var attrList in typeDecl.AttributeLists)
+                    var typeSymbol = semanticModel.GetDeclaredSymbol(typeDecl);
+                    if (typeSymbol == null) continue;
+
+                    bool isTopic = HasAttribute(typeSymbol, "CycloneDDS.Schema.DdsTopicAttribute");
+                    bool isEnum = typeSymbol.TypeKind == TypeKind.Enum;
+
+                    if (isTopic || isEnum)
                     {
-                        foreach (var attr in attrList.Attributes)
+                        var typeInfo = new TypeInfo 
+                        { 
+                            Name = typeSymbol.Name,
+                            Namespace = typeSymbol.ContainingNamespace?.ToDisplayString() ?? string.Empty,
+                            IsEnum = isEnum,
+                            Attributes = ExtractAttributes(typeSymbol)
+                        };
+
+                        if (isEnum)
                         {
-                            var name = attr.Name.ToString();
-                            // Simple name check for now. 
-                            // In a full implementation we would use SemanticModel to resolve the type.
-                            if (name.EndsWith("DdsTopic") || name.EndsWith("DdsTopicAttribute"))
+                            foreach (var member in typeSymbol.GetMembers().OfType<IFieldSymbol>())
                             {
-                                var ns = GetNamespace(typeDecl);
-                                topics.Add(new TypeInfo 
-                                { 
-                                    Name = typeDecl.Identifier.Text,
-                                    Namespace = ns
-                                });
+                                if (member.IsConst && member.HasConstantValue)
+                                {
+                                    typeInfo.EnumMembers.Add(member.Name);
+                                }
                             }
                         }
+                        else
+                        {
+                            // Extract fields and properties
+                            foreach (var member in typeSymbol.GetMembers())
+                            {
+                                if (member is IFieldSymbol fieldSymbol && !fieldSymbol.IsImplicitlyDeclared)
+                                {
+                                    typeInfo.Fields.Add(CreateFieldInfo(fieldSymbol));
+                                }
+                                else if (member is IPropertySymbol propSymbol && !propSymbol.IsImplicitlyDeclared)
+                                {
+                                    typeInfo.Fields.Add(CreateFieldInfo(propSymbol));
+                                }
+                            }
+                        }
+
+                        topics.Add(typeInfo);
+                    }
+                }
+            }
+
+            // Second pass: Resolve nested types
+            // We can do this by matching FullName
+            var topicMap = topics.ToDictionary(t => t.FullName);
+            foreach (var topic in topics)
+            {
+                foreach (var field in topic.Fields)
+                {
+                    // Remove nullable ? for lookup
+                    var lookupName = field.TypeName.TrimEnd('?');
+                    if (topicMap.TryGetValue(lookupName, out var resolvedType))
+                    {
+                        field.Type = resolvedType;
                     }
                 }
             }
@@ -68,22 +128,45 @@ namespace CycloneDDS.CodeGen
             return topics;
         }
 
-        private string GetNamespace(SyntaxNode node)
+        private bool HasAttribute(ISymbol symbol, string attributeFullName)
         {
-            var nsNode = node.Parent;
-            while (nsNode != null && !(nsNode is BaseNamespaceDeclarationSyntax))
-            {
-                nsNode = nsNode.Parent;
-            }
+            return symbol.GetAttributes().Any(a => a.AttributeClass?.ToDisplayString() == attributeFullName);
+        }
 
-            if (nsNode is BaseNamespaceDeclarationSyntax nsDecl)
+        private List<AttributeInfo> ExtractAttributes(ISymbol symbol)
+        {
+            var attributes = new List<AttributeInfo>();
+            foreach (var attr in symbol.GetAttributes())
             {
-                var currentNs = nsDecl.Name.ToString();
-                var parentNs = GetNamespace(nsDecl);
-                return string.IsNullOrEmpty(parentNs) ? currentNs : $"{parentNs}.{currentNs}";
+                var attrInfo = new AttributeInfo
+                {
+                    Name = attr.AttributeClass?.Name ?? "",
+                };
+
+                foreach (var arg in attr.ConstructorArguments)
+                {
+                    attrInfo.Arguments.Add(arg.Value);
+                }
+                attributes.Add(attrInfo);
             }
-            
-            return string.Empty;
+            return attributes;
+        }
+
+        private FieldInfo CreateFieldInfo(ISymbol member)
+        {
+            ITypeSymbol type = member switch
+            {
+                IFieldSymbol f => f.Type,
+                IPropertySymbol p => p.Type,
+                _ => throw new ArgumentException("Member must be field or property")
+            };
+
+            return new FieldInfo
+            {
+                Name = member.Name,
+                TypeName = type.ToDisplayString(),
+                Attributes = ExtractAttributes(member)
+            };
         }
     }
 }

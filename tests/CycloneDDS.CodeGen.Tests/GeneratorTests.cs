@@ -133,7 +133,7 @@ public struct GenTopic { }
             generator.Generate(_tempDir, outputDir);
 
             Assert.True(Directory.Exists(outputDir));
-            Assert.True(File.Exists(Path.Combine(outputDir, "GenTopic.txt")));
+            Assert.True(File.Exists(Path.Combine(outputDir, "GenTopic.idl")));
         }
 
         [Fact]
@@ -149,7 +149,7 @@ public struct MainTopic { }
             var result = Program.Main(new string[] { _tempDir, outputDir });
             
             Assert.Equal(0, result);
-            Assert.True(File.Exists(Path.Combine(outputDir, "MainTopic.txt")));
+            Assert.True(File.Exists(Path.Combine(outputDir, "MainTopic.idl")));
         }
 
         [Fact]
