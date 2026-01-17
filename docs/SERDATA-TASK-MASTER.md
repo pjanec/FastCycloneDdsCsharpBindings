@@ -1453,10 +1453,313 @@ Comprehensive user documentation and example projects.
 
 ---
 
+## STAGE 6: Advanced Optimizations (Performance++)
+
+**Goal:** Extended type support and block copy optimizations for maximum performance  
+**Status:** 🔴 Not Started  
+**Duration:** 16-21 days  
+**Reference:** [ADVANCED-OPTIMIZATIONS-DESIGN.md](ADVANCED-OPTIMIZATIONS-DESIGN.md)
+
+### FCDC-ADV01: Custom Type Support (Guid, DateTime)
+**Status:** 🔴 Not Started  
+**Priority:** Medium  
+**Estimated Effort:** 3-4 days  
+**Dependencies:** FCDC-S002, FCDC-S003, FCDC-S004, FCDC-S007
+
+**Description:**  
+Add built-in serialization support for common .NET types: `Guid` and `DateTime`.
+
+**Implementation:**
+
+1. **CdrWriter Extensions** (`Src/CycloneDDS.Core/CdrWriter.cs`):
+   ```csharp
+   public void WriteGuid(Guid value)        // 16 bytes, align 1
+   public void WriteDateTime(DateTime value) // int64 ticks, align 4
+   ```
+
+2. **CdrSizer Extensions** (`Src/CycloneDDS.Core/CdrSizer.cs`):
+   ```csharp
+   public void WriteGuid(Guid value)        // _cursor += 16
+   public void WriteDateTime(DateTime value) // WriteInt64(0)
+   ```
+
+3. **CdrReader Extensions** (`Src/CycloneDDS.Core/CdrReader.cs`):
+   ```csharp
+   public Guid ReadGuid()
+   public DateTime ReadDateTime()
+   ```
+
+4. **TypeMapper Updates** (`tools/CycloneDDS.CodeGen/TypeMapper.cs`):
+   - Add mappings: `"Guid" => "WriteGuid"`, `"DateTime" => "WriteDateTime"`
+   - Add alignment: Guid=1, DateTime=4
+
+5. **IdlEmitter Updates** (`tools/CycloneDDS.CodeGen/IdlEmitter.cs`):
+   - Map `Guid` → `typedef octet Guid[16];`
+   - Map `DateTime` → `typedef int64 DateTime;`
+
+**Deliverables:**
+- Updated Core library (Writer/Sizer/Reader)
+- Updated CodeGen (TypeMapper, IdlEmitter)
+- Unit tests: `CustomTypesTests.cs` (8+ tests)
+
+**Validation:**
+- Round-trip tests pass for Guid and DateTime
+- Generated IDL compiles with idlc
+- Byte-perfect wire format (verified via Golden Rig if needed)
+
+---
+
+### FCDC-ADV02: System.Numerics Support
+**Status:** 🔴 Not Started  
+**Priority:** Medium  
+**Estimated Effort:** 2-3 days  
+**Dependencies:** FCDC-ADV01
+
+**Description:**  
+Add built-in support for `System.Numerics` math types for robotics/graphics applications.
+
+**Supported Types:**
+- `Vector2` (8 bytes: 2 × float)
+- `Vector3` (12 bytes: 3 × float)
+- `Vector4` (16 bytes: 4 × float)
+- `Quaternion` (16 bytes: 4 × float)
+- `Matrix4x4` (64 bytes: 16 × float)
+
+**Implementation:**
+
+1. **CdrWriter Extensions**:
+   ```csharp
+   public void WriteVector2(System.Numerics.Vector2 value)
+   public void WriteVector3(System.Numerics.Vector3 value)
+   public void WriteVector4(System.Numerics.Vector4 value)
+   public void WriteQuaternion(System.Numerics.Quaternion value)
+   public void WriteMatrix4x4(System.Numerics.Matrix4x4 value)
+   ```
+
+2. **TypeMapper Updates**:
+   - Add all `System.Numerics.*` mappings
+   - All align to 4 (float alignment)
+
+3. **IdlEmitter Updates**:
+   - Emit struct definitions for each type (e.g., `struct Quaternion { float x,y,z,w; }`)
+
+**Deliverables:**
+- Core extensions
+- CodeGen updates
+- Unit tests: `SystemNumericsTests.cs` (6+ tests)
+
+**Validation:**
+- Round-trip tests for all types
+- IDL structs compile correctly
+
+---
+
+### FCDC-ADV03: Array Support (`T[]`)
+**Status:** 🔴 Not Started  
+**Priority:** Medium  
+**Estimated Effort:** 2-3 days  
+**Dependencies:** FCDC-S010, FCDC-S011, FCDC-S012, FCDC-S015
+
+**Description:**  
+Add support for native C# arrays (`T[]`) with `[DdsManaged]` attribute.
+
+**Wire Format:** `sequence<T>` (length header + elements)
+
+**Implementation:**
+
+1. **SerializerEmitter** (`tools/CycloneDDS.CodeGen/SerializerEmitter.cs`):
+   - Add `EmitArrayWriter(FieldInfo field)`
+   - OPTIMIZATION: For primitive arrays, use block copy:
+     ```csharp
+     var byteSpan = MemoryMarshal.AsBytes(new ReadOnlySpan<T>(array));
+     writer.WriteBytes(byteSpan);
+     ```
+
+2. **DeserializerEmitter** (`tools/CycloneDDS.CodeGen/DeserializerEmitter.cs`):
+   - Add `EmitArrayReader(FieldInfo field)`
+   - OPTIMIZATION: For primitives, use block copy:
+     ```csharp
+     var src = reader.ReadFixedBytes(len * elemSize);
+     MemoryMarshal.Cast<byte, T>(src).CopyTo(array);
+     ```
+
+3. **ManagedTypeValidator**:
+   - Enforce `[DdsManaged]` on all array fields
+
+**Deliverables:**
+- Updated emitters
+- Updated validator
+- Unit tests: `ArraySupportTests.cs` (6+ tests: primitive arrays, string arrays, struct arrays)
+
+**Validation:**
+- Round-trip tests for `int[]`, `double[]`, `string[]`, custom struct arrays
+- Block copy optimization verified for primitives
+- Performance test: 10k element array < 1ms
+
+---
+
+### FCDC-ADV04: Dictionary Support (`Dictionary<K,V>`)
+**Status:** 🔴 Not Started  
+**Priority:** Medium  
+**Estimated Effort:** 4-5 days  
+**Dependencies:** FCDC-S010, FCDC-S011, FCDC-S012, FCDC-S015
+
+**Description:**  
+Add support for `Dictionary<K,V>` with `[DdsManaged]` attribute.
+
+**Wire Format:** `sequence<Entry<K,V>>` (NOT DDS `map<K,V>` to avoid sorting overhead)
+
+**Implementation:**
+
+1. **IdlEmitter** (`tools/CycloneDDS.CodeGen/IdlEmitter.cs`):
+   - Pre-scan struct fields for dictionaries
+   - Emit Entry struct for each unique `<K,V>` combination:
+     ```idl
+     struct Entry_String_Int {
+         string key;
+         int32 value;
+     };
+     ```
+   - Track emitted structs to avoid duplicates
+
+2. **SerializerEmitter**:
+   - Add `EmitDictionaryWriter(FieldInfo field)`
+   - Iterate dictionary pairs:
+     ```csharp
+     writer.WriteUInt32((uint)dict.Count);
+     foreach (var kvp in dict) {
+         WriteKey(kvp.Key);
+         WriteValue(kvp.Value);
+     }
+     ```
+
+3. **DeserializerEmitter**:
+   - Add `EmitDictionaryReader(FieldInfo field)`
+   - Read count, loop to read pairs:
+     ```csharp
+     var dict = new Dictionary<K,V>((int)count);
+     for (int i=0; i<count; i++) {
+         var key = ReadKey();
+         var val = ReadValue();
+         dict.Add(key, val);
+     }
+     ```
+
+4. **CdrSizer**:
+   - Add `EmitDictionarySizer(FieldInfo field)`
+   - Iterate if K or V are variable-length
+
+**Helper Methods:**
+- `(string kType, string vType) GetDictTypes(string typeName)` - Parse `Dictionary<K,V>`
+- `string CleanName(string type)` - Convert type to valid IDL identifier (replace dots, remove brackets)
+
+**Deliverables:**
+- Updated IdlEmitter with Entry struct generation
+- Updated SerializerEmitter/DeserializerEmitter/CdrSizer
+- Unit tests: `DictionarySupport Tests.cs` (8+ tests)
+
+**Validation:**
+- Test combinations: `Dictionary<int,string>`, `Dictionary<string,double>`, `Dictionary<Guid,SensorData>`
+- Verify linear O(N) serialization (no sorting)
+- Round-trip correctness
+
+---
+
+### FCDC-ADV05: Block Copy Optimization (`[DdsOptimize]`)
+**Status:** 🔴 Not Started  
+**Priority:** Medium  
+**Estimated Effort:** 5-6 days  
+**Dependencies:** FCDC-ADV02, FCDC-ADV03, FCDC-S015
+
+**Description:**  
+Implement `[DdsOptimize]` attribute for enabling block copy (memcpy) on user-defined blittable structs and external library types.
+
+**Design:** Three-layer priority system:
+1. **Field Attribute** (highest) - Override on specific field
+2. **Internal Whitelist** - Automatic for `System.Numerics.*`
+3. **Type Attribute** - User's own struct definitions
+
+**Implementation:**
+
+1. **Attribute Definition** (`Src/CycloneDDS.Schema/Attributes/TypeLevel/DdsOptimizeAttribute.cs`):
+   ```csharp
+   [AttributeUsage(AttributeTargets.Struct | AttributeTargets.Field | AttributeTargets.Property)]
+   public sealed class DdsOptimizeAttribute : Attribute
+   {
+       public bool BlockCopy { get; set; } = true;
+       public int Alignment { get; set; } = 4;
+   }
+   ```
+
+2. **SerializerEmitter Updates**:
+   - Add `GetOptimizationSettings(FieldInfo field, string elementType)` helper
+   - Add `IsWhitelisted(string typeName, out int alignment)` helper
+   - Update `EmitListWriter`/`EmitArrayWriter` to check optimization settings
+   - For optimized types, use block copy path (same as primitives)
+
+3. **DeserializerEmitter Updates**:
+   - Same helper methods
+   - Update `EmitListReader`/`EmitArrayReader` for block copy
+   - Use `Unsafe.SizeOf<T>()` for user types
+
+4. **CdrSizer Updates**:
+   - Skip iteration for optimized types:
+     ```csharp
+     int totalBytes = list.Count * Unsafe.SizeOf<T>();
+     sizer.Skip(totalBytes);
+     ```
+
+5. **Whitelist**:
+   - Vector2, Vector3, Vector4, Quaternion, Plane, Matrix4x4 (all align 4)
+
+**User Scenarios:**
+
+**A. Whitelisted (zero config):**
+```csharp
+[DdsManaged]
+public List<Vector3> Waypoints;  // Automatically optimized
+```
+
+**B. User struct:**
+```csharp
+[DdsOptimize(BlockCopy=true, Alignment=4)]
+[StructLayout(LayoutKind.Sequential, Pack=1)]
+public struct LidarPoint {
+    public float Distance;
+    public byte Intensity;
+}
+
+[DdsManaged]
+public List<LidarPoint> Points;  // Optimized via type attribute
+```
+
+**C. External type:**
+```csharp
+[DdsManaged]
+[DdsOptimize(BlockCopy=true, Alignment=4)]  // Field-level override
+public List<OpenCV.Point2f> Features;
+```
+
+**Deliverables:**
+- `DdsOptimizeAttribute.cs`
+- Updated emitters (Serializer/Deserializer/Sizer)
+- Whitelist implementation
+- Unit tests: `BlockCopyOptimizationTests.cs` (12+ tests)
+- Documentation: `docs/BLOCK-COPY-GUIDE.md`
+
+**Validation:**
+- Whitelist types automatically optimized
+- User structs with attribute use block copy
+- Field-level override works for external types
+- Performance test: `List<Vector3>` (10k items) < 1ms serialization
+- Safety: Verify blittable requirement enforced
+
+---
+
 ## Summary Statistics
 
-**Total Tasks:** 30  
-**Total Estimated Effort:** 85-110 person-days  
+**Total Tasks:** 35  
+**Total Estimated Effort:** 101-131 person-days  
 
 **By Stage:**
 - Stage 1 (Foundation): 12-16 days (**Blocking**, 5 tasks)
@@ -1464,6 +1767,7 @@ Comprehensive user documentation and example projects.
 - Stage 3 (Runtime): 18-24 days (**Blocking**, 6 tasks)
 - Stage 4 (XCDR2): 10-14 days (4 tasks)
 - Stage 5 (Polish): 15-20 days (4 tasks)
+- Stage 6 (Advanced Optimizations): 16-21 days (5 tasks)
 
 **Critical Path (MVP):** Stages 1-3 = ~50-65 days  
 **Production Readiness:** All Stages = ~85-110 days

@@ -261,6 +261,20 @@
 
 ---
 
+## Stage 6: Advanced Optimizations (Performance++) 🔵
+
+**Goal:** Extended type support and block copy optimizations for maximum performance  
+**Status:** Blocked (awaits Stage 3 completion for practical testing)  
+**Reference:** [ADVANCED-OPTIMIZATIONS-DESIGN.md](../docs/ADVANCED-OPTIMIZATIONS-DESIGN.md)
+
+- [ ] **FCDC-ADV01** Custom Type Support (Guid, DateTime) → [details](../docs/SERDATA-TASK-MASTER.md#fcdc-adv01-custom-type-support-guid-datetime)
+- [ ] **FCDC-ADV02** System.Numerics Support → [details](../docs/SERDATA-TASK-MASTER.md#fcdc-adv02-systemnumerics-support)
+- [ ] **FCDC-ADV03** Array Support (`T[]`) → [details](../docs/SERDATA-TASK-MASTER.md#fcdc-adv03-array-support-t)
+- [ ] **FCDC-ADV04** Dictionary Support → [details](../docs/SERDATA-TASK-MASTER.md#fcdc-adv04-dictionary-support-dictionarykv)
+- [ ] **FCDC-ADV05** Block Copy Optimization (`[DdsOptimize]`) → [details](../docs/SERDATA-TASK-MASTER.md#fcdc-adv05-block-copy-optimization-ddsoptimize)
+
+---
+
 ## Completed Batches Summary
 
 ### ✅ BATCH-01 (Stage 1 Foundation - Part 1)
@@ -456,22 +470,26 @@
 
 ## Progress Statistics
 
-**Total Tasks:** 32  
+**Total Tasks:** 37 (32 original + 5 advanced optimizations)  
 **Completed:** 16 tasks (FCDC-S001 through S016) ✅  
 **In Progress:** 0 tasks  
 **Deferred:** 0 tasks  
-**Remaining:** 16 tasks (Stage 3-5)
+**Remaining:** 21 tasks (Stage 3-6)
 
 **Test Count:** 162 passing tests (57 Core + 10 Schema + 95 CodeGen)  
 **Validation Gates Passed:** 3/3 (Golden Rig ✅, Union Interop ✅, Wire Format ✅)
 
-**Estimated Progress:** ~52% complete  
+**Estimated Progress:** ~45% complete  
 - Stage 1: 100% ✅ (5/5 tasks)
 - Stage 2: 100% ✅ (14/14 tasks - ALL COMPLETE!)
-- Stage 3: 0% ⏳ (Ready to start)
-- Stage 4-5: 0% 🔵
+- Stage 3: 0% ⏳ (Ready to start, 6 tasks)
+- Stage 4: 0% 🔵 (4 tasks)
+- Stage 5: 0% 🔵 (4 tasks)
+- Stage 6: 0% 🔵 (5 tasks - Advanced Optimizations)
 
 **Milestone:** 🎉 **STAGE 2 100% COMPLETE!** - Code generator fully functional with managed types + extensibility!
+
+**Next Priority:** Stage 3 - Runtime Integration (DDS Bindings)
 
 ---
 

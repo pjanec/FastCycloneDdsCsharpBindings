@@ -4144,3 +4144,962 @@ Generate serialization for DDS unions assuming **Appendable** behavior.
 
 This aligns perfectly with your goal: **Highest performance *within* the constraints of XTypes 2 compatibility.** You aren't sacrificing safety for speed; you are choosing the fastest *safe* encoding.
 ---
+
+
+
+how the solution support using custom types like Numeric.Quaternion or Guid or DateTime in the DSL (c# defition of the data structs?)
+---
+You can support custom types like `Guid`, `DateTime`, and `Quaternion` directly in the DSL while maintaining zero-allocation performance and standard DDS interoperability.
+
+There are two strategies to achieve this. I recommend **Strategy A (Built-in Support)** for standard .NET types (`Guid`, `DateTime`, `Quaternion`) and **Strategy B (Wrapper Structs)** for user-domain specific types.
+
+---
+
+### Strategy A: Built-in Support (Recommended for Standard Types)
+
+We will modify the Generator and Core library to "natively" understand these types. This allows the user to simply use them in their struct without extra work.
+
+#### 1. How it looks for the User
+```csharp
+[DdsTopic("RobotPose")]
+public partial struct RobotPose
+{
+    [DdsKey]
+    public Guid RobotId;           // Mapped to octet[16]
+    public System.Numerics.Quaternion Orientation; // Mapped to struct { float x,y,z,w; }
+    public DateTime Timestamp;     // Mapped to int64 (ticks)
+}
+```
+
+#### 2. How to Implement (Step-by-Step)
+
+You need to update 3 components: **Core** (Runtime), **TypeMapper** (CodeGen), and **IdlEmitter** (Discovery).
+
+**Step 2.1: Update `CycloneDDS.Core/CdrWriter.cs`**
+Add extension methods or instance methods to handle the serialization logic efficiently.
+
+```csharp
+// In CdrWriter.cs
+
+// 1. GUID (16 bytes)
+public void WriteGuid(Guid value)
+{
+    Align(1); // Guids are usually octet arrays (align 1)
+    EnsureSize(16);
+    // Note: Guid.TryWriteBytes writes in .NET internal endianness (mixed).
+    // For standard DDS interoperability, you might need to swap bytes 
+    // to big-endian or raw byte order if communicating with non-.NET DDS.
+    // For now, fast native write:
+    value.TryWriteBytes(_span.Slice(_buffered));
+    _buffered += 16;
+}
+
+// 2. DateTime (Int64 Ticks)
+public void WriteDateTime(DateTime value)
+{
+    // Write as simple Ticks (int64)
+    WriteInt64(value.Ticks);
+}
+
+// 3. Quaternion (4 floats)
+public void WriteQuaternion(System.Numerics.Quaternion value)
+{
+    Align(4);
+    WriteFloat(value.X);
+    WriteFloat(value.Y);
+    WriteFloat(value.Z);
+    WriteFloat(value.W);
+}
+```
+
+**Step 2.2: Update `CycloneDDS.Core/CdrSizer.cs`**
+Ensure the sizing logic matches.
+
+```csharp
+public void WriteGuid(Guid value) => _cursor += 16;
+public void WriteDateTime(DateTime value) => WriteInt64(0);
+public void WriteQuaternion(System.Numerics.Quaternion value)
+{
+    Align(4);
+    _cursor += 16; // 4 * 4 bytes
+}
+```
+
+**Step 2.3: Update `CycloneDDS.CodeGen/TypeMapper.cs`**
+Register these types so the `SerializerEmitter` knows which method to call.
+
+```csharp
+public static string GetWriterMethod(string typeName)
+{
+    return typeName switch
+    {
+        // ... existing primitives ...
+        "Guid" or "System.Guid" => "WriteGuid",
+        "DateTime" or "System.DateTime" => "WriteDateTime",
+        "Quaternion" or "System.Numerics.Quaternion" => "WriteQuaternion",
+        _ => null
+    };
+}
+
+public static int GetAlignment(string typeName)
+{
+    if (typeName == "Guid" || typeName == "System.Guid") return 1;
+    if (typeName.Contains("Quaternion")) return 4;
+    return 4; // Default
+}
+```
+
+**Step 2.4: Update `CycloneDDS.CodeGen/IdlEmitter.cs`**
+Ensure the generated IDL (for discovery) matches the wire format.
+
+```csharp
+private (string Type, string Suffix) MapType(FieldInfo field)
+{
+    // ...
+    if (typeName == "Guid" || typeName == "System.Guid") return ("octet", "[16]");
+    if (typeName == "DateTime" || typeName == "System.DateTime") return ("int64", ""); // Ticks
+    if (typeName.Contains("Quaternion")) return ("Quaternion", ""); // Needs a typedef or struct definition!
+}
+```
+*Note: For Quaternion, you must also define the struct in the IDL or emit a `typedef`.*
+
+---
+
+### Strategy B: Wrapper Structs (For Domain Types)
+
+If you have complex custom types (e.g., `GeoPoint`) or want explicit control over the wire format (e.g., `DdsTime` vs `DateTime`), use the **Wrapper Pattern**.
+
+#### 1. Define the Wrapper in `CycloneDDS.Core`
+Create a struct that implements `IDdsSerializable`.
+
+```csharp
+[StructLayout(LayoutKind.Explicit, Size = 16)]
+public struct DdsTime : IDdsSerializable
+{
+    [FieldOffset(0)] public int Sec;
+    [FieldOffset(4)] public uint NanoSec;
+
+    // Implicit conversion for user convenience
+    public static implicit operator DdsTime(DateTime dt)
+    {
+        long unixTime = ((DateTimeOffset)dt).ToUnixTimeSeconds();
+        long nanos = (dt.Ticks % 10000000) * 100;
+        return new DdsTime { Sec = (int)unixTime, NanoSec = (uint)nanos };
+    }
+
+    public static implicit operator DateTime(DdsTime dt) { /* inverse */ }
+
+    // Implement Interface
+    public int GetSerializedSize(int offset) => 8;
+    public void Serialize(ref CdrWriter writer)
+    {
+        writer.WriteInt32(Sec);
+        writer.WriteUInt32(NanoSec);
+    }
+}
+```
+
+#### 2. User Usage
+The user uses the wrapper type in their definition.
+
+```csharp
+[DdsTopic("LogEntry")]
+public partial struct LogEntry
+{
+    // User assigns DateTime, C# compiler handles the implicit cast to DdsTime
+    public DdsTime Timestamp; 
+}
+```
+
+#### 3. Generator Logic
+The generator treats `DdsTime` as just another nested struct (because it implements `IDdsSerializable` or is a struct). No special mapping logic is needed in the generator!
+
+### Recommendation
+
+1.  **Use Strategy A (Native Support)** for `Guid` and `DateTime` because they are so ubiquitous. It significantly improves the Developer Experience (DX).
+2.  **Use Strategy B (Wrappers)** for `Quaternion` or generic Math types if you don't want to hard-dependency on `System.Numerics` in your Core library, OR implement Strategy A if you are fine with the dependency.
+
+**To implement Strategy A now:**
+Add the `Write/Read` methods to your `CdrWriter`/`Reader` and update `TypeMapper.cs`. The generator will pick them up automatically via the `GetWriterMethod` switch statement.
+---
+built-in support for those types look good. I would also like to support arrays and dictionaries. and serialize disctionaries as a sequence of Key-Value structures to avoid using idl's map<> which requires the items to be sorted (and that would break the performance).
+---
+This is a sound architectural decision. Mapping `Dictionary<K,V>` to DDS `map<K,V>` is indeed a performance trap because DDS requires the wire format to be sorted by Key, forcing an $O(N \log N)$ operation on every write.
+
+By mapping it to a `sequence<Entry<K,V>>`, you get $O(N)$ serialization (linear iteration), which is much faster for .NET `Dictionary` (which is hash-based and unsorted).
+
+Here is the implementation plan for **Arrays** (`T[]`) and **Dictionaries** (`Dictionary<K,V>`) within your existing framework.
+
+### 1. User Experience
+
+Both require the `[DdsManaged]` attribute because they allocate on the heap.
+
+```csharp
+[DdsTopic("ConfigData")]
+public partial struct ConfigData
+{
+    // 1. Arrays (Native T[])
+    // Fast Path: treated like Sequence, but using native array memory
+    [DdsManaged]
+    public double[] CalibrationMatrix; 
+
+    // 2. Dictionaries
+    // Serialize as: sequence<struct { string key; string value; }>
+    [DdsManaged]
+    public Dictionary<string, string> Properties;
+}
+```
+
+---
+
+### 2. Implementation: Support for `T[]` (Arrays)
+
+This is effectively identical to `List<T>`, but slightly faster because we don't need `CollectionsMarshal` to access the span—arrays *are* memory.
+
+#### A. Update `SerializerEmitter.cs` (EmitArrayWriter)
+
+Refactor your `EmitListWriter` logic to be generic, or add a specific `EmitArrayWriter`.
+
+```csharp
+private string EmitArrayWriter(FieldInfo field)
+{
+    // T[] -> T
+    string elementType = field.TypeName.Substring(0, field.TypeName.Length - 2); 
+    string fieldAccess = $"this.{ToPascalCase(field.Name)}";
+
+    // OPTIMIZATION: Block Copy for Primitives
+    if (IsPrimitive(elementType))
+    {
+        return $@"writer.Align(4);
+            // Array Length
+            writer.WriteUInt32((uint)({fieldAccess}?.Length ?? 0));
+            if ({fieldAccess} != null && {fieldAccess}.Length > 0)
+            {{
+                writer.Align({GetAlignment(elementType)});
+                // Arrays cast directly to Span
+                var byteSpan = System.Runtime.InteropServices.MemoryMarshal.AsBytes(new ReadOnlySpan<{elementType}>({fieldAccess}));
+                writer.WriteBytes(byteSpan);
+            }}";
+    }
+
+    // Slow Path (Strings/Structs)
+    // Reuse the loop logic from List/Sequence
+    return EmitLoopWriter(fieldAccess, elementType, isArray: true);
+}
+```
+
+#### B. Update `DeserializerEmitter.cs` (EmitArrayReader)
+
+```csharp
+private string EmitArrayReader(FieldInfo field)
+{
+    string elementType = field.TypeName.Substring(0, field.TypeName.Length - 2);
+    
+    if (IsPrimitive(elementType))
+    {
+        int elemSize = GetSize(elementType);
+        return $@"reader.Align(4);
+            uint len = reader.ReadUInt32();
+            view.{field.Name} = new {elementType}[len];
+            if (len > 0) {{
+                reader.Align({GetAlignment(elementType)});
+                var src = reader.ReadFixedBytes((int)len * {elemSize});
+                System.Runtime.InteropServices.MemoryMarshal.Cast<byte, {elementType}>(src).CopyTo(view.{field.Name});
+            }}";
+    }
+    
+    // Loop for managed types
+    return $@"reader.Align(4);
+            uint len = reader.ReadUInt32();
+            view.{field.Name} = new {elementType}[len];
+            for(int i=0; i<len; i++) view.{field.Name}[i] = {GetReadCallForElement(elementType)};";
+}
+```
+
+---
+
+### 3. Implementation: Support for `Dictionary<K,V>`
+
+This requires "flattening" the dictionary into a list of pairs.
+
+#### A. Wire Format & IDL Strategy
+
+Since IDL doesn't support generic structs inline, your `IdlEmitter` needs to generate a specific Key-Value struct for every unique dictionary type used.
+
+**IDL Output:**
+```idl
+struct Entry_String_String {
+    string key;
+    string value;
+};
+
+struct ConfigData {
+    sequence<Entry_String_String> Properties;
+};
+```
+
+**Update `IdlEmitter.cs`:**
+```csharp
+private void EmitStruct(StringBuilder sb, TypeInfo type)
+{
+    // 1. Pre-scan for Dictionaries to emit Entry structs FIRST
+    foreach(var field in type.Fields) 
+    {
+        if (field.TypeName.StartsWith("Dictionary<")) 
+        {
+            EmitDictionaryEntryStruct(sb, field);
+        }
+    }
+    
+    // 2. Emit main struct
+    sb.AppendLine($"struct {type.Name} {{");
+    // ...
+}
+
+private void EmitDictionaryEntryStruct(StringBuilder sb, FieldInfo field)
+{
+    var (kType, vType) = GetDictTypes(field.TypeName);
+    string structName = $"Entry_{CleanName(kType)}_{CleanName(vType)}";
+    
+    // Avoid duplicates if multiple fields use same dict type
+    if (_emittedStructs.Contains(structName)) return;
+    _emittedStructs.Add(structName);
+
+    sb.AppendLine("@appendable");
+    sb.AppendLine($"struct {structName} {{");
+    sb.AppendLine($"    {MapIdlType(kType)} key;");
+    sb.AppendLine($"    {MapIdlType(vType)} value;");
+    sb.AppendLine("};");
+}
+```
+
+#### B. Update `SerializerEmitter.cs` (EmitDictionaryWriter)
+
+This logic iterates the dictionary and writes K, then V.
+
+```csharp
+private string EmitDictionaryWriter(FieldInfo field)
+{
+    var (kType, vType) = GetDictTypes(field.TypeName);
+    string fieldAccess = $"this.{ToPascalCase(field.Name)}";
+
+    // Reusable writer logic for single elements
+    // We need to refactor GetWriterCall to accept a variable name, 
+    // e.g., "kvp.Key" instead of "this.Field"
+    string kWriter = GenerateWriteStatement(kType, "kvp.Key");
+    string vWriter = GenerateWriteStatement(vType, "kvp.Value");
+
+    return $@"writer.Align(4);
+        // Write Count
+        writer.WriteUInt32((uint)({fieldAccess}?.Count ?? 0));
+        
+        if ({fieldAccess} != null)
+        {{
+            foreach (var kvp in {fieldAccess})
+            {{
+                {kWriter};
+                {vWriter};
+            }}
+        }}";
+}
+```
+
+#### C. Update `DeserializerEmitter.cs` (EmitDictionaryReader)
+
+```csharp
+private string EmitDictionaryReader(FieldInfo field)
+{
+    var (kType, vType) = GetDictTypes(field.TypeName);
+    
+    return $@"reader.Align(4);
+        uint len = reader.ReadUInt32();
+        view.{field.Name} = new Dictionary<{kType}, {vType}>((int)len);
+        
+        for(int i=0; i<len; i++)
+        {{
+            var key = {GetReadCallForType(kType)};
+            var val = {GetReadCallForType(vType)};
+            view.{field.Name}.Add(key, val);
+        }}";
+}
+```
+
+#### D. Sizing (EmitDictionarySizer)
+
+For `GetSerializedSize`, you must iterate the dictionary if the Key or Value are variable-length (strings).
+
+```csharp
+private string EmitDictionarySizer(FieldInfo field)
+{
+    var (kType, vType) = GetDictTypes(field.TypeName);
+    
+    // If K and V are fixed size, we can calculate count * fixed_size
+    if (IsFixedSize(kType) && IsFixedSize(vType))
+    {
+        int entrySize = GetFixedSize(kType) + GetFixedSize(vType); 
+        // Be careful with alignment here! 
+        // If K is int (4) and V is double (8), we might need padding between them.
+        // It's safer to iterate or use a math formula if alignment is simple.
+    }
+
+    // General Case: Iterate
+    return $@"sizer.Align(4); sizer.WriteUInt32(0); // Count
+        if (this.{field.Name} != null) {{
+            foreach(var kvp in this.{field.Name}) {{
+                {GenerateSizerStatement(kType, "kvp.Key")};
+                {GenerateSizerStatement(vType, "kvp.Value")};
+            }}
+        }}";
+}
+```
+
+---
+
+### 4. Refactoring `GetWriterCall`
+
+To support this cleanly, your emitter needs a slight refactor. Currently, `GetWriterCall` likely assumes it is writing `this.Property`.
+
+Change it to:
+`string GetWriterCall(string typeName, string variableName)`
+
+*   **Old:** `GetWriterCall(field)` -> returns `writer.WriteInt(this.MyField)`
+*   **New:** `GetWriterCall(field.TypeName, $"this.{field.Name}")`
+
+This allows you to reuse the logic for the dictionary loop:
+`GetWriterCall(kType, "kvp.Key")` -> returns `writer.WriteInt(kvp.Key)`
+
+### Summary
+
+1.  **Arrays (`T[]`):** Implement exactly like `List<T>` but use `MemoryMarshal.AsBytes(span)` directly. Fastest possible serialization.
+2.  **Dictionaries:** Flatten to `sequence<Entry>`.
+    *   **IDL:** Emit `struct Entry { K key; V value; }`.
+    *   **C#:** Iterate and write K, then V.
+    *   **Perf:** $O(N)$ (linear), avoiding sorting costs.
+
+This enables full C# collection support while staying XCDR2 compliant and performant.
+---
+does the block copy optimization for lists/arrays work out of the box also for custom blittable structs like Vector3?
+---
+**No, it does not work out of the box** with the current code, because the `IsPrimitive` check I provided earlier returns `false` for structs like `Vector3`.
+
+As a result, a `List<Vector3>` would currently fall back to the slow loop (`foreach`), calling `WriteFloat` 3 times per item.
+
+To enable the "Blazing Fast" block copy for `System.Numerics` types (and potentially your own simple structs), you need to slightly expand the logic in `SerializerEmitter` and `DeserializerEmitter`.
+
+### Why it's safe for `Vector3`
+`Vector3` is a struct of `{ float x; float y; float z; }`.
+1.  **Memory Layout:** It occupies exactly 12 bytes.
+2.  **Alignment:** 4 bytes.
+3.  **Array Packing:** `Vector3[]` packs these 12-byte chunks continuously.
+4.  **Wire Format:** XCDR2 expects `[x][y][z][x][y][z]`.
+
+Because C# arrays match the XCDR2 wire format for these types, we can `memcpy` them.
+
+### How to Implement (The "Block Copy Whitelist")
+
+Modify `SerializerEmitter.cs` and `DeserializerEmitter.cs` to use a helper method instead of checking `IsPrimitive` directly.
+
+#### 1. Add `IsBlockCopySafe` Helper
+Add this method to **both** emitters (or a shared utility):
+
+```csharp
+private bool IsBlockCopySafe(string typeName)
+{
+    // 1. Standard Primitives
+    if (IsPrimitive(typeName)) return true;
+
+    // 2. Safe System.Numerics Types (Blittable, no padding issues)
+    // Note: Do NOT include Guid here (endianness issues) or Boolean (implementation specific)
+    return typeName switch
+    {
+        "System.Numerics.Vector2" or "Vector2" => true,
+        "System.Numerics.Vector3" or "Vector3" => true,
+        "System.Numerics.Vector4" or "Vector4" => true,
+        "System.Numerics.Quaternion" or "Quaternion" => true,
+        "System.Numerics.Matrix4x4" or "Matrix4x4" => true,
+        _ => false
+    };
+}
+```
+
+#### 2. Update `EmitListWriter` / `EmitArrayWriter`
+In `SerializerEmitter.cs`, replace `if (IsPrimitive(elementType))` with the new check:
+
+```csharp
+// Inside EmitListWriter or EmitArrayWriter
+if (IsBlockCopySafe(elementType))
+{
+    // ... generate the fast path block copy code ...
+    // Note: If using Vector3, GetAlignment("Vector3") must return 4. 
+    // Ensure GetAlignment() handles these types correctly!
+}
+```
+
+#### 3. Update `GetAlignment`
+You must ensure `GetAlignment` knows about these types, otherwise the `writer.Align(X)` call will be wrong (defaulting to 1).
+
+```csharp
+private int GetAlignment(string typeName)
+{
+    // ... existing checks ...
+    
+    // Check Numerics
+    if (typeName.Contains("Vector2") || typeName.Contains("Vector3") || 
+        typeName.Contains("Vector4") || typeName.Contains("Quaternion") ||
+        typeName.Contains("Matrix4x4"))
+    {
+        return 4; // Floats are 4-byte aligned
+    }
+
+    return 4; // Default safe fallback
+}
+```
+
+#### 4. Update `GetSize` (For Deserializer)
+In `DeserializerEmitter.cs`, the fast reader calculates `len * elemSize`. You need to know the size of `Vector3`.
+
+```csharp
+private int GetSize(string typeName)
+{
+    // ... existing ...
+    return typeName switch {
+        "Vector2" or "System.Numerics.Vector2" => 8,
+        "Vector3" or "System.Numerics.Vector3" => 12,
+        "Vector4" or "System.Numerics.Vector4" => 16,
+        "Quaternion" or "System.Numerics.Quaternion" => 16,
+        "Matrix4x4" or "System.Numerics.Matrix4x4" => 64,
+        _ => 1 // Fallback
+    };
+}
+```
+
+### What about User-Defined Structs?
+
+If you have:
+```csharp
+public struct MyPoint { public float X; public float Y; }
+```
+
+The generator currently doesn't know if `MyPoint` is safe to block-copy (it requires analyzing the fields of `MyPoint` to ensure no reference types exist).
+
+**Recommendation for Stage 2:**
+Stick to the **Whitelist** approach above for `System.Numerics`. It covers 90% of high-perf math cases. For user structs, let them fall back to the loop (which calls `Serialize` per item).
+
+If you absolutely need block-copy for custom structs later, add an attribute like `[DdsOptimize(BlockCopy=true)]` to force the generator to take the fast path, putting the responsibility on the user to ensure the struct is blittable.
+---
+the \[DdsOptimize\(BlockCopy=true\)\] is a great idea, pls be more detailed about it
+---
+This is a **power-user feature**. It allows you to bypass the safety checks of the generator and tell it: *"I promise the memory layout of this struct in C# matches exactly the wire format of XCDR2. Just copy the bytes."*
+
+This turns serialization of complex lists (e.g., `List<MyTelemetryPoint>`) from $O(N)$ function calls into a single `memcpy`.
+
+Here is the detailed design and implementation plan.
+
+---
+
+### 1. Define the Attribute
+
+Add this to `CycloneDDS.Schema`. We include an `Alignment` property because the generator cannot easily guess the alignment requirement of an opaque user struct (though it is usually 4 or 8).
+
+**File:** `src/CycloneDDS.Schema/Attributes/TypeLevel/DdsOptimizeAttribute.cs`
+
+```csharp
+using System;
+
+namespace CycloneDDS.Schema
+{
+    [AttributeUsage(AttributeTargets.Struct, Inherited = false)]
+    public sealed class DdsOptimizeAttribute : Attribute
+    {
+        /// <summary>
+        /// If true, lists and arrays of this struct will be serialized using 
+        /// raw block copy (memcpy) instead of iterating elements.
+        /// <para>
+        /// <b>WARNING:</b> You must ensure the C# struct layout matches XCDR2 exactly.
+        /// Usually requires [StructLayout(LayoutKind.Sequential, Pack = 1)].
+        /// Endianness must match the system (Little Endian).
+        /// </para>
+        /// </summary>
+        public bool BlockCopy { get; set; } = false;
+
+        /// <summary>
+        /// Required alignment for the block. Defaults to 4.
+        /// If your struct contains a double/long, set this to 8.
+        /// </summary>
+        public int Alignment { get; set; } = 4;
+    }
+}
+```
+
+---
+
+### 2. Update Generator Logic (`SerializerEmitter.cs`)
+
+You need to update `EmitListWriter` and `EmitArrayWriter`. Currently, they look up the element type string (e.g., "MyPoint"). You need to verify if that type has the attribute.
+
+**Challenge:** The emitter receives `FieldInfo`. It knows the type name ("MyPoint"), but it needs the `TypeInfo` of `MyPoint` to check its attributes.
+**Solution:** Pass the list of all discovered `TypeInfo` objects (the `topics` list from `CodeGenerator.cs`) to the Emitter so it can perform lookups.
+
+#### Modified `EmitListWriter` Logic:
+
+```csharp
+private string EmitListWriter(FieldInfo field)
+{
+    string elementType = ExtractGenericType(field.TypeName);
+    string fieldAccess = $"this.{ToPascalCase(field.Name)}";
+    
+    // 1. Check for optimization attribute
+    // helper method to find TypeInfo by name
+    var typeDef = _knownTypes.FirstOrDefault(t => t.Name == elementType);
+    
+    var optimizeAttr = typeDef?.GetAttribute("DdsOptimize");
+    bool blockCopy = false;
+    int align = 4;
+    
+    if (optimizeAttr != null)
+    {
+        // simplistic parsing of arguments, or if you use the property setter syntax in your parser:
+        // assuming your parser extracts named arguments into the attribute info
+        // implementation detail depends on your parser logic
+        blockCopy = GetBoolArg(optimizeAttr, "BlockCopy", false);
+        align = GetIntArg(optimizeAttr, "Alignment", 4);
+    }
+
+    // 2. Fast Path (Primitive OR Optimized Struct)
+    if (IsPrimitive(elementType) || blockCopy)
+    {
+        // For custom structs, we need to know the alignment. 
+        // If primitive, use GetAlignment(). If custom, use attribute value.
+        int finalAlign = IsPrimitive(elementType) ? GetAlignment(elementType) : align;
+
+        return $@"writer.Align(4); 
+            writer.WriteUInt32((uint){fieldAccess}.Count);
+            if ({fieldAccess}.Count > 0)
+            {{
+                writer.Align({finalAlign});
+                var span = System.Runtime.InteropServices.CollectionsMarshal.AsSpan({fieldAccess});
+                var byteSpan = System.Runtime.InteropServices.MemoryMarshal.AsBytes(span);
+                writer.WriteBytes(byteSpan);
+            }}";
+    }
+
+    // ... Standard loop logic ...
+}
+```
+
+---
+
+### 3. Update Generator Logic (`DeserializerEmitter.cs`)
+
+Similarly, update `EmitListReader` to perform the bulk read.
+
+```csharp
+private string EmitListReader(FieldInfo field)
+{
+    string elementType = ExtractGenericType(field.TypeName);
+    // ... Lookup DdsOptimize attribute as above ...
+    
+    if (IsPrimitive(elementType) || blockCopy)
+    {
+        int finalAlign = IsPrimitive(elementType) ? GetAlignment(elementType) : align;
+        
+        // For size calculation:
+        // If primitive, we use hardcoded sizes.
+        // For custom structs, we can use Unsafe.SizeOf<T>() in the generated code.
+        string sizeCalc = IsPrimitive(elementType) 
+            ? GetSize(elementType).ToString() 
+            : $"System.Runtime.CompilerServices.Unsafe.SizeOf<{elementType}>()";
+
+        return $@"reader.Align(4);
+            uint len = reader.ReadUInt32();
+            view.{field.Name} = new List<{elementType}>((int)len);
+            
+            if (len > 0) {{
+                // 1. Force Count
+                System.Runtime.InteropServices.CollectionsMarshal.SetCount(view.{field.Name}, (int)len);
+                // 2. Get Target Span
+                var targetSpan = System.Runtime.InteropServices.CollectionsMarshal.AsSpan(view.{field.Name});
+                // 3. Align Reader
+                reader.Align({finalAlign});
+                // 4. Read Bytes
+                int totalBytes = (int)len * {sizeCalc};
+                var srcBytes = reader.ReadFixedBytes(totalBytes);
+                // 5. Cast and Copy
+                System.Runtime.InteropServices.MemoryMarshal.Cast<byte, {elementType}>(srcBytes).CopyTo(targetSpan);
+            }}";
+    }
+    
+    // ... Standard loop logic ...
+}
+```
+
+---
+
+### 4. Updating `GetSerializedSize` logic
+
+Don't forget the sizing pass! Iterating 10,000 items just to sum up `sizeof(T)` 10,000 times is slow.
+
+```csharp
+// Inside SerializerEmitter.EmitListSizer
+if (blockCopy)
+{
+    // Skip iterating!
+    // Just align and jump.
+    return $@"sizer.Align(4); 
+              sizer.WriteUInt32(0); // Count header
+              if ({fieldAccess}.Count > 0) {{
+                  sizer.Align({align});
+                  int totalBytes = {fieldAccess}.Count * System.Runtime.CompilerServices.Unsafe.SizeOf<{elementType}>();
+                  sizer.Skip(totalBytes);
+              }}";
+}
+```
+
+---
+
+### 5. User Usage Example
+
+The user must now be careful with their struct definition.
+
+```csharp
+using System.Runtime.InteropServices;
+using CycloneDDS.Schema;
+
+// 1. Define the struct
+// Pack=1 is usually safer for XCDR2 if the struct matches the wire exactly.
+// Or Pack=4/8 if XCDR2 expects padding.
+// For simple floats/ints, Sequential is fine.
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
+[DdsOptimize(BlockCopy = true, Alignment = 4)] 
+public struct Point3D
+{
+    public float X;
+    public float Y;
+    public float Z;
+}
+
+// 2. Use it in a list
+[DdsTopic("PointCloud")]
+public partial struct PointCloud
+{
+    [DdsManaged]
+    public List<Point3D> Points; 
+}
+```
+
+**Result:**
+The generator sees `List<Point3D>`, finds `Point3D` has `BlockCopy=true`, and emits a `memcpy` instead of a loop.
+
+### 6. Safety Warnings (To document)
+
+When using this, the user guarantees:
+1.  **No References:** The struct must contain *only* unmanaged types (int, float, fixed buffers). No strings, no classes.
+2.  **Layout Match:** The C# struct padding matches the XCDR2 stream padding.
+3.  **Endianness:** The machine running the code has the same endianness as the DDS network (usually Little Endian).
+
+This is the ultimate performance unlock for heavy data like Point Clouds, LIDAR, or spectral data.
+---
+does this work together with the white-listed types? i can't put my attribute to types that i do not own/maintains (like system defined types)
+---
+You are exactly right—you cannot add `[DdsOptimize]` to `System.Numerics.Vector3` because you don't own the source code for .NET.
+
+To solve this, we need a **Three-Layer Strategy**. This ensures everything works seamlessly:
+
+1.  **Internal Whitelist:** (Zero config for System types like `Vector3`)
+2.  **Type-Level Attribute:** (For your own custom structs)
+3.  **Field-Level Attribute:** (The "Override" for external types you don't own but want to optimize)
+
+Here is how to implement all three so they work together perfectly.
+
+---
+
+### 1. Update the Attribute Definition
+
+Modify `DdsOptimizeAttribute` so it can be placed on **Fields** and **Properties** too, not just Structs.
+
+```csharp
+// Src/CycloneDDS.Schema/Attributes/TypeLevel/DdsOptimizeAttribute.cs
+
+using System;
+
+namespace CycloneDDS.Schema
+{
+    // Added Field and Property targets
+    [AttributeUsage(AttributeTargets.Struct | AttributeTargets.Field | AttributeTargets.Property, Inherited = false)]
+    public sealed class DdsOptimizeAttribute : Attribute
+    {
+        public bool BlockCopy { get; set; } = true;
+        public int Alignment { get; set; } = 4;
+    }
+}
+```
+
+---
+
+### 2. The Logic Chain (Generator)
+
+Update your `SerializerEmitter` and `DeserializerEmitter` to check for optimization configuration in this specific order:
+
+1.  **Check Field Attribute:** Did the user force it on the `List<>` field?
+2.  **Check Internal Whitelist:** Is it a known System type (`Vector3`)?
+3.  **Check Type Attribute:** Does the custom struct definition have the attribute?
+
+#### Updated Generator Logic
+
+```csharp
+// Helper in SerializerEmitter.cs AND DeserializerEmitter.cs
+
+private (bool IsBlockCopy, int Alignment) GetOptimizationSettings(FieldInfo listField, string elementTypeName)
+{
+    // 1. Check Field Attribute (Highest Priority - "I know what I am doing")
+    // usage: [DdsManaged, DdsOptimize(BlockCopy=true, Alignment=16)] public List<ExternalType> Data;
+    var fieldAttr = listField.GetAttribute("DdsOptimize");
+    if (fieldAttr != null)
+    {
+        // Parse arguments from the attribute info
+        bool blockCopy = GetBoolArg(fieldAttr, "BlockCopy", true);
+        int align = GetIntArg(fieldAttr, "Alignment", 4);
+        return (blockCopy, align);
+    }
+
+    // 2. Check Internal Whitelist (System types)
+    if (IsWhitelisted(elementTypeName, out int whitelistAlign))
+    {
+        return (true, whitelistAlign);
+    }
+
+    // 3. Check Type Attribute (User's own structs)
+    // Find TypeInfo for 'elementTypeName' in discovered topics/types
+    var typeDef = _knownTypes.FirstOrDefault(t => t.Name == elementTypeName || t.FullName == elementTypeName);
+    var typeAttr = typeDef?.GetAttribute("DdsOptimize");
+    
+    if (typeAttr != null)
+    {
+        bool blockCopy = GetBoolArg(typeAttr, "BlockCopy", true);
+        int align = GetIntArg(typeAttr, "Alignment", 4);
+        return (blockCopy, align);
+    }
+
+    // 4. Default: No optimization, standard loop
+    return (false, 4);
+}
+
+private bool IsWhitelisted(string typeName, out int alignment)
+{
+    // Handle fully qualified and simple names
+    var cleanName = typeName.Split('.').Last();
+
+    switch (cleanName)
+    {
+        case "Vector2":
+        case "Vector3":
+        case "Vector4":
+        case "Quaternion":
+        case "Plane":
+        case "Matrix4x4":
+            alignment = 4; // Floats are 4-byte aligned
+            return true;
+        
+        // Add others as needed, e.g. System.Drawing.Point?
+        // case "Point": alignment = 4; return true; 
+
+        default:
+            alignment = 4;
+            return false;
+    }
+}
+```
+
+---
+
+### 3. User Scenarios
+
+With this setup, you cover all bases.
+
+#### Scenario A: Whitelisted Types (No Config Needed)
+You just use `Vector3`. The generator sees it in the whitelist and uses `memcpy`.
+
+```csharp
+[DdsTopic("RobotPath")]
+public partial struct RobotPath
+{
+    [DdsManaged]
+    public List<System.Numerics.Vector3> Waypoints; // <--- Automatically Optimized!
+}
+```
+
+#### Scenario B: Your Own Custom Structs
+You own the code, so you decorate the struct.
+
+```csharp
+[DdsOptimize(BlockCopy=true)] // <--- Optimization defined here
+[StructLayout(LayoutKind.Sequential, Pack=1)]
+public struct LidarPoint
+{
+    public float Distance;
+    public byte Intensity;
+}
+
+[DdsTopic("Scan")]
+public partial struct Scan
+{
+    [DdsManaged]
+    public List<LidarPoint> Points; // <--- Automatically Optimized
+}
+```
+
+#### Scenario C: External/Third-Party Structs
+You use a library (`OpenCV.Point2f`) that you cannot edit. You force the optimization on the field usage.
+
+```csharp
+[DdsTopic("Vision")]
+public partial struct VisionData
+{
+    [DdsManaged]
+    [DdsOptimize(BlockCopy=true, Alignment=4)] // <--- Forces optimization for this field
+    public List<OpenCV.Point2f> Features; 
+}
+```
+
+---
+
+### 4. Implementation Details for Whitelisted Types
+
+Since `Vector3` properties are floats, the **Alignment** is `4`.
+Since `Vector3` size is 12 bytes, it packs perfectly in arrays.
+
+In `DeserializerEmitter`, when generating the `memcpy` code, you need to know the **Size** of the element to read the correct number of bytes.
+
+**Update `GetSize` logic:**
+
+```csharp
+private string GetSizeExpression(string typeName)
+{
+    // 1. Primitive?
+    if (IsPrimitive(typeName)) return GetSize(typeName).ToString();
+
+    // 2. Unsafe.SizeOf works for EVERYTHING (Structs, Vectors, etc.)
+    // This is the safest way to generate code for types we don't fully inspect
+    return $"System.Runtime.CompilerServices.Unsafe.SizeOf<{typeName}>()";
+}
+```
+
+**Generated Code Example:**
+
+```csharp
+// Generated code for List<Vector3>
+int itemSize = System.Runtime.CompilerServices.Unsafe.SizeOf<System.Numerics.Vector3>(); // 12
+int totalBytes = count * itemSize;
+var bytes = reader.ReadFixedBytes(totalBytes);
+// Cast and Copy...
+```
+
+### Summary
+
+Yes, it works together. By adding the **Whitelist** check in the middle of the priority chain, you get:
+1.  **Automatic speed** for `Vector3`.
+2.  **Explicit speed** for `MyStruct`.
+3.  **Forced speed** for `ThirdPartyStruct`.
+
+This gives you maximum flexibility for your high-performance production environment.
+---
