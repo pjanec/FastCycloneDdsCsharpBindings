@@ -22,6 +22,13 @@ namespace CycloneDDS.Core
 
         public int Position => _totalWritten + _buffered;
 
+        public void WriteBytes(ReadOnlySpan<byte> data)
+        {
+            EnsureSize(data.Length);
+            data.CopyTo(_span.Slice(_buffered));
+            _buffered += data.Length;
+        }
+
         public void Align(int alignment)
         {
             int currentPos = Position;

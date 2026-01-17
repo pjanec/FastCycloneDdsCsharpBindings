@@ -403,15 +403,24 @@ using CycloneDDS.Schema;
             var deserializeMethod = helperType.GetMethod("Deserialize");
             var buffer = new ArrayBufferWriter<byte>();
 
+            // Warmup JIT
+            for(int i=0; i<5; i++)
+            {
+                buffer.Clear();
+                serializeMethod.Invoke(null, new object[] { instance, buffer });
+            }
+
+            buffer.Clear();
             var sw = Stopwatch.StartNew();
             serializeMethod.Invoke(null, new object[] { instance, buffer });
             var serializeMs = sw.ElapsedMilliseconds;
             
-            sw.Restart();
-            var result = deserializeMethod.Invoke(null, new object[] { buffer.WrittenMemory });
-            var deserializeMs = sw.ElapsedMilliseconds;
+            _output.WriteLine($"Large List (10k ints): Serialize {serializeMs}ms");
             
-            _output.WriteLine($"Large List (10k ints): Serialize {serializeMs}ms, Deserialize {deserializeMs}ms");
+            // Should be very fast now (< 50ms implies optimization works)
+            Assert.True(serializeMs < 100, $"Serialization took too long: {serializeMs}ms");
+
+            var result = deserializeMethod.Invoke(null, new object[] { buffer.WrittenMemory });
             
             var resultNumbers = (List<int>)GetField(result, "Numbers");
             Assert.Equal(10000, resultNumbers.Count);

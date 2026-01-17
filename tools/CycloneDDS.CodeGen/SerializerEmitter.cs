@@ -502,6 +502,21 @@ namespace CycloneDDS.CodeGen
             string fieldAccess = $"this.{ToPascalCase(field.Name)}";
             string elementType = ExtractSequenceElementType(field.TypeName);
             
+            // OPTIMIZATION for BoundedSeq primitives
+            if (IsPrimitive(elementType))
+            {
+                 // BoundedSeq exposes AsSpan() which internally uses CollectionsMarshal
+                 return $@"writer.Align(4); 
+            writer.WriteUInt32((uint){fieldAccess}.Count);
+            if ({fieldAccess}.Count > 0)
+            {{
+                writer.Align({GetAlignment(elementType)});
+                var span = {fieldAccess}.AsSpan();
+                var byteSpan = System.Runtime.InteropServices.MemoryMarshal.AsBytes(span);
+                writer.WriteBytes(byteSpan);
+            }}";
+            }
+            
             string writerMethod = TypeMapper.GetWriterMethod(elementType);
             int align = GetAlignment(elementType);
             
@@ -616,6 +631,20 @@ namespace CycloneDDS.CodeGen
         {
              string fieldAccess = $"this.{ToPascalCase(field.Name)}";
              string elementType = ExtractGenericType(field.TypeName);
+             
+             // OPTIMIZATION: Block copy for primitives
+             if (IsPrimitive(elementType))
+             {
+                 return $@"writer.Align(4); 
+            writer.WriteUInt32((uint){fieldAccess}.Count);
+            if ({fieldAccess}.Count > 0)
+            {{
+                writer.Align({GetAlignment(elementType)});
+                var span = System.Runtime.InteropServices.CollectionsMarshal.AsSpan({fieldAccess});
+                var byteSpan = System.Runtime.InteropServices.MemoryMarshal.AsBytes(span);
+                writer.WriteBytes(byteSpan);
+            }}";
+             }
              
              string writerMethod = TypeMapper.GetWriterMethod(elementType);
              int align = GetAlignment(elementType);

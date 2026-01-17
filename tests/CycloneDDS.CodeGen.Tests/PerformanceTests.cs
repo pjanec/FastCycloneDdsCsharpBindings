@@ -44,7 +44,11 @@ namespace Perf {
             var buffer = new System.Buffers.ArrayBufferWriter<byte>(65536);
             
             // Warmup
-            method.Invoke(null, new object[] { inst, buffer });
+            for(int i=0; i<10; i++)
+            {
+                buffer.Clear();
+                method.Invoke(null, new object[] { inst, buffer });
+            }
             buffer.Clear();
             
             var sw = Stopwatch.StartNew();
@@ -56,8 +60,9 @@ namespace Perf {
             var resSeq = (BoundedSeq<int>)GetField(result, "Items");
             Assert.Equal(count, resSeq.Count);
             
-            // Assuming < 1000ms for 10k ints (40KB data)
-            Assert.True(sw.ElapsedMilliseconds < 1000, $"Serialization took too long: {sw.ElapsedMilliseconds}ms");
+            // With optimizations, this should be blazing fast (< 50ms including reflection overhead)
+            // 40KB memcpy is microseconds.
+            Assert.True(sw.ElapsedMilliseconds < 50, $"Serialization took {sw.ElapsedMilliseconds}ms, expected < 50ms");
         }
 
         [Fact]

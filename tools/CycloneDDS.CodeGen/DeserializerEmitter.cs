@@ -554,6 +554,23 @@ namespace CycloneDDS.CodeGen
         private string EmitListReader(FieldInfo field)
         {
             string elementType = ExtractGenericType(field.TypeName);
+            
+            // OPTIMIZATION: Block copy for primitives (int, double, etc.)
+            if (IsPrimitive(elementType))
+            {
+                int elemSize = GetSize(elementType);
+                int align = GetAlignment(elementType);
+                
+                return $@"reader.Align(4);
+            uint {field.Name}_len = reader.ReadUInt32();
+            view.{field.Name} = new List<{elementType}>((int){field.Name}_len);
+            System.Runtime.InteropServices.CollectionsMarshal.SetCount(view.{field.Name}, (int){field.Name}_len);
+            var targetSpan = System.Runtime.InteropServices.CollectionsMarshal.AsSpan(view.{field.Name});
+            reader.Align({align});
+            var sourceBytes = reader.ReadFixedBytes((int){field.Name}_len * {elemSize});
+            System.Runtime.InteropServices.MemoryMarshal.Cast<byte, {elementType}>(sourceBytes).CopyTo(targetSpan);";
+            }
+
             string sizerMethod = TypeMapper.GetSizerMethod(elementType);
             string readMethod = sizerMethod?.Replace("Write", "Read");
             
