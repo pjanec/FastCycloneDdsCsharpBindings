@@ -61,6 +61,7 @@ namespace CycloneDDS.Core
         
         public void WriteString(ReadOnlySpan<char> value)
         {
+            Align(4);
             _cursor += 4; // Length (Int32)
             _cursor += Encoding.UTF8.GetByteCount(value);
             _cursor += 1; // NUL terminator

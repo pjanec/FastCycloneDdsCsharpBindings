@@ -161,10 +161,11 @@ namespace CycloneDDS.CodeGen
             {
                 sb.AppendLine("            // DHEADER");
                 sb.AppendLine("            writer.Align(4);");
-                sb.AppendLine("            int dheaderPos = writer.Position;");
-                sb.AppendLine("            writer.WriteUInt32(0);");
-                sb.AppendLine();
-                sb.AppendLine("            int bodyStart = writer.Position;");
+                sb.AppendLine("            // Calculate size upfront using the Sizer pass");
+                sb.AppendLine("            // GetSerializedSize returns Header(4) + Body.");
+                sb.AppendLine("            // DHEADER requires Body size, so we subtract 4.");
+                sb.AppendLine("            int totalSize = GetSerializedSize(writer.Position);");
+                sb.AppendLine("            writer.WriteUInt32((uint)totalSize - 4);");
                 sb.AppendLine();
             }
 
@@ -195,13 +196,7 @@ namespace CycloneDDS.CodeGen
                 }
             }
             
-            if (IsAppendable(type))
-            {
-                sb.AppendLine();
-                sb.AppendLine("            // Patch DHEADER");
-                sb.AppendLine("            int bodySize = writer.Position - bodyStart;");
-                sb.AppendLine("            writer.PatchUInt32(dheaderPos, (uint)bodySize);");
-            }
+
             sb.AppendLine("        }");
         }
 

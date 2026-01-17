@@ -148,45 +148,39 @@ namespace CycloneDDS.Core
         {
             EnsureSize(fixedSize);
             
-            var target = _span.Slice(_buffered, fixedSize);
-            int written = 0;
-            if (!string.IsNullOrEmpty(value))
+            var dest = _span.Slice(_buffered, fixedSize);
+            
+            if (string.IsNullOrEmpty(value))
             {
-                // Note: GetBytes might throw if target is too small for strict encoding, 
-                // but usually for fixed size we assume it fits or we truncate?
-                // C# UTF8 GetBytes into span does not throw, it returns false/written count?
-                // Actually standard method: int GetBytes(ReadOnlySpan<char> chars, Span<byte> bytes)
-                // If it doesn't fit, it might not write anything or write partial?
-                // We should probably safeguard.
-                // For this exercise, simple attempt.
+                dest.Clear();
+            }
+            else
+            {
+                var chars = value.AsSpan();
+                int byteCount = Encoding.UTF8.GetByteCount(chars);
                 
-                try 
+                if (byteCount <= fixedSize)
                 {
-                   // Create a temp span for source to handle potential size mismatch logic if needed, 
-                   // but standard GetBytes should handle it by filling what fits?
-                   // No, TryGetBytes returns false if not enough space.
-                   // GetBytes throws if destination is too small for WHOLE string.
-                   
-                   // So we need to ensure we only try to write what fits.
-                   // This is complex. For now, assume it fits, or truncate string.
-                   
-                   // Truncate logic:
-                   // Just use TryGetBytes loop or something.
-                   // Simpler: Use Utf8 encoding instance.
-                   
-                   // Fallback for simplicity: Convert to array and use span overload.
-                   byte[] bytes = Encoding.UTF8.GetBytes(value);
-                   WriteFixedString(bytes, fixedSize);
-                   return; // Done
+                    int written = Encoding.UTF8.GetBytes(chars, dest);
+                    if (written < fixedSize)
+                    {
+                        dest.Slice(written).Clear();
+                    }
                 }
-                catch 
+                else
                 {
-                   // Fallback
+                    // Truncation required
+                    var encoder = Encoding.UTF8.GetEncoder();
+                    encoder.Convert(chars, dest, true, out int charsUsed, out int bytesUsed, out bool completed);
+                    
+                    if (bytesUsed < fixedSize)
+                    {
+                        dest.Slice(bytesUsed).Clear();
+                    }
                 }
             }
-            // Null or empty
-             _span.Slice(_buffered, fixedSize).Clear();
-             _buffered += fixedSize;
+            
+            _buffered += fixedSize;
         }
 
         public void PatchUInt32(int position, uint value)
