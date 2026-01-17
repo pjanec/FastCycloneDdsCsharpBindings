@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using Xunit;
 using CycloneDDS.Runtime;
+using CycloneDDS.Runtime.Interop;
 using CycloneDDS.Runtime.Tests;
 
 namespace CycloneDDS.Runtime.Tests
@@ -35,7 +36,7 @@ namespace CycloneDDS.Runtime.Tests
             bool found = false;
             for(int i=0; i<scope.Count; i++)
             {
-                if (scope.Infos[i].ValidData)
+                if (scope.Infos[i].ValidData != 0)
                 {
                     Assert.Equal(42, scope[i].Id);
                     Assert.Equal(123456, scope[i].Value);
@@ -137,13 +138,48 @@ namespace CycloneDDS.Runtime.Tests
              bool found = false;
             for(int i=0; i<scope.Count; i++)
             {
-                if (scope.Infos[i].ValidData)
+                if (scope.Infos[i].ValidData != 0)
                 {
                     Assert.Equal(999, scope[i].Id);
                     found = true;
                 }
             }
             Assert.True(found);
+        }
+        [Fact]
+        public void GetTopicSertype_ReturnsValidPointer()
+        {
+            using var participant = new DdsParticipant(0);
+            using var desc = new DescriptorContainer(
+                TestMessage.GetDescriptorOps(), 8, 4, 16, "SertypeTopic");
+            
+            var topic = DdsApi.dds_create_topic(
+                participant.NativeEntity,
+                desc.Ptr,
+                "SertypeTopic",
+                IntPtr.Zero,
+                IntPtr.Zero);
+                
+            Assert.True(topic.IsValid);
+            
+            IntPtr sertype = DdsApi.dds_get_topic_sertype(topic);
+            Assert.NotEqual(IntPtr.Zero, sertype);
+            
+            DdsApi.dds_delete(topic);
+        }
+
+        [Fact]
+        public void Write_UsingDdsWrite_Success()
+        {
+            using var participant = new DdsParticipant(0);
+            using var desc = new DescriptorContainer(
+                TestMessage.GetDescriptorOps(), 8, 4, 16, "WriteTopic");
+            
+            using var writer = new DdsWriter<TestMessage>(
+                participant, "WriteTopic", desc.Ptr);
+            
+            var msg = new TestMessage { Id = 1, Value = 123 };
+            writer.WriteViaDdsWrite(msg);
         }
     }
 }

@@ -76,23 +76,47 @@ namespace CycloneDDS.Runtime
             _writerHandle = new DdsEntityHandle(writer);
         }
 
+        public void WriteViaDdsWrite(in T sample)
+        {
+             if (_writerHandle == null) throw new ObjectDisposedException(nameof(DdsWriter<T>));
+             unsafe
+             {
+                 fixed (void* p = &sample)
+                 {
+                     int ret = DdsApi.dds_write(_writerHandle.NativeHandle.Handle, (IntPtr)p);
+                     if (ret < 0) throw new DdsException((DdsApi.DdsReturnCode)ret, $"dds_write failed: {ret}");
+                 }
+             }
+        }
+
         public void Write(in T sample)
         {
             if (_writerHandle == null) throw new ObjectDisposedException(nameof(DdsWriter<T>));
 
             // 1. Get Size (no alloc)
-            int size = _sizer!(sample, 0); 
+            // Start at offset 4 because we will prepend 4-byte CDR header
+            int payloadSize = _sizer!(sample, 4); 
+            int totalSize = payloadSize + 4;
 
             // 2. Rent Buffer (no alloc - pooled)
-            byte[] buffer = Arena.Rent(size);
+            byte[] buffer = Arena.Rent(totalSize);
             
             try
             {
                 // 3. Serialize (ZERO ALLOC via new Span overload)
-                var span = buffer.AsSpan(0, size);
+                var span = buffer.AsSpan(0, totalSize);
                 var cdr = new CdrWriter(span);  // ✅ No wrapper allocation!
                 
+                // Write CDR Header (XCDR1 LE: 00 01 00 00)
+                // Identifier: 0x0001 (LE) -> 00 01
+                // Options: 0x0000 -> 00 00
+                cdr.WriteByte(0x00);
+                cdr.WriteByte(0x01);
+                cdr.WriteByte(0x00);
+                cdr.WriteByte(0x00);
+                
                 _serializer!(sample, ref cdr);
+                // For fixed buffer, Complete() is no-op but good practice
                 cdr.Complete();
                 
                 // 4. Write to DDS via Serdata
@@ -102,30 +126,29 @@ namespace CycloneDDS.Runtime
                     {
                         IntPtr dataPtr = (IntPtr)p;
                         
-                        // Create serdata from CDR bytes
+                        // Create serdata from CDR bytes using the topic entity to get sertype
                         IntPtr serdata = DdsApi.dds_create_serdata_from_cdr(
-                            _topicDescriptor,
-                            IntPtr.Zero, // Kind 0 (DDS_EST_1_0)
+                            _topicHandle.NativeHandle,
                             dataPtr,
-                            (uint)size);
-                            
+                            (uint)totalSize);
+
                         if (serdata == IntPtr.Zero)
-                            throw new DdsException(DdsApi.DdsReturnCode.Error, "dds_create_serdata_from_cdr failed");
+                        {
+                             throw new DdsException(DdsApi.DdsReturnCode.Error, "dds_create_serdata_from_cdr failed");
+                        }
                             
                         try
                         {
-                            int ret = DdsApi.dds_write_serdata(_writerHandle.NativeHandle, serdata);
+                            int ret = DdsApi.dds_writecdr(_writerHandle.NativeHandle, serdata);
                             if (ret < 0)
                             {
-                                throw new DdsException((DdsApi.DdsReturnCode)ret, $"dds_write_serdata failed: {ret}");
+                                throw new DdsException((DdsApi.DdsReturnCode)ret, $"dds_writecdr failed: {ret}");
                             }
                         }
                         finally
                         {
-                            // If create_serdata succeeds, we must release it? 
-                            // Or does dds_write_serdata take ownership?
-                            // Architect says: "4. Release our ref (Cyclone holds its own ref now if sending async)"
-                            DdsApi.dds_free_serdata(serdata);
+                             // Release our reference to the serdata
+                             DdsApi.ddsi_serdata_unref(serdata);
                         }
                     }
                 }
@@ -134,15 +157,6 @@ namespace CycloneDDS.Runtime
             {
                 Arena.Return(buffer);
             }
-        }
-
-
-        private void WriteFallback(in T sample)
-        {
-            // Fallback to dds_write is currently crashing due to likely struct layout mismatches
-            // with the provided native library version.
-            // Disable to prevent process crash.
-            Console.WriteLine("Warning: Write operation skipped (Native API missing and fallback unstable).");
         }
         
         public void Dispose()
