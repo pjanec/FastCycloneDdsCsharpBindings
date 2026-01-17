@@ -1,7 +1,9 @@
 compiled with vs2022 from
 
-https://github.com/eclipse-cyclonedds/cyclonedds.git
-c49206be5cfbe76de546e0adad172a0d80726f77
+https://github.com/pjanec/cyclonedds.git
+466ce26c08b3d68b9b686978548c2fec62081eb2
+branch: pj/exposing-serdata-api
 
-from 14.12.2025 "Update cmake minimum version  to  3.21"
+branched from https://github.com/eclipse-cyclonedds/cyclonedds.git  on 17th Jan 2026
+
 

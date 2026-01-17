@@ -35,6 +35,7 @@
 #include "dds/ddsrt/time.h"
 #include "dds/ddsrt/retcode.h"
 #include "dds/ddsrt/log.h"
+#include "dds/ddsrt/iovec.h"
 #include "dds/ddsc/dds_public_impl.h"
 #include "dds/ddsc/dds_public_alloc.h"
 #include "dds/ddsc/dds_public_qos.h"
@@ -505,6 +506,22 @@ dds_delete(dds_entity_t entity);
  */
 DDS_EXPORT dds_entity_t
 dds_get_publisher(dds_entity_t writer);
+
+/**
+ * @brief Get the sertype associated with a topic.
+ * @ingroup topic
+ *
+ * @param[in] topic The topic entity.
+ * @returns The sertype pointer, or NULL if the entity is not a topic or invalid.
+ */
+DDS_EXPORT const struct ddsi_sertype *
+dds_get_topic_sertype(dds_entity_t topic);
+
+DDS_EXPORT struct ddsi_serdata *dds_serdata_ref(struct ddsi_serdata *serdata);
+DDS_EXPORT void dds_serdata_unref(struct ddsi_serdata *serdata);
+DDS_EXPORT uint32_t dds_serdata_size(const struct ddsi_serdata *serdata);
+DDS_EXPORT void dds_serdata_to_ser(const struct ddsi_serdata *serdata, size_t off, size_t sz, void *buf);
+DDS_EXPORT struct ddsi_serdata *dds_serdata_from_ser_iov(const struct ddsi_sertype *type, int kind, uint32_t niov, const ddsrt_iovec_t *iov, size_t size);
 
 /**
  * @brief Get entity subscriber.
