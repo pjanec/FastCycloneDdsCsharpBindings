@@ -95,6 +95,30 @@ namespace CycloneDDS.Core
             _position += 1;
             return value;
         }
+        
+        public byte ReadUInt8() => ReadByte();
+        
+        public sbyte ReadInt8() => (sbyte)ReadByte();
+        
+        public bool ReadBoolean() => ReadByte() != 0;
+
+        public short ReadInt16()
+        {
+            if (_position + sizeof(short) > _data.Length)
+                throw new IndexOutOfRangeException();
+            short value = BinaryPrimitives.ReadInt16LittleEndian(_data.Slice(_position));
+            _position += sizeof(short);
+            return value;
+        }
+
+        public ushort ReadUInt16()
+        {
+            if (_position + sizeof(ushort) > _data.Length)
+                throw new IndexOutOfRangeException();
+            ushort value = BinaryPrimitives.ReadUInt16LittleEndian(_data.Slice(_position));
+            _position += sizeof(ushort);
+            return value;
+        }
 
         public ReadOnlySpan<byte> ReadStringBytes()
         {

@@ -7,14 +7,20 @@ namespace CycloneDDS.CodeGen
 {
     public class DeserializerEmitter
     {
-        public string EmitDeserializer(TypeInfo type)
+        private HashSet<string> _generatedRefStructs = new HashSet<string>();
+
+        public string EmitDeserializer(TypeInfo type, bool generateUsings = true)
         {
             var sb = new StringBuilder();
             
-            sb.AppendLine("using CycloneDDS.Core;");
-            sb.AppendLine("using System.Runtime.InteropServices;");
-            sb.AppendLine("using System.Text;");
-            sb.AppendLine();
+            if (generateUsings)
+            {
+                sb.AppendLine("using CycloneDDS.Core;");
+                sb.AppendLine("using System.Runtime.InteropServices;");
+                sb.AppendLine("using System.Text;");
+                sb.AppendLine("using System.Linq;");
+                sb.AppendLine();
+            }
             
             if (!string.IsNullOrEmpty(type.Namespace))
             {
@@ -178,7 +184,23 @@ namespace CycloneDDS.CodeGen
 
         private void EmitViewStruct(StringBuilder sb, TypeInfo type)
         {
-             sb.AppendLine($"    public ref struct {type.Name}View");
+             bool needsRef = type.Fields.Any(f => 
+             {
+                 string baseType = GetBaseType(f.TypeName);
+                 if (baseType.StartsWith("BoundedSeq"))
+                 {
+                     string elem = ExtractSequenceElementType(baseType);
+                     return IsPrimitive(elem); // Span requires ref struct
+                 }
+                 if (baseType == "string" && f.HasAttribute("DdsManaged")) return true;
+                 
+                 return _generatedRefStructs.Contains(baseType);
+             });
+
+             if (needsRef) _generatedRefStructs.Add(type.Name);
+
+             string decl = needsRef ? "ref struct" : "struct";
+             sb.AppendLine($"    public {decl} {type.Name}View");
              sb.AppendLine("    {");
              foreach(var field in type.Fields)
              {
@@ -279,9 +301,16 @@ namespace CycloneDDS.CodeGen
             {
                 string elem = ExtractSequenceElementType(typeName);
                 if (IsPrimitive(elem))
-                    return $"ReadOnlySpan<{elem}>"; // Span cannot be null
-                // BoundedSeq? -> use array or List?
-                return $"{elem}[]"; 
+                    return $"ReadOnlySpan<{elem}>"; 
+                
+                // If element View is a ref struct, we cannot have an array of it.
+                // We fallback to array of DTOs (Owned).
+                if (_generatedRefStructs.Contains(elem))
+                    return $"{elem}[]";
+                
+                if (elem == "string") return "string[]";
+                    
+                return $"{elem}View[]"; 
             }
             
             if (IsPrimitive(typeName))
@@ -320,36 +349,54 @@ namespace CycloneDDS.CodeGen
         
         private string EmitSequenceReader(FieldInfo field)
         {
+            var boundsAttr = field.GetAttribute("DdsBounds");
+            string boundsCheck = "";
+            if (boundsAttr != null && boundsAttr.Arguments.Count > 0)
+            {
+                var bound = boundsAttr.Arguments[0];
+                boundsCheck = $@"if ({field.Name}_len > {bound}) throw new IndexOutOfRangeException(""Sequence length exceeds bound {bound}"");";
+            }
+
             string elem = ExtractSequenceElementType(field.TypeName);
             if (IsPrimitive(elem))
             {
                 int elemSize = GetSize(elem);
-                // reader.Align(4) (Header) -> ReadUInt32 -> length
-                // Align(element) ? NO.
-                // If primitive sequence, elements are packed naturally? 
-                // CdrSizer emitted Align BEFORE loop. And Align INSIDE loop.
-                // So elements are aligned.
-                // If elements are aligned, they might have gaps.
-                // ReadOnlySpan view requires contiguous memory.
-                // IF GAPS EXIST, WE CANNOT RETURN SPAN.
-                // `int` (align 4) in sequence: 4,4,4. Contiguous.
-                // `long` (align 8) in sequence: 8,8,8. Contiguous.
-                // `short` (align 2): 2,2,2. Contiguous.
-                // Is there any primitive where Align > Size? No.
-                // Is there any case where `Align` inside loop causes gaps?
-                // Only if previous item ended at misaligned address.
-                // Primitives are Size == Align (except maybe bool? 1 byte, align 1).
-                // So Primitives are always contiguous.
-                // So we CAN use Span.
-                
                 return $@"reader.Align(4);
             uint {field.Name}_len = reader.ReadUInt32();
+            {boundsCheck}
             reader.Align({GetAlignment(elem)});
             view.{field.Name} = MemoryMarshal.Cast<byte, {elem}>(reader.ReadFixedBytes((int){field.Name}_len * {elemSize}))";
             }
             
+            if (elem == "string")
+            {
+                return $@"reader.Align(4);
+            uint {field.Name}_len = reader.ReadUInt32();
+            {boundsCheck}
+            view.{field.Name} = new string[{field.Name}_len];
+            for(int i=0; i<{field.Name}_len; i++)
+            {{
+                reader.Align(4);
+                view.{field.Name}[i] = Encoding.UTF8.GetString(reader.ReadStringBytes().ToArray());
+            }}";
+            }
+
             // Non-primitive sequence
-            return $"/* Sequence<{elem}> not fully supported in View */";
+            string itemType;
+            string deserializerCall;
+            
+            itemType = _generatedRefStructs.Contains(elem) ? elem : $"{elem}View";
+            string toOwned = _generatedRefStructs.Contains(elem) ? ".ToOwned()" : "";
+            deserializerCall = $"{elem}.Deserialize(ref reader){toOwned}";
+            
+            return $@"reader.Align(4);
+            uint {field.Name}_len = reader.ReadUInt32();
+            {boundsCheck}
+            view.{field.Name} = new {itemType}[{field.Name}_len];
+            for(int i=0; i<{field.Name}_len; i++)
+            {{
+                view.{field.Name}[i] = {deserializerCall};
+            }}";
         }
         
         private string MapToOwnedConversion(FieldInfo field)
@@ -366,7 +413,8 @@ namespace CycloneDDS.CodeGen
                 if (!IsReferenceType(baseType))
                 {
                     // Struct/Primitive
-                    return access; 
+                    if (IsPrimitive(baseType)) return access;
+                    return $"{access}?.ToOwned()";
                 }
             }
 
@@ -389,6 +437,12 @@ namespace CycloneDDS.CodeGen
                  string elem = ExtractSequenceElementType(typeName);
                  if (IsPrimitive(elem))
                      return $"new BoundedSeq<{elem}>({fieldName}.ToArray().ToList())"; 
+                 
+                 // If we stored DTOs (because element was ref struct), just ToList
+                 if (_generatedRefStructs.Contains(elem) || elem == "string")
+                     return $"new BoundedSeq<{elem}>({fieldName}.ToList())";
+
+                 return $"new BoundedSeq<{elem}>({fieldName}.Select(x => x.ToOwned()).ToList())";
             }
 
             return fieldName;

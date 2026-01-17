@@ -7,15 +7,18 @@ namespace CycloneDDS.CodeGen
 {
     public class SerializerEmitter
     {
-        public string EmitSerializer(TypeInfo type)
+        public string EmitSerializer(TypeInfo type, bool generateUsings = true)
         {
             var sb = new StringBuilder();
             
             // Using directives
-            sb.AppendLine("using CycloneDDS.Core;");
-            sb.AppendLine("using System.Runtime.InteropServices;"); // Just in case
-            sb.AppendLine("using System.Text;");
-            sb.AppendLine();
+            if (generateUsings)
+            {
+                sb.AppendLine("using CycloneDDS.Core;");
+                sb.AppendLine("using System.Runtime.InteropServices;"); // Just in case
+                sb.AppendLine("using System.Text;");
+                sb.AppendLine();
+            }
             
             // Namespace
             if (!string.IsNullOrEmpty(type.Namespace))

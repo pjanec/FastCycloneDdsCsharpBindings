@@ -35,6 +35,16 @@ public struct BoundedSeq<T> : IEnumerable<T>
     }
 
     /// <summary>
+    /// Initializes a new instance from an existing list.
+    /// Capacity is set to the list's capacity.
+    /// </summary>
+    public BoundedSeq(List<T> items)
+    {
+        _storage = items ?? throw new ArgumentNullException(nameof(items));
+        _capacity = items.Capacity;
+    }
+
+    /// <summary>
     /// Gets the maximum capacity of the sequence.
     /// </summary>
     public int Capacity => _capacity;
