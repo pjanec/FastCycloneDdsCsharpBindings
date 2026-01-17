@@ -77,7 +77,7 @@ namespace TestNamespace
             // GetSerializedSize verification
             var getSerializedSizeMethod = generatedType.GetMethod("GetSerializedSize");
             int size = (int)getSerializedSizeMethod.Invoke(instance, new object[] { 0 });
-            Assert.Equal(16, size);
+            Assert.Equal(12, size);
 
             // Serialize
             var writerBuffer = new ArrayBufferWriter<byte>();
@@ -87,15 +87,10 @@ namespace TestNamespace
             serializeWrapper.Invoke(null, new object[] { instance, writerBuffer });
             
             // Verify output
-            // DHEADER: 16 - 4 = 12 (0x0C).
-            // DHEADER: 0C 00 00 00
-            // ID: 15 CD 5B 07 (123456789 = 0x075BCD15) -> LE: 15 CD 5B 07
-            // Value: 123.456. Double.
-            // 123.456 hex: 40 5E DD 2F 1A 9F BE 77
-            // LE: 77 BE 9F 1A 2F DD 5E 40
+            // DHEADER: No Header (Final)
             
-            // Full: 0C 00 00 00 15 CD 5B 07 77 BE 9F 1A 2F DD 5E 40
-            string expected = "0C 00 00 00 15 CD 5B 07 77 BE 9F 1A 2F DD 5E 40";
+            // Full: 15 CD 5B 07 77 BE 9F 1A 2F DD 5E 40
+            string expected = "15 CD 5B 07 77 BE 9F 1A 2F DD 5E 40";
             // Correct logic DHEADER is (0C 00 00 00)
             // Wait, example in instructions: "00 00 00 0C" ? No, expected is usually LE for DHEADER unless big endian default?
             // XCDR2 default is LE.

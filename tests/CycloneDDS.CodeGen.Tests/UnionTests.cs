@@ -131,9 +131,9 @@ using CycloneDDS.Schema;
             var serializeWrapper = testHelperType.GetMethod("SerializeWithBuffer");
             serializeWrapper.Invoke(null, new object[] { instance, writerBuffer });
             
-            // Expected: DHEADER(12) | Disc(1) | Radius(10.5)
-            // 0C 00 00 00 | 01 00 00 00 | 00 00 00 00 00 00 25 40
-            string expectedHex = "0C 00 00 00 01 00 00 00 00 00 00 00 00 00 25 40";
+            // Expected: Disc(1) | Radius(10.5)
+            // 01 00 00 00 | 00 00 00 00 00 00 25 40
+            string expectedHex = "01 00 00 00 00 00 00 00 00 00 25 40";
             string actualHex = ToHex(writerBuffer.WrittenSpan.ToArray());
             Assert.Equal(expectedHex.Replace(" ", ""), actualHex.Replace(" ", ""));
 
@@ -155,11 +155,10 @@ using CycloneDDS.Schema;
             var writerBuffer2 = new ArrayBufferWriter<byte>();
             serializeWrapper.Invoke(null, new object[] { instance2, writerBuffer2 });
             
-            // Expected: DHEADER(8) | Disc(2) | Side(55)
+            // Expected: Disc(2) | Side(55)
             // Side(55) = 0x37. 37 00 00 00.
-            // Body Size = 4 + 4 = 8.
-            // 08 00 00 00 | 02 00 00 00 | 37 00 00 00
-            expectedHex = "08 00 00 00 02 00 00 00 37 00 00 00";
+            // 02 00 00 00 | 37 00 00 00
+            expectedHex = "02 00 00 00 37 00 00 00";
             actualHex = ToHex(writerBuffer2.WrittenSpan.ToArray());
             Assert.Equal(expectedHex.Replace(" ", ""), actualHex.Replace(" ", ""));
             
@@ -171,9 +170,9 @@ using CycloneDDS.Schema;
 
              // 4. Test Unknown Case (Skipping)
              // Construct buffer manually with unknown case
-             // DHEADER(8) | Disc(3) | Extra(4 bytes junk)
-             // 08 00 00 00 | 03 00 00 00 | FF FF FF FF
-             byte[] unknownBytes = ParseHex("08 00 00 00 03 00 00 00 FF FF FF FF");
+             // Disc(3) | Extra(4 bytes junk)
+             // 03 00 00 00 | FF FF FF FF
+             byte[] unknownBytes = ParseHex("03 00 00 00 FF FF FF FF");
              
              var deserializedObj3 = deserializeWrapper.Invoke(null, new object[] { (ReadOnlyMemory<byte>)unknownBytes });
              // Should not throw

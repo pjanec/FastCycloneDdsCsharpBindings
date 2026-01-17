@@ -39,6 +39,12 @@ namespace CycloneDDS.CodeGen
             return sb.ToString();
         }
         
+        private bool IsAppendable(TypeInfo type)
+        {
+            if (type.Fields.Any(f => IsOptional(f))) return true;
+            return type.HasAttribute("DdsAppendable") || type.HasAttribute("DdsMutable") || type.HasAttribute("Appendable");
+        }
+
         private void EmitPartialStruct(StringBuilder sb, TypeInfo type)
         {
             sb.AppendLine($"    public partial struct {type.Name}");
@@ -47,10 +53,17 @@ namespace CycloneDDS.CodeGen
             sb.AppendLine("        {");
             sb.AppendLine($"            var view = new {type.Name}View();");
             
-            // DHEADER
-            sb.AppendLine("            reader.Align(4);");
-            sb.AppendLine("            uint dheader = reader.ReadUInt32();");
-            sb.AppendLine("            int endPos = reader.Position + (int)dheader;");
+            if (IsAppendable(type))
+            {
+                sb.AppendLine("            // DHEADER");
+                sb.AppendLine("            reader.Align(4);");
+                sb.AppendLine("            uint dheader = reader.ReadUInt32();");
+                sb.AppendLine("            int endPos = reader.Position + (int)dheader;");
+            }
+            else
+            {
+                sb.AppendLine("            int endPos = int.MaxValue;");
+            }
             
             if (type.HasAttribute("DdsUnion"))
             {
@@ -58,31 +71,48 @@ namespace CycloneDDS.CodeGen
             }
             else
             {
-                int currentId = 0;
-                foreach(var field in type.Fields)
+                var fieldsWithIds = type.Fields.Select((f, i) => new { Field = f, Id = GetFieldId(f, i) }).OrderBy(x => x.Id).ToList();
+
+                foreach(var item in fieldsWithIds)
                 {
-                    int fieldId = currentId++;
+                    var field = item.Field;
+                    int fieldId = item.Id;
 
                     if (IsOptional(field))
                     {
+                        // Optional logic handles its own existence?
+                        // Usually logic depends on context. For Appendable, optional fields are in the stream?
+                        // Optional logic emits "EMHEADER" check or bitmask?
+                        // Code I saw earlier used EMHEADER.
                         EmitOptionalReader(sb, field, fieldId);
                     }
                     else
                     {
-                        sb.AppendLine($"            if (reader.Position < endPos)");
-                        sb.AppendLine("            {");
+                        if (IsAppendable(type))
+                        {
+                            sb.AppendLine($"            if (reader.Position < endPos)");
+                            sb.AppendLine("            {");
+                        }
+                        
                         string readCall = GetReadCall(field);
                         sb.AppendLine($"                {readCall};");
-                        sb.AppendLine("            }");
+                        
+                        if (IsAppendable(type))
+                        {
+                            sb.AppendLine("            }");
+                        }
                     }
                 }
             }
             
-            sb.AppendLine();
-            sb.AppendLine("            if (reader.Position < endPos)");
-            sb.AppendLine("            {");
-            sb.AppendLine("                reader.Seek(endPos);");
-            sb.AppendLine("            }");
+            if (IsAppendable(type))
+            {
+                sb.AppendLine();
+                sb.AppendLine("            if (reader.Position < endPos)");
+                sb.AppendLine("            {");
+                sb.AppendLine("                reader.Seek(endPos);");
+                sb.AppendLine("            }");
+            }
             
             sb.AppendLine("            return view;");
             sb.AppendLine("        }");
@@ -477,7 +507,7 @@ namespace CycloneDDS.CodeGen
                 "byte" or "uint8" or "sbyte" or "int8" or "bool" or "boolean" => 1,
                 "short" or "int16" or "ushort" or "uint16" => 2,
                 "int" or "int32" or "uint" or "uint32" or "float" => 4,
-                "long" or "int64" or "ulong" or "uint64" or "double" => 8,
+                "long" or "int64" or "ulong" or "uint64" or "double" => 4,
                 _ => 1
             };
         }
@@ -515,6 +545,17 @@ namespace CycloneDDS.CodeGen
                 "short" or "int16" or "ushort" or "uint16" or
                 "int" or "int32" or "uint" or "uint32" or "float" or
                 "long" or "int64" or "ulong" or "uint64" or "double";
+        }
+
+        private int GetFieldId(FieldInfo field, int defaultId)
+        {
+            var idAttr = field.GetAttribute("DdsId");
+            if (idAttr != null && idAttr.Arguments.Count > 0)
+            {
+                 if (idAttr.Arguments[0] is int id) return id;
+                 if (idAttr.Arguments[0] is string s && int.TryParse(s, out int sid)) return sid;
+            }
+            return defaultId;
         }
     }
 }

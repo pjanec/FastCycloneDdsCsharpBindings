@@ -49,6 +49,12 @@ namespace CycloneDDS.CodeGen
             return sb.ToString();
         }
         
+        private bool IsAppendable(TypeInfo type)
+        {
+             if (type.Fields.Any(f => IsOptional(f))) return true;
+             return type.HasAttribute("DdsAppendable") || type.HasAttribute("DdsMutable") || type.HasAttribute("Appendable");
+        }
+
         private void EmitGetSerializedSize(StringBuilder sb, TypeInfo type)
         {
             sb.AppendLine("        public int GetSerializedSize(int currentOffset)");
@@ -56,11 +62,13 @@ namespace CycloneDDS.CodeGen
             sb.AppendLine("            var sizer = new CdrSizer(currentOffset);");
             sb.AppendLine();
             
-            // DHEADER (required for @appendable)
-            sb.AppendLine("            // DHEADER");
-            sb.AppendLine("            sizer.Align(4);");
-            sb.AppendLine("            sizer.WriteUInt32(0);");
-            sb.AppendLine();
+            if (IsAppendable(type))
+            {
+                sb.AppendLine("            // DHEADER");
+                sb.AppendLine("            sizer.Align(4);");
+                sb.AppendLine("            sizer.WriteUInt32(0);");
+                sb.AppendLine();
+            }
 
             if (type.HasAttribute("DdsUnion"))
             {
@@ -70,8 +78,11 @@ namespace CycloneDDS.CodeGen
             {
                 sb.AppendLine("            // Struct body");
                 
-                foreach (var field in type.Fields)
+                var fieldsWithIds = type.Fields.Select((f, i) => new { Field = f, Id = GetFieldId(f, i) }).OrderBy(x => x.Id).ToList();
+
+                foreach (var item in fieldsWithIds)
                 {
+                    var field = item.Field;
                     if (IsOptional(field))
                     {
                         EmitOptionalSizer(sb, field);
@@ -146,13 +157,16 @@ namespace CycloneDDS.CodeGen
         {
             sb.AppendLine("        public void Serialize(ref CdrWriter writer)");
             sb.AppendLine("        {");
-            sb.AppendLine("            // DHEADER");
-            sb.AppendLine("            writer.Align(4);");
-            sb.AppendLine("            int dheaderPos = writer.Position;");
-            sb.AppendLine("            writer.WriteUInt32(0);");
-            sb.AppendLine();
-            sb.AppendLine("            int bodyStart = writer.Position;");
-            sb.AppendLine();
+            if (IsAppendable(type))
+            {
+                sb.AppendLine("            // DHEADER");
+                sb.AppendLine("            writer.Align(4);");
+                sb.AppendLine("            int dheaderPos = writer.Position;");
+                sb.AppendLine("            writer.WriteUInt32(0);");
+                sb.AppendLine();
+                sb.AppendLine("            int bodyStart = writer.Position;");
+                sb.AppendLine();
+            }
 
             if (type.HasAttribute("DdsUnion"))
             {
@@ -162,10 +176,13 @@ namespace CycloneDDS.CodeGen
             {
                 sb.AppendLine("            // Struct body");
                 
-                int currentId = 0;
-                foreach (var field in type.Fields)
+                var fieldsWithIds = type.Fields.Select((f, i) => new { Field = f, Id = GetFieldId(f, i) }).OrderBy(x => x.Id).ToList();
+
+                foreach (var item in fieldsWithIds)
                 {
-                    int fieldId = currentId++;
+                    var field = item.Field;
+                    int fieldId = item.Id;
+
                     if (IsOptional(field))
                     {
                         EmitOptionalSerializer(sb, field, fieldId);
@@ -178,10 +195,13 @@ namespace CycloneDDS.CodeGen
                 }
             }
             
-            sb.AppendLine();
-            sb.AppendLine("            // Patch DHEADER");
-            sb.AppendLine("            int bodySize = writer.Position - bodyStart;");
-            sb.AppendLine("            writer.PatchUInt32(dheaderPos, (uint)bodySize);");
+            if (IsAppendable(type))
+            {
+                sb.AppendLine();
+                sb.AppendLine("            // Patch DHEADER");
+                sb.AppendLine("            int bodySize = writer.Position - bodyStart;");
+                sb.AppendLine("            writer.PatchUInt32(dheaderPos, (uint)bodySize);");
+            }
             sb.AppendLine("        }");
         }
 
@@ -375,7 +395,7 @@ namespace CycloneDDS.CodeGen
             {
                  var size = new string(field.TypeName.Where(char.IsDigit).ToArray());
                  if (string.IsNullOrEmpty(size)) size = "32"; 
-                 return $"sizer.Align(1); sizer.WriteFixedString(null, {size})";
+                 return $"sizer.Align(1); sizer.WriteFixedString((string)null, {size})";
             }
 
             string method = TypeMapper.GetSizerMethod(field.TypeName);
@@ -522,7 +542,7 @@ namespace CycloneDDS.CodeGen
                 "byte" or "uint8" or "sbyte" or "int8" or "bool" or "boolean" => 1,
                 "short" or "int16" or "ushort" or "uint16" => 2,
                 "int" or "int32" or "uint" or "uint32" or "float" => 4,
-                "long" or "int64" or "ulong" or "uint64" or "double" => 8,
+                "long" or "int64" or "ulong" or "uint64" or "double" => 4,
                 _ => 1
             };
         }
@@ -565,6 +585,17 @@ namespace CycloneDDS.CodeGen
         private bool HasVariableFields(TypeInfo type)
         {
             return type.Fields.Any(f => IsVariableType(f));
+        }
+
+        private int GetFieldId(FieldInfo field, int defaultId)
+        {
+            var idAttr = field.GetAttribute("DdsId");
+            if (idAttr != null && idAttr.Arguments.Count > 0)
+            {
+                 if (idAttr.Arguments[0] is int id) return id;
+                 if (idAttr.Arguments[0] is string s && int.TryParse(s, out int sid)) return sid;
+            }
+            return defaultId;
         }
 
         private string ToPascalCase(string name)

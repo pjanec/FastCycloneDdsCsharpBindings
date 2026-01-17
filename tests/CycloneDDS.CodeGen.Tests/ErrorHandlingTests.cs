@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Collections.Generic;
 using System.Reflection;
 using Xunit;
@@ -101,6 +102,30 @@ namespace CycloneDDS.CodeGen.Tests
              code += emitter.EmitSerializer(type2, false);
              
              Assert.ThrowsAny<Exception>(() => CompileToAssembly(code, "ErrBadDiscType"));
+        }
+
+        [Fact]
+        public void MalformedIDL_ReportsError()
+        {
+            var tempIdl = Path.Combine(Path.GetTempPath(), "bad_test_11_1.idl");
+            File.WriteAllText(tempIdl, @"
+module Test {
+    struct BadStruct {
+        long field1
+        string field2  // Missing semicolons
+    };
+};
+");
+            
+            try {
+                var runner = new IdlcRunner();
+                runner.IdlcPathOverride = @"d:\Work\FastCycloneDdsCsharpBindings\cyclone-bin\Release\idlc.exe";
+                var result = runner.RunIdlc(tempIdl, Path.GetTempPath());
+                Assert.NotEqual(0, result.ExitCode);
+            }
+            finally {
+                if (File.Exists(tempIdl)) File.Delete(tempIdl);
+            }
         }
     }
 }

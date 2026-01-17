@@ -73,10 +73,10 @@ namespace TestNamespace
             generatedType.GetField("Id").SetValue(instance, 10);
             generatedType.GetField("Message").SetValue(instance, "Hello"); // 5 chars + NUL = 6 bytes. Aligned 4.
             
-            // Size: DHEADER (4) + Id (4) + String Length (4) + String (6) = 18.
+            // Size: Id (4) + String Length (4) + String (6) = 14.
             var getSerializedSizeMethod = generatedType.GetMethod("GetSerializedSize");
             int size = (int)getSerializedSizeMethod.Invoke(instance, new object[] { 0 });
-            Assert.Equal(18, size); 
+            Assert.Equal(14, size); 
 
             // Serialize
             var writerBuffer = new ArrayBufferWriter<byte>();
@@ -84,13 +84,12 @@ namespace TestNamespace
             testHelperType.GetMethod("SerializeWithBuffer").Invoke(null, new object[] { instance, writerBuffer });
             
             // Verify
-            // DHEADER: 18 - 4 = 14 (0x0E).
-            // 0E 00 00 00
+            // DHEADER: No Header (Final)
             // Id: 10 -> 0A 00 00 00
             // String Len: 6 -> 06 00 00 00
             // String: 'H' 'e' 'l' 'l' 'o' '\0' -> 48 65 6C 6C 6F 00
             
-            string expected = "0E 00 00 00 0A 00 00 00 06 00 00 00 48 65 6C 6C 6F 00";
+            string expected = "0A 00 00 00 06 00 00 00 48 65 6C 6C 6F 00";
             string actual = ToHex(writerBuffer.WrittenSpan.ToArray());
             Assert.Equal(expected.Replace(" ", ""), actual.Replace(" ", ""));
         }
@@ -151,23 +150,22 @@ namespace TestNamespace
             
             generatedType.GetField("Numbers").SetValue(instance, seqInstance);
             
-            // Size: DHEADER (4) + SeqLen (4) + 2*4 = 16.
+            // Size: SeqLen (4) + 2*4 = 12.
             var getSerializedSizeMethod = generatedType.GetMethod("GetSerializedSize");
             int size = (int)getSerializedSizeMethod.Invoke(instance, new object[] { 0 });
-            Assert.Equal(16, size);
+            Assert.Equal(12, size);
             
             // Serialize
             var writerBuffer = new ArrayBufferWriter<byte>();
             assembly.GetType("TestNamespace.TestHelper").GetMethod("SerializeWithBuffer").Invoke(null, new object[] { instance, writerBuffer });
             
             // Verify
-            // DHEADER: 12 (0x0C)
-            // 0C 00 00 00
+            // DHEADER: No Header (Final)
             // SeqLen: 2 -> 02 00 00 00
             // Item 1: 100 -> 64 00 00 00
             // Item 2: 200 -> C8 00 00 00
             
-            string expected = "0C 00 00 00 02 00 00 00 64 00 00 00 C8 00 00 00";
+            string expected = "02 00 00 00 64 00 00 00 C8 00 00 00";
              string actual = ToHex(writerBuffer.WrittenSpan.ToArray());
             Assert.Equal(expected.Replace(" ", ""), actual.Replace(" ", ""));
         }
@@ -243,30 +241,24 @@ namespace TestNamespace
             outerTypeGenerated.GetField("Inner").SetValue(outerInstance, innerInstance);
             
             // Size:
-            // Outer DHEADER (4)
-            // Inner:
-            //   Inner DHEADER (4)
-            //   Text Len (4)
-            //   Text (4) ("Abc\0")
-            // Total Inner Body = 4+4 = 8. (DHEADER is generally Body Size, but here we calculate total consumed)
-            // Inner Total = 12.
-            // Outer Total = 4 + 12 = 16.
+            // Text Len (4)
+            // Text (4) ("Abc\0")
+            // Inner Total = 8.
+            // Outer Total = 8.
             
             var getSerializedSizeMethod = outerTypeGenerated.GetMethod("GetSerializedSize");
             int size = (int)getSerializedSizeMethod.Invoke(outerInstance, new object[] { 0 });
-            Assert.Equal(16, size);
+            Assert.Equal(8, size);
             
             // Serialize
              var writerBuffer = new ArrayBufferWriter<byte>();
             assembly.GetType("TestNamespace.TestHelper").GetMethod("SerializeWithBuffer").Invoke(null, new object[] { outerInstance, writerBuffer });
             
             // Verify
-            // Outer DHEADER: 12 (0C 00 00 00) (Body size = 16 - 4 = 12)
-            // Inner DHEADER: 8 (08 00 00 00) (Body size = 12 - 4 = 8)
             // Text Len: 4 (04 00 00 00)
             // Text: 41 62 63 00
             
-            string expected = "0C 00 00 00 08 00 00 00 04 00 00 00 41 62 63 00";
+            string expected = "04 00 00 00 41 62 63 00";
              string actual = ToHex(writerBuffer.WrittenSpan.ToArray());
             Assert.Equal(expected.Replace(" ", ""), actual.Replace(" ", ""));
         }

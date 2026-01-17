@@ -76,6 +76,11 @@ namespace CycloneDDS.Core
             _cursor += fixedSize;
         }
 
+        public void WriteFixedString(string value, int fixedSize)
+        {
+             _cursor += fixedSize;
+        }
+
         public void WriteUInt8(byte value) => _cursor += 1;
         
         public void WriteInt8(sbyte value) => _cursor += 1;

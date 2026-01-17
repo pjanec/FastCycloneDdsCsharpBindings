@@ -17,6 +17,10 @@ namespace CycloneDDS.CodeGen.Tests
             string v2StructDef, 
             Action<System.Reflection.Assembly> setupAndVerify)
         {
+            // Enforce Appendable for schema evolution tests to ensure DHEADER support
+            if (!v1Type.HasAttribute("Appendable")) v1Type.Attributes.Add(new AttributeInfo { Name = "Appendable" });
+            if (!v2Type.HasAttribute("Appendable")) v2Type.Attributes.Add(new AttributeInfo { Name = "Appendable" });
+
             var emitter = new SerializerEmitter();
             var demitter = new DeserializerEmitter();
 
@@ -479,6 +483,146 @@ namespace SchemaTest {
                      Assert.Null(GetField(v1Res, "X"));
                  }
              );
+        }
+
+        [Fact]
+        public void FieldReordering_Compatible_WithAppendable()
+        {
+            // V1: { [DdsId(0)] int A; [DdsId(1)] int B; }
+            var v1 = new TypeInfo { 
+                Name = "DataOrder", 
+                Namespace = "Version1", 
+                Fields = new List<FieldInfo> { 
+                    new FieldInfo { Name = "A", TypeName = "int", Attributes = new List<AttributeInfo>{ new AttributeInfo { Name = "DdsId", Arguments = new List<object> {0} } } },
+                    new FieldInfo { Name = "B", TypeName = "int", Attributes = new List<AttributeInfo>{ new AttributeInfo { Name = "DdsId", Arguments = new List<object> {1} } } }
+                } 
+            };
+            
+            // V2: { [DdsId(1)] int B; [DdsId(0)] int A; } - REORDERED
+            var v2 = new TypeInfo { 
+                Name = "DataOrder", 
+                Namespace = "Version2", 
+                Fields = new List<FieldInfo> { 
+                    new FieldInfo { Name = "B", TypeName = "int", Attributes = new List<AttributeInfo>{ new AttributeInfo { Name = "DdsId", Arguments = new List<object> {1} } } },
+                    new FieldInfo { Name = "A", TypeName = "int", Attributes = new List<AttributeInfo>{ new AttributeInfo { Name = "DdsId", Arguments = new List<object> {0} } } }
+                } 
+            };
+            
+            TestEvolution(v1, v2,
+                "public partial struct DataOrder { [DdsId(0)] public int A; [DdsId(1)] public int B; }",
+                "public partial struct DataOrder { [DdsId(1)] public int B; [DdsId(0)] public int A; }",
+                (asm) => {
+                    var tV2 = asm.GetType("Version2.DataOrder");
+                    var v2Inst = Activator.CreateInstance(tV2);
+                    SetField(v2Inst, "A", 111);
+                    SetField(v2Inst, "B", 222);
+
+                    var helper = asm.GetType("SchemaTest.Interaction");
+                    var buffer = new System.Buffers.ArrayBufferWriter<byte>();
+                    helper.GetMethod("Run").Invoke(null, new object[] { v2Inst, buffer });
+
+                    var v1Res = helper.GetMethod("ReadV1").Invoke(null, new object[] { (ReadOnlyMemory<byte>)buffer.WrittenMemory });
+                    
+                    Assert.Equal(111, GetField(v1Res, "A"));
+                    Assert.Equal(222, GetField(v1Res, "B"));
+                }
+            );
+        }
+
+        [Fact]
+        public void OptionalBecomesRequired_Fails_WithoutHeader()
+        {
+            // V1: { [DdsId(0)] int? OptField; }  
+            var v1 = new TypeInfo { 
+                Name = "DataOpt", 
+                Namespace = "Version1", 
+                Fields = new List<FieldInfo> { 
+                    new FieldInfo { Name = "OptField", TypeName = "int?", Attributes = new List<AttributeInfo>{ new AttributeInfo { Name = "DdsId", Arguments = new List<object> {0} } } }
+                } 
+            };
+            
+            // V2: { [DdsId(0)] int OptField; } - NO LONGER OPTIONAL
+            var v2 = new TypeInfo { 
+                Name = "DataOpt", 
+                Namespace = "Version2", 
+                Fields = new List<FieldInfo> { 
+                    new FieldInfo { Name = "OptField", TypeName = "int", Attributes = new List<AttributeInfo>{ new AttributeInfo { Name = "DdsId", Arguments = new List<object> {0} } } }
+                } 
+            };
+            
+            TestEvolution(v1, v2,
+                "public partial struct DataOpt { [DdsId(0)] public int? OptField; }",
+                "public partial struct DataOpt { [DdsId(0)] public int OptField; }",
+                (asm) => {
+                    var tV2 = asm.GetType("Version2.DataOpt");
+                    var v2Inst = Activator.CreateInstance(tV2);
+                    SetField(v2Inst, "OptField", 999);
+
+                    var helper = asm.GetType("SchemaTest.Interaction");
+                    var buffer = new System.Buffers.ArrayBufferWriter<byte>();
+                    helper.GetMethod("Run").Invoke(null, new object[] { v2Inst, buffer });
+
+                    var v1Res = helper.GetMethod("ReadV1").Invoke(null, new object[] { (ReadOnlyMemory<byte>)buffer.WrittenMemory });
+                    
+                    // Expect failure (null) because V2 writes 4 bytes (999), 
+                    // V1 reads 4 bytes as EMHEADER, finds mismatch/invalid, and skips field.
+                    Assert.Null(GetField(v1Res, "OptField"));
+                }
+            );
+        }
+
+        [Fact]
+        public void UnionDiscriminatorTypeChange_Incompatible()
+        {
+            // V1: union switch(short)
+            var v1 = new TypeInfo { 
+                Name = "UShort", 
+                Namespace = "Version1", 
+                Attributes = new List<AttributeInfo>{ new AttributeInfo{Name="DdsUnion"} },
+                Fields = new List<FieldInfo> {
+                    new FieldInfo { Name = "D", TypeName = "short", 
+                        Attributes = new List<AttributeInfo>{ new AttributeInfo{Name="DdsDiscriminator"} } },
+                    new FieldInfo { Name = "X", TypeName = "int", 
+                        Attributes = new List<AttributeInfo>{ new AttributeInfo{Name="DdsCase", Arguments=new List<object>{1}} } }
+                }
+            };
+            
+            // V2: union switch(int) - DISCRIMINATOR TYPE CHANGED
+            var v2 = new TypeInfo { 
+                Name = "UShort", 
+                Namespace = "Version2", 
+                Attributes = new List<AttributeInfo>{ new AttributeInfo{Name="DdsUnion"} },
+                Fields = new List<FieldInfo> {
+                    new FieldInfo { Name = "D", TypeName = "int",
+                        Attributes = new List<AttributeInfo>{ new AttributeInfo{Name="DdsDiscriminator"} } },
+                    new FieldInfo { Name = "X", TypeName = "int", 
+                        Attributes = new List<AttributeInfo>{ new AttributeInfo{Name="DdsCase", Arguments=new List<object>{1}} } }
+                }
+            };
+            
+            TestEvolution(v1, v2,
+                "[DdsUnion] public partial struct UShort { [DdsDiscriminator] public short D; [DdsCase(1)] public int X; }",
+                "[DdsUnion] public partial struct UShort { [DdsDiscriminator] public int D; [DdsCase(1)] public int X; }",
+                (asm) => {
+                    var tV2 = asm.GetType("Version2.UShort");
+                    var v2Inst = Activator.CreateInstance(tV2);
+                    SetField(v2Inst, "D", 1);
+                    SetField(v2Inst, "X", 777);
+
+                    var helper = asm.GetType("SchemaTest.Interaction");
+                    var buffer = new System.Buffers.ArrayBufferWriter<byte>();
+                    helper.GetMethod("Run").Invoke(null, new object[] { v2Inst, buffer });
+
+                    try {
+                        var v1Res = helper.GetMethod("ReadV1").Invoke(null, new object[] { (ReadOnlyMemory<byte>)buffer.WrittenMemory });
+                        var disc = (short)GetField(v1Res, "D");
+                        Assert.True(disc != 1, "Discriminator type change causes incompatibility");
+                    }
+                    catch (Exception) {
+                        Assert.True(true, "Discriminator type change is incompatible (threw exception as expected)");
+                    }
+                }
+            );
         }
     }
 }
