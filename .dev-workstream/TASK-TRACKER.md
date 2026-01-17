@@ -42,7 +42,7 @@
 - [x] **FCDC-S015** [DdsManaged] Support → [details](../docs/SERDATA-TASK-MASTER.md#fcdc-s015-ddsmanaged-support-managed-types) ✅ **🎉 COMPLETE**
 - [x] **FCDC-S016** Generator Testing Suite → [details](../docs/SERDATA-TASK-MASTER.md#fcdc-s016-generator-testing-suite) ✅ **🎉 COMPLETE**
 
-**Batches:** BATCH-03 ✅ | BATCH-04 ✅ | BATCH-05 ✅ | BATCH-05.1 ✅ | BATCH-06 ✅ | BATCH-07 ✅ | BATCH-08 ✅ | BATCH-09 ✅ | BATCH-09.1 ✅ | BATCH-09.2 ✅ | BATCH-10 ✅ | BATCH-10.1 ✅ | BATCH-11 ✅ | BATCH-11.1 ✅ | BATCH-12 ✅
+**Batches:** BATCH-03 ✅ | BATCH-04 ✅ | BATCH-05 ✅ | BATCH-05.1 ✅ | BATCH-06 ✅ | BATCH-07 ✅ | BATCH-08 ✅ | BATCH-09 ✅ | BATCH-09.1 ✅ | BATCH-09.2 ✅ | BATCH-10 ✅ | BATCH-10.1 ✅ | BATCH-11 ✅ | BATCH-11.1 ✅ | BATCH-12 ✅ | BATCH-12.1 ✅
 
 ---
 
@@ -428,6 +428,32 @@
 
 ---
 
+### ✅ BATCH-12.1 (Stage 2 - Managed Types Polish)
+**Completed:** 2026-01-17  
+**Tasks:** Edge case verification, validator, type extensibility  
+**Review:** `.dev-workstream/reviews/BATCH-12.1-REVIEW.md`  
+**Tests:** 162 passing (156 + 6 edge case tests)
+
+**Deliverables:**
+- ManagedTypeValidator: Enforces [DdsManaged] attribute (72 lines)
+- Edge case tests: null strings, empty lists, large lists (10k), List<string>, mixed mode
+- Performance verification: 753ms for 10k elements (acceptable)
+- TYPE-EXTENSION-GUIDE.md: Documentation for adding custom types (162 lines)
+
+**Tests Added (6):**
+- ManagedString_Null_RoundTrip: Null string handling
+- ManagedList_Empty_RoundTrip: Empty list (Count=0)
+- ManagedList_Large_PerformanceTest: 10k elements in 753ms
+- ManagedList_Strings_RoundTrip: List<string> verification  
+- MixedManagedUnmanaged_RoundTrip: BoundedSeq + List mixed
+- UnmarkedManagedType_FailsValidation: Validator enforcement
+
+**Quality:** ⭐⭐⭐⭐⭐ Production-ready, comprehensive testing, professional documentation
+
+**Impact:** ✅ **MANAGED TYPES COMPLETE** - Edge cases verified, validator enforces safety, type system extensible!
+
+---
+
 ## Progress Statistics
 
 **Total Tasks:** 32  
@@ -436,7 +462,7 @@
 **Deferred:** 0 tasks  
 **Remaining:** 16 tasks (Stage 3-5)
 
-**Test Count:** 156 passing tests (57 Core + 10 Schema + 89 CodeGen)  
+**Test Count:** 162 passing tests (57 Core + 10 Schema + 95 CodeGen)  
 **Validation Gates Passed:** 3/3 (Golden Rig ✅, Union Interop ✅, Wire Format ✅)
 
 **Estimated Progress:** ~52% complete  
@@ -445,7 +471,7 @@
 - Stage 3: 0% ⏳ (Ready to start)
 - Stage 4-5: 0% 🔵
 
-**Milestone:** 🎉 **STAGE 2 100% COMPLETE!** - Code generator fully functional with managed types support!
+**Milestone:** 🎉 **STAGE 2 100% COMPLETE!** - Code generator fully functional with managed types + extensibility!
 
 ---
 

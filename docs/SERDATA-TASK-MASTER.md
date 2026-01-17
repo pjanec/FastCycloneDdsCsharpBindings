@@ -893,7 +893,6 @@ if (hasValue)
 ---
 
 ### FCDC-S015: [DdsManaged] Support (Managed Types)
-**Status:** 🔴 Not Started  
 **Priority:** Medium  
 **Estimated Effort:** 3-4 days  
 **Dependencies:** FCDC-S011
@@ -919,7 +918,6 @@ Support `[DdsManaged]` attribute for convenience types (`string`, `List<T>`) tha
 ---
 
 ### FCDC-S016: Generator Testing Suite
-**Status:** 🔴 Not Started  
 **Priority:** High  
 **Estimated Effort:** 3-4 days  
 **Dependencies:** FCDC-S010 through FCDC-S015
