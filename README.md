@@ -260,6 +260,8 @@ See `docs/SERDATA-TASK-MASTER.md` for Stage 4+ roadmap.
 # Detailed Overview
 FastCycloneDDS C\# Bindings is a .NET library that provides a high-performance interface to the Eclipse Cyclone DDS middleware. It enables C\# applications to publish/subscribe DDS topics with minimal overhead by eliminating GC allocations and leveraging Cyclone’s native serialization (XCDR2). The binding introduces a C\#-based DSL for defining topic data structures using attributes and custom types, and a zero-copy read/write path for maximum throughput.
 
+![Overview](docs/CsharpBindings_flyer.png)
+
 ## **Features at a Glance**
 
 * **Zero-Allocation Serialization:** Uses a custom CDR serializer (XCDR2 Appendable) implemented in C\#, ensuring no garbage collection overhead in steady-state publishing and receiving. Both fixed-size and variable-size data are handled with zero runtime allocations via pooled buffers.  
