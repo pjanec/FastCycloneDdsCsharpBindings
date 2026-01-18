@@ -179,7 +179,7 @@ namespace Golden {
 ";
 
             // 3. Compile
-            var asm = CompileToAssembly(code, "GoldenAssembly");
+            var asm = CompileToAssembly("GoldenAssembly", code);
             var helper = asm.GetType("Golden.Helper");
             
             // 4. Verify Cases

@@ -153,7 +153,7 @@ namespace SchemaTest
 }}
 ";
             
-            var assembly = CompileToAssembly(fullCode, "SchemaTest_" + Guid.NewGuid().ToString().Replace("-", ""));
+            var assembly = CompileToAssembly("SchemaTest_" + Guid.NewGuid().ToString().Replace("-", ""), fullCode);
             setupAndVerify(assembly);
         }
 
@@ -348,7 +348,7 @@ namespace SchemaTest {
         }
     }
 }";
-             var assembly = CompileToAssembly(code, "SchemaTestNested");
+             var assembly = CompileToAssembly("SchemaTestNested", code);
              var tV2Outer = assembly.GetType("Version2.Outer");
              var tV2Inner = assembly.GetType("Version2.Inner");
              

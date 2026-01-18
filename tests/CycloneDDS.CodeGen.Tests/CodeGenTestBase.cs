@@ -14,9 +14,9 @@ namespace CycloneDDS.CodeGen.Tests
 {
     public class CodeGenTestBase
     {
-        protected Assembly CompileToAssembly(string code, string assemblyName)
+        protected Assembly CompileToAssembly(string assemblyName, params string[] sources)
         {
-            var tree = CSharpSyntaxTree.ParseText(code);
+            var trees = sources.Select(s => CSharpSyntaxTree.ParseText(s)).ToArray();
             
             // Gather references
             var references = new List<MetadataReference>
@@ -37,7 +37,7 @@ namespace CycloneDDS.CodeGen.Tests
             var compilation = CSharpCompilation.Create(assemblyName)
                 .WithOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
                 .AddReferences(references)
-                .AddSyntaxTrees(tree);
+                .AddSyntaxTrees(trees);
 
             using var ms = new MemoryStream();
             var result = compilation.Emit(ms);
@@ -48,7 +48,7 @@ namespace CycloneDDS.CodeGen.Tests
                     diagnostic.IsWarningAsError || diagnostic.Severity == DiagnosticSeverity.Error);
                 
                 var errorMsg = string.Join("\n", failures.Select(d => $"{d.Id}: {d.GetMessage()}"));
-                throw new Exception($"Compilation failed:\n{errorMsg}\n\nCode:\n{code}");
+                throw new Exception($"Compilation failed:\n{errorMsg}\n\nCode:\n{string.Join("\n\n---\n\n", sources)}");
             }
 
             ms.Seek(0, SeekOrigin.Begin);

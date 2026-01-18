@@ -74,7 +74,7 @@ namespace TestNamespace
                     demitter.EmitDeserializer(type, false) + "\n" +
                     GenerateTestHelper("TestNamespace", "AllFeatures");
                           
-            var assembly = CompileToAssembly(code, "ComplexTest1");
+            var assembly = CompileToAssembly("ComplexTest1", code);
             var allFeaturesType = assembly.GetType("TestNamespace.AllFeatures");
             var nestedUnionType = assembly.GetType("TestNamespace.NestedUnion");
             
@@ -141,7 +141,7 @@ namespace TestNamespace
                      emitter.EmitSerializer(lvl1, false) + "\n" + demitter.EmitDeserializer(lvl1, false) + "\n" +
                      GenerateTestHelper("TestNamespace", "Level1");
 
-             var assembly = CompileToAssembly(code, "ComplexTest2");
+             var assembly = CompileToAssembly("ComplexTest2", code);
              var t1 = assembly.GetType("TestNamespace.Level1");
              var t2 = assembly.GetType("TestNamespace.Level2");
              var t3 = assembly.GetType("TestNamespace.Level3");
@@ -215,7 +215,7 @@ namespace TestNamespace
                     emitter.EmitSerializer(dataType, false) + "\n" + demitter.EmitDeserializer(dataType, false) + "\n" +
                     GenerateTestHelper("TestNamespace", "Data");
 
-            var assembly = CompileToAssembly(code, "ComplexTest3");
+            var assembly = CompileToAssembly("ComplexTest3", code);
             var tData = assembly.GetType("TestNamespace.Data");
             var tUnion = assembly.GetType("TestNamespace.MyUnion");
 
@@ -272,7 +272,7 @@ namespace TestNamespace {
                     emitter.EmitSerializer(outer, false) + "\n" + demitter.EmitDeserializer(outer, false) + "\n" +
                     GenerateTestHelper("TestNamespace", "Outer");
 
-            var assembly = CompileToAssembly(code, "ComplexTest4");
+            var assembly = CompileToAssembly("ComplexTest4", code);
             var tOuter = assembly.GetType("TestNamespace.Outer");
             var tInner = assembly.GetType("TestNamespace.InnerStruct");
 
@@ -313,7 +313,7 @@ namespace TestNamespace {
             code += emitter.EmitSerializer(empty, false) + "\n" + demitter.EmitDeserializer(empty, false) + "\n" +
                     GenerateTestHelper("TestNamespace", "Empty");
             
-            var assembly = CompileToAssembly(code, "ComplexTestEmpty");
+            var assembly = CompileToAssembly("ComplexTestEmpty", code);
             var tEmpty = assembly.GetType("TestNamespace.Empty");
             var inst = Activator.CreateInstance(tEmpty);
             
@@ -353,7 +353,7 @@ namespace TestNamespace {
             code += emitter.EmitSerializer(multi, false) + "\n" + demitter.EmitDeserializer(multi, false) + "\n" +
                     GenerateTestHelper("TestNamespace", "MultiOpt");
 
-            var assembly = CompileToAssembly(code, "ComplexTestMultiOpt");
+            var assembly = CompileToAssembly("ComplexTestMultiOpt", code);
             var tMulti = assembly.GetType("TestNamespace.MultiOpt");
             var inst = Activator.CreateInstance(tMulti);
             SetField(inst, "Id", 123);
@@ -404,7 +404,7 @@ namespace TestNamespace {
             code += emitter.EmitSerializer(unionType, false) + "\n" + demitter.EmitDeserializer(unionType, false) + "\n" +
                     GenerateTestHelper("TestNamespace", "DataUnion");
 
-            var assembly = CompileToAssembly(code, "ComplexTestStrUnion");
+            var assembly = CompileToAssembly("ComplexTestStrUnion", code);
             var tUnion = assembly.GetType("TestNamespace.DataUnion");
             var instance = Activator.CreateInstance(tUnion);
             SetField(instance, "D", 1);
@@ -456,7 +456,7 @@ namespace TestNamespace {
                     emitter.EmitSerializer(unionType, false) + "\n" + demitter.EmitDeserializer(unionType, false) + "\n" +
                     GenerateTestHelper("TestNamespace", "DataUnionOpt");
 
-            var assembly = CompileToAssembly(code, "ComplexTestUnionOpt");
+            var assembly = CompileToAssembly("ComplexTestUnionOpt", code);
             var tUnion = assembly.GetType("TestNamespace.DataUnionOpt");
             var tOpt = assembly.GetType("TestNamespace.OptionalStruct");
             
@@ -499,7 +499,7 @@ namespace TestNamespace {
             code += emitter.EmitSerializer(type, false) + "\n" + demitter.EmitDeserializer(type, false) + "\n" +
                     GenerateTestHelper("TestNamespace", "LargeStruct");
 
-            var assembly = CompileToAssembly(code, "ComplexTestLarge");
+            var assembly = CompileToAssembly("ComplexTestLarge", code);
             var tLarge = assembly.GetType("TestNamespace.LargeStruct");
             var instance = Activator.CreateInstance(tLarge);
             for(int i=0; i<120; i++) {
@@ -548,7 +548,7 @@ namespace TestNamespace {
                     emitter.EmitSerializer(matrix, false) + "\n" + demitter.EmitDeserializer(matrix, false) + "\n" +
                     GenerateTestHelper("TestNamespace", "Matrix");
 
-            var assembly = CompileToAssembly(code, "ComplexTestMatrix");
+            var assembly = CompileToAssembly("ComplexTestMatrix", code);
             var tMatrix = assembly.GetType("TestNamespace.Matrix");
             var tRow = assembly.GetType("TestNamespace.InnerRow");
             

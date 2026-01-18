@@ -29,7 +29,7 @@ namespace Perf {
             code += emitter.EmitSerializer(type, false) + "\n" + demitter.EmitDeserializer(type, false) + "\n" +
                     GenerateTestHelper("Perf", "BigSeq");
 
-            var assembly = CompileToAssembly(code, "PerfSeq");
+            var assembly = CompileToAssembly("PerfSeq", code);
             var t = assembly.GetType("Perf.BigSeq");
             var inst = Activator.CreateInstance(t);
             
@@ -86,7 +86,7 @@ namespace Perf {
                      emitter.EmitSerializer(outer, false) + "\n" + demitter.EmitDeserializer(outer, false) + "\n" +
                      GenerateTestHelper("Perf", "Outer");
 
-             var assembly = CompileToAssembly(code, "PerfStress");
+             var assembly = CompileToAssembly("PerfStress", code);
              var tOuter = assembly.GetType("Perf.Outer");
              var tInner = assembly.GetType("Perf.Inner");
              

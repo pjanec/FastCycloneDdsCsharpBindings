@@ -88,7 +88,7 @@ using System.Buffers;
 using CycloneDDS.Schema;
 " + serializerCode + "\n" + deserializerCode + "\n" + structDef;
 
-            var assembly = CompileToAssembly(code, "ManagedStringAssembly");
+            var assembly = CompileToAssembly("ManagedStringAssembly", code);
             
             // Instantiate
             var instance = Instantiate(assembly, "TestManaged.ManagedStringStruct");
@@ -171,7 +171,7 @@ using System.Buffers;
 using CycloneDDS.Schema;
 " + serializerCode + "\n" + deserializerCode + "\n" + structDef;
 
-            var assembly = CompileToAssembly(code, "ManagedListAssembly");
+            var assembly = CompileToAssembly("ManagedListAssembly", code);
             
             var instance = Instantiate(assembly, "TestManaged.ManagedListStruct");
             var numbers = new List<int> { 1, 2, 3, 4, 5 };
@@ -245,7 +245,7 @@ using System.Buffers;
 using CycloneDDS.Schema;
 " + serializerCode + "\n" + deserializerCode + "\n" + structDef;
             
-            var assembly = CompileToAssembly(code, "ManagedStringNullAssembly");
+            var assembly = CompileToAssembly("ManagedStringNullAssembly", code);
             
             var instance = Instantiate(assembly, "TestManaged.ManagedStringStruct");
             SetField(instance, "Text", null);
@@ -318,7 +318,7 @@ using System.Buffers;
 using CycloneDDS.Schema;
 " + serializerCode + "\n" + deserializerCode + "\n" + structDef;
 
-            var assembly = CompileToAssembly(code, "ManagedListEmptyAssembly");
+            var assembly = CompileToAssembly("ManagedListEmptyAssembly", code);
             
             var instance = Instantiate(assembly, "TestManaged.ManagedListStruct");
             SetField(instance, "Numbers", new List<int>());
@@ -392,7 +392,7 @@ using System.Buffers;
 using CycloneDDS.Schema;
 " + serializerCode + "\n" + deserializerCode + "\n" + structDef;
 
-            var assembly = CompileToAssembly(code, "ManagedListLargeAssembly");
+            var assembly = CompileToAssembly("ManagedListLargeAssembly", code);
             
             var instance = Instantiate(assembly, "TestManaged.ManagedListStruct");
             var largeList = Enumerable.Range(0, 10000).ToList();
@@ -483,7 +483,7 @@ using System.Buffers;
 using CycloneDDS.Schema;
 " + serializerCode + "\n" + deserializerCode + "\n" + structDef;
             
-            var assembly = CompileToAssembly(code, "ManagedStringListAssembly");
+            var assembly = CompileToAssembly("ManagedStringListAssembly", code);
             
             var instance = Instantiate(assembly, "TestManaged.StringListStruct");
             var strings = new List<string> { "Alpha", "Beta", "Gamma", "Delta" };
@@ -571,7 +571,7 @@ using System.Buffers;
 using CycloneDDS.Schema;
 " + serializerCode + "\n" + deserializerCode + "\n" + structDef;
 
-            var assembly = CompileToAssembly(code, "MixedStructAssembly");
+            var assembly = CompileToAssembly("MixedStructAssembly", code);
 
             var instance = Instantiate(assembly, "TestManaged.MixedStruct");
             SetField(instance, "Id", 999);
@@ -625,6 +625,149 @@ using CycloneDDS.Schema;
             Assert.Contains(diagnostics, d => d.Severity == ValidationSeverity.Error);
             Assert.Contains(diagnostics, d => d.Message.Contains("[DdsManaged]"));
             Assert.Contains(diagnostics, d => d.Message.Contains("Text"));
+        }
+
+        [Fact]
+        public void TypeManaged_StringField_NoFieldAttribute_Validates()
+        {
+            var type = new TypeInfo
+            {
+                Name = "LogEvent",
+                Namespace = "TestManaged",
+                Attributes = new List<AttributeInfo> { new AttributeInfo { Name = "DdsManaged" } },
+                Fields = new List<FieldInfo>
+                {
+                    new FieldInfo { Name = "Message", TypeName = "string" }  // No field attribute
+                }
+            };
+            
+            var validator = new ManagedTypeValidator();
+            var diagnostics = validator.Validate(type);
+            
+            Assert.Empty(diagnostics); 
+        }
+
+        [Fact]
+        public void TypeManaged_GeneratedCode_Compiles()
+        {
+            var type = new TypeInfo
+            {
+                Name = "CompileLog",
+                Namespace = "TestManaged",
+                Attributes = new List<AttributeInfo> { new AttributeInfo { Name = "DdsManaged" } },
+                Fields = new List<FieldInfo>
+                {
+                    new FieldInfo { Name = "Message", TypeName = "string" },
+                    new FieldInfo { Name = "Names", TypeName = "List<string>" }
+                }
+            };
+            
+            var serializerEmitter = new SerializerEmitter();
+            var serializerCode = serializerEmitter.EmitSerializer(type, false);
+            var deserializerEmitter = new DeserializerEmitter();
+            var deserializerCode = deserializerEmitter.EmitDeserializer(type, false);
+            
+            string structDef = @"
+namespace TestManaged
+{
+    [DdsManaged]
+    public partial struct CompileLog
+    {
+        public string Message;
+        public List<string> Names;
+    }
+}";
+            string code = @"using CycloneDDS.Core;
+using System;
+using System.Text;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Collections.Generic;
+using System.Buffers;
+using CycloneDDS.Schema;
+" + serializerCode + "\n" + deserializerCode + "\n" + structDef;
+
+             var assembly = CompileToAssembly("CompileLogAssembly", code);
+             Assert.NotNull(assembly);
+        }
+
+        [Fact]
+        public void TypeManaged_Roundtrip_Preserves()
+        {
+            var type = new TypeInfo
+            {
+                Name = "RoundtripLog",
+                Namespace = "TestManaged",
+                Attributes = new List<AttributeInfo> { new AttributeInfo { Name = "DdsManaged" } },
+                Fields = new List<FieldInfo>
+                {
+                    new FieldInfo { Name = "Message", TypeName = "string" },
+                    new FieldInfo { Name = "Tags", TypeName = "List<string>" }
+                }
+            };
+            
+            var serializerEmitter = new SerializerEmitter();
+            var serializerCode = serializerEmitter.EmitSerializer(type, false);
+            
+            var deserializerEmitter = new DeserializerEmitter();
+            var deserializerCode = deserializerEmitter.EmitDeserializer(type, false);
+            
+            string structDef = @"
+namespace TestManaged
+{
+    [DdsManaged]
+    public partial struct RoundtripLog
+    {
+        public string Message;
+        public List<string> Tags;
+    }
+    
+    public static class RTLogger
+    {
+         public static void Serialize(object instance, IBufferWriter<byte> buffer)
+        {
+            var typed = (RoundtripLog)instance;
+            var writer = new CycloneDDS.Core.CdrWriter(buffer);
+            typed.Serialize(ref writer);
+            writer.Complete();
+        }
+
+        public static object Deserialize(ReadOnlyMemory<byte> buffer)
+        {
+            var reader = new CycloneDDS.Core.CdrReader(buffer.Span);
+            var view = RoundtripLog.Deserialize(ref reader);
+            return view.ToOwned();
+        }
+    }
+}";
+           string code = @"using CycloneDDS.Core;
+using System;
+using System.Text;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Collections.Generic;
+using System.Buffers;
+using CycloneDDS.Schema;
+" + serializerCode + "\n" + deserializerCode + "\n" + structDef;
+
+           var assembly = CompileToAssembly("RoundtripLogAssembly", code);
+           
+           var logType = assembly.GetType("TestManaged.RoundtripLog");
+           var instance = Activator.CreateInstance(logType);
+           SetField(instance, "Message", "Valid Message");
+           SetField(instance, "Tags", new List<string> { "Tag1", "Tag2" });
+           
+           var helper = assembly.GetType("TestManaged.RTLogger");
+           var buffer = new ArrayBufferWriter<byte>();
+           helper.GetMethod("Serialize").Invoke(null, new object[] { instance, buffer });
+           
+           var bytes = buffer.WrittenMemory;
+           var result = helper.GetMethod("Deserialize").Invoke(null, new object[] { bytes });
+           
+           Assert.Equal("Valid Message", GetField(result, "Message"));
+           var tags = (List<string>)GetField(result, "Tags");
+           Assert.Equal(2, tags.Count);
+           Assert.Equal("Tag1", tags[0]);
         }
     }
 }

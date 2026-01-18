@@ -72,14 +72,17 @@ namespace CycloneDDS.CodeGen
                     if (typeSymbol == null) continue;
 
                     bool isTopic = HasAttribute(typeSymbol, "CycloneDDS.Schema.DdsTopicAttribute");
+                    bool isStruct = HasAttribute(typeSymbol, "CycloneDDS.Schema.DdsStructAttribute");
                     bool isEnum = typeSymbol.TypeKind == TypeKind.Enum;
 
-                    if (isTopic || isEnum)
+                    if (isTopic || isStruct || isEnum)
                     {
                         var typeInfo = new TypeInfo 
                         { 
                             Name = typeSymbol.Name,
                             Namespace = typeSymbol.ContainingNamespace?.ToDisplayString() ?? string.Empty,
+                            IsTopic = isTopic,
+                            IsStruct = isStruct,
                             IsEnum = isEnum,
                             Attributes = ExtractAttributes(typeSymbol)
                         };
@@ -127,6 +130,17 @@ namespace CycloneDDS.CodeGen
                     if (topicMap.TryGetValue(lookupName, out var resolvedType))
                     {
                         field.Type = resolvedType;
+                    }
+                    else if (lookupName.Contains("<") && lookupName.Contains(">"))
+                    {
+                         var start = lookupName.IndexOf('<') + 1;
+                         var end = lookupName.LastIndexOf('>');
+                         var innerName = lookupName.Substring(start, end - start).Trim().TrimEnd('?');
+                         
+                         if (topicMap.TryGetValue(innerName, out var resolvedInner))
+                         {
+                             field.GenericType = resolvedInner;
+                         }
                     }
                 }
             }

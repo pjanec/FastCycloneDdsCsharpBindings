@@ -10,6 +10,8 @@ namespace CycloneDDS.CodeGen
         public List<AttributeInfo> Attributes { get; set; } = new List<AttributeInfo>();
         
         public bool IsEnum { get; set; }
+        public bool IsTopic { get; set; }
+        public bool IsStruct { get; set; }
         public List<string> EnumMembers { get; set; } = new List<string>();
 
         public bool HasAttribute(string name) => Attributes.Any(a => a.Name == name || a.Name == name + "Attribute");
@@ -27,6 +29,7 @@ namespace CycloneDDS.CodeGen
         public string Name { get; set; } = string.Empty;
         public string TypeName { get; set; } = string.Empty;
         public TypeInfo? Type { get; set; } // Resolved nested type, null if primitive/external
+        public TypeInfo? GenericType { get; set; } // Resolved generic argument type (e.g. T in List<T>)
         public List<AttributeInfo> Attributes { get; set; } = new List<AttributeInfo>();
 
         public bool HasAttribute(string name) => Attributes.Any(a => a.Name == name || a.Name == name + "Attribute");

@@ -6,6 +6,15 @@ namespace CycloneDDS.CodeGen
 {
     public class SchemaValidator
     {
+        private readonly HashSet<string> _knownTypeNames;
+   
+        public SchemaValidator(IEnumerable<TypeInfo> discoveredTypes)
+        {
+            _knownTypeNames = new HashSet<string>(
+                discoveredTypes.Select(t => t.FullName)
+            );
+        }
+
         public ValidationResult Validate(TypeInfo type)
         {
             var errors = new List<string>();
@@ -17,8 +26,7 @@ namespace CycloneDDS.CodeGen
             // 2. Validate field types
             foreach (var field in type.Fields)
             {
-                if (!IsValidFieldType(field))
-                    errors.Add($"Invalid field type: {field.TypeName} in {type.FullName}.{field.Name}");
+               ValidateFieldType(field, type.FullName, errors);
             }
             
             // 3. Check union structure (if [DdsUnion])
@@ -30,62 +38,65 @@ namespace CycloneDDS.CodeGen
             return new ValidationResult(errors);
         }
 
-        private bool IsValidFieldType(FieldInfo field)
+        private void ValidateFieldType(FieldInfo field, string containerName, List<string> errors)
         {
-            // If it's a resolved nested type, it's valid (assuming the nested type itself is valid, which is checked separately)
-            if (field.Type != null) return true;
-
-            var typeName = field.TypeName;
+            string typeName = field.TypeName;
             
-            // Primitives
-            if (IsPrimitive(typeName)) return true;
+            // Handle nullable
+            if (typeName.EndsWith("?"))
+                typeName = typeName.TrimEnd('?');
             
-            // String (must be managed)
-            if (typeName == "string" || typeName == "System.String")
+            // Primitives OK
+            if (TypeMapper.IsPrimitive(typeName)) return;
+            
+            // Known wrappers OK
+            if (typeName.Contains("FixedString")) return;
+            if (typeName == "Guid" || typeName == "DateTime" || typeName == "TimeSpan") return;
+            if (typeName.Contains("Vector") || typeName == "Quaternion") return;
+            
+            // Collections - recurse
+            if (typeName.StartsWith("BoundedSeq<") || typeName.StartsWith("List<"))
             {
-                return field.HasAttribute("DdsManaged");
+                string innerType = ExtractGenericArgument(typeName);
+                // Recursively validate inner type
+                if (!IsValidUserType(innerType) && !TypeMapper.IsPrimitive(innerType) && innerType != "string")
+                {
+                    errors.Add($"Field '{containerName}.{field.Name}' uses collection of type '{innerType}', " +
+                               $"which is not a valid DDS type. Mark '{innerType}' with [DdsStruct] or [DdsTopic].");
+                }
+                return;
             }
-
-            // Fixed Strings
-            if (typeName.Contains("FixedString32") || 
-                typeName.Contains("FixedString64") ||
-                typeName.Contains("FixedString128") ||
-                typeName.Contains("FixedString256")) return true;
-
-            // BoundedSeq
-            if (typeName.Contains("BoundedSeq<")) return true;
-
-            // Managed types
-            if (field.HasAttribute("DdsManaged"))
+            
+            // Managed strings
+            if (typeName == "string")
             {
-                if (typeName == "string" || typeName == "System.String") return true;
-                if (typeName.Contains("List<")) return true;
+                // Already validated by ManagedTypeValidator
+                return;
             }
-
-            // Enums or other user types (not system types)
-            if (!typeName.StartsWith("System.") && !typeName.StartsWith("List<")) return true;
-
-            return false;
+            
+            // User-defined types - THE STRICT CHECK
+            if (!IsValidUserType(typeName))
+            {
+                errors.Add($"Field '{containerName}.{field.Name}' uses type '{typeName}', " +
+                           $"which is not a valid DDS type. " +
+                           $"Did you forget to add [DdsStruct] or [DdsTopic] to '{typeName}'?");
+            }
         }
-
-        private bool IsPrimitive(string typeName)
+   
+        private bool IsValidUserType(string typeName)
         {
-            return typeName switch
+            return _knownTypeNames.Contains(typeName);
+        }
+   
+        private string ExtractGenericArgument(string typeName)
+        {
+            int start = typeName.IndexOf('<') + 1;
+            int end = typeName.LastIndexOf('>');
+            if (start > 0 && end > start)
             {
-                "byte" or "System.Byte" => true,
-                "sbyte" or "System.SByte" => true,
-                "short" or "System.Int16" => true,
-                "ushort" or "System.UInt16" => true,
-                "int" or "System.Int32" => true,
-                "uint" or "System.UInt32" => true,
-                "long" or "System.Int64" => true,
-                "ulong" or "System.UInt64" => true,
-                "float" or "System.Single" => true,
-                "double" or "System.Double" => true,
-                "bool" or "System.Boolean" => true,
-                "char" or "System.Char" => true,
-                _ => false
-            };
+                return typeName.Substring(start, end - start).Trim();
+            }
+            return typeName;
         }
         
         private void ValidateUnion(TypeInfo type, List<string> errors)

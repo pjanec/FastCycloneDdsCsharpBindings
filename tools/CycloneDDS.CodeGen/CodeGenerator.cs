@@ -6,36 +6,47 @@ namespace CycloneDDS.CodeGen
     public class CodeGenerator
     {
         private readonly SchemaDiscovery _discovery = new SchemaDiscovery();
-        private readonly SchemaValidator _validator = new SchemaValidator();
+        // SchemaValidator now requires types, so instantiated in Generate
         private readonly IdlEmitter _idlEmitter = new IdlEmitter();
-        
+        private readonly SerializerEmitter _serializerEmitter = new SerializerEmitter();
+        private readonly DeserializerEmitter _deserializerEmitter = new DeserializerEmitter();
+
         public void Generate(string sourceDir, string outputDir)
         {
-            Console.WriteLine($"Discovering topics in: {sourceDir}");
-            var topics = _discovery.DiscoverTopics(sourceDir);
+            Console.WriteLine($"Discovering types in: {sourceDir}");
+            var types = _discovery.DiscoverTopics(sourceDir);
             
-            Console.WriteLine($"Found {topics.Count} topic(s)");
-
-            // Managed Type Validation
+            Console.WriteLine($"Found {types.Count} type(s)");
+            
+            // 2. Validate ALL types with strict checking
+            var validator = new SchemaValidator(types);
             var managedValidator = new ManagedTypeValidator();
-            var allDiagnostics = new List<ValidationMessage>();
-
-            foreach (var topic in topics)
+            
+            bool hasErrors = false;
+            foreach (var type in types)
             {
-                var validationErrors = managedValidator.Validate(topic);
-                allDiagnostics.AddRange(validationErrors);
-            }
-
-            if (allDiagnostics.Any(d => d.Severity == ValidationSeverity.Error))
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                foreach (var diagnostic in allDiagnostics.Where(d => d.Severity == ValidationSeverity.Error))
+                var result = validator.Validate(type);
+                if (!result.IsValid)
                 {
-                    Console.WriteLine($"ERROR: {diagnostic.Message}");
+                    hasErrors = true;
+                    foreach (var err in result.Errors)
+                    {
+                        Console.Error.WriteLine($"ERROR: {err}");
+                    }
                 }
-                Console.ResetColor();
-                Console.WriteLine("Generation failed due to validation errors.");
-                return;
+
+                var managedErrors = managedValidator.Validate(type);
+                if (managedErrors.Any(d => d.Severity == ValidationSeverity.Error))
+                {
+                    hasErrors = true;
+                     foreach (var d in managedErrors.Where(d => d.Severity == ValidationSeverity.Error))
+                         Console.Error.WriteLine($"ERROR: {d.Message}");
+                }
+            }
+            
+            if (hasErrors)
+            {
+                throw new InvalidOperationException("Schema validation failed. Fix errors above.");
             }
             
             if (!Directory.Exists(outputDir))
@@ -43,84 +54,65 @@ namespace CycloneDDS.CodeGen
                 Directory.CreateDirectory(outputDir);
             }
 
-            foreach (var topic in topics)
+            foreach (var topic in types)
             {
-                var validationResult = _validator.Validate(topic);
-                if (!validationResult.IsValid)
+                if (topic.IsTopic || topic.IsStruct)
                 {
-                    Console.Error.WriteLine($"Validation failed for {topic.FullName}:");
-                    foreach (var error in validationResult.Errors)
-                    {
-                        Console.Error.WriteLine($"  - {error}");
-                    }
-                    continue; // Skip invalid topics
+                    var serializerCode = _serializerEmitter.EmitSerializer(topic);
+                    File.WriteAllText(Path.Combine(outputDir, $"{topic.Name}.Serializer.cs"), serializerCode);
+
+                    var deserializerCode = _deserializerEmitter.EmitDeserializer(topic);
+                    File.WriteAllText(Path.Combine(outputDir, $"{topic.Name}.Deserializer.cs"), deserializerCode);
+                    Console.WriteLine($"    Generated Serializers for {topic.Name}");
                 }
 
-                Console.WriteLine($"  - {topic.FullName}");
-                
-                var idl = _idlEmitter.EmitIdl(topic);
-                string idlPath = Path.Combine(outputDir, $"{topic.Name}.idl");
-                File.WriteAllText(idlPath, idl);
-                Console.WriteLine($"    Generated {topic.Name}.idl");
-
-                // --- Descriptor Generation ---
-                try
+                if (topic.IsTopic)
                 {
-                    var idlcRunner = new IdlcRunner();
-                    // Try to find idlc relative to workspace if not found
-                    // Assuming we are in tools/CycloneDDS.CodeGen/bin/Debug/net8.0
-                    // And cyclonedds-bin is in root/cyclone-bin/Release
-                    // But simpler to rely on IdlcRunner logic, maybe set env var if needed?
-                    // For now, let's try to detect if we can find it.
-                    // Or explicitly set it if we know where we are.
+                    Console.WriteLine($"  - {topic.FullName}");
                     
-                    // Actually, let's just run it. If it fails, we catch exception.
-                    // We need a temp dir for C output to avoid polluting Gen folder? 
-                    // Or just use Gen folder and delete .c/.h files?
-                    string tempCGroup = Path.Combine(outputDir, "temp_c");
-                    if (!Directory.Exists(tempCGroup)) Directory.CreateDirectory(tempCGroup);
+                    var idl = _idlEmitter.EmitIdl(topic);
+                    string idlPath = Path.Combine(outputDir, $"{topic.Name}.idl");
+                    File.WriteAllText(idlPath, idl);
+                    Console.WriteLine($"    Generated {topic.Name}.idl");
 
-                    var result = idlcRunner.RunIdlc(idlPath, tempCGroup);
-                    if (result.ExitCode != 0)
+                    // --- Descriptor Generation ---
+                    try
                     {
-                         Console.Error.WriteLine($"    idlc failed: {result.StandardError}");
-                    }
-                    else
-                    {
-                        // Parse C file
-                        string cFile = Path.Combine(tempCGroup, $"{topic.Name}.c");
-                        if (File.Exists(cFile))
+                        var idlcRunner = new IdlcRunner();
+                        string tempCGroup = Path.Combine(outputDir, "temp_c");
+                        if (!Directory.Exists(tempCGroup)) Directory.CreateDirectory(tempCGroup);
+
+                        var result = idlcRunner.RunIdlc(idlPath, tempCGroup);
+                        if (result.ExitCode != 0)
                         {
-                            var parser = new DescriptorParser();
-                            var metadata = parser.ParseDescriptor(cFile);
-                            
-                            // Generate Descriptor Code
-                            var descCode = GenerateDescriptorCode(topic, metadata);
-                             File.WriteAllText(Path.Combine(outputDir, $"{topic.Name}.Descriptor.cs"), descCode);
-                             Console.WriteLine($"    Generated {topic.Name}.Descriptor.cs");
+                             Console.Error.WriteLine($"    idlc failed: {result.StandardError}");
                         }
                         else
                         {
-                            Console.Error.WriteLine($"    Could not find generated C file: {cFile}");
+                            // Parse C file
+                            string cFile = Path.Combine(tempCGroup, $"{topic.Name}.c");
+                            if (File.Exists(cFile))
+                            {
+                                var parser = new DescriptorParser();
+                                var metadata = parser.ParseDescriptor(cFile);
+                                
+                                // Generate Descriptor Code
+                                var descCode = GenerateDescriptorCode(topic, metadata);
+                                 File.WriteAllText(Path.Combine(outputDir, $"{topic.Name}.Descriptor.cs"), descCode);
+                                 Console.WriteLine($"    Generated {topic.Name}.Descriptor.cs");
+                            }
+                            else
+                            {
+                                Console.Error.WriteLine($"    Could not find generated C file: {cFile}");
+                            }
                         }
                     }
+                    catch (Exception ex)
+                    {
+                         Console.Error.WriteLine($"    Descriptor generation failed: {ex.Message}");
+                         // Don't fail the whole build for now, but warn
+                    }
                 }
-                catch (Exception ex)
-                {
-                     Console.Error.WriteLine($"    Descriptor generation failed: {ex.Message}");
-                     // Don't fail the whole build for now, but warn
-                }
-                // -----------------------------
-
-                var serializerEmitter = new SerializerEmitter();
-                var serializerCode = serializerEmitter.EmitSerializer(topic);
-                File.WriteAllText(Path.Combine(outputDir, $"{topic.Name}.Serializer.cs"), serializerCode);
-                Console.WriteLine($"    Generated {topic.Name}.Serializer.cs");
-
-                var deserializerEmitter = new DeserializerEmitter();
-                var deserializerCode = deserializerEmitter.EmitDeserializer(topic);
-                File.WriteAllText(Path.Combine(outputDir, $"{topic.Name}.Deserializer.cs"), deserializerCode);
-                Console.WriteLine($"    Generated {topic.Name}.Deserializer.cs");
             }
             
             Console.WriteLine($"Output will go to: {outputDir}");

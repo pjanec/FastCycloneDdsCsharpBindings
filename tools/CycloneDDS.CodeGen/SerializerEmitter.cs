@@ -694,24 +694,36 @@ namespace CycloneDDS.CodeGen
             return "int"; // Fallback
         }
 
-        private bool IsVariableType(FieldInfo field)
+        private bool IsVariableType(TypeInfo parent, FieldInfo field)
         {
-            if (field.TypeName == "string" && field.HasAttribute("DdsManaged"))
-                return true;
+            if (field.TypeName == "string")
+            {
+                if (ShouldUseManagedSerialization(parent, field)) return true;
+                // Validation ensures string is always managed, so technically this is always true if valid
+            }
             
             if (field.TypeName.StartsWith("BoundedSeq") || field.TypeName.Contains("BoundedSeq<"))
                 return true;
             
+            // Checks for List<T> (Managed)
+            if (field.TypeName.StartsWith("List<") || field.TypeName.StartsWith("System.Collections.Generic.List<"))
+                return true;
+
             // Check if nested struct is variable
             if (field.Type != null && HasVariableFields(field.Type))
                 return true;
             
             return false;
         }
+        
+        private bool ShouldUseManagedSerialization(TypeInfo type, FieldInfo field)
+        {
+            return type.HasAttribute("DdsManaged") || field.HasAttribute("DdsManaged");
+        }
 
         private bool HasVariableFields(TypeInfo type)
         {
-            return type.Fields.Any(f => IsVariableType(f));
+            return type.Fields.Any(f => IsVariableType(type, f));
         }
 
         private int GetFieldId(FieldInfo field, int defaultId)

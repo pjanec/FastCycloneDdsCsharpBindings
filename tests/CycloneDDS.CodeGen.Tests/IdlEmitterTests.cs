@@ -169,7 +169,7 @@ namespace CycloneDDS.CodeGen.Tests
         [Fact]
         public void Struct_WithDependency_EmitsInclude()
         {
-            var depType = new TypeInfo { Name = "OtherStruct" };
+            var depType = new TypeInfo { Name = "OtherStruct", IsTopic = true };
             var type = new TypeInfo
             {
                 Name = "MyStruct",

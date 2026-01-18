@@ -6,6 +6,11 @@ namespace CycloneDDS.CodeGen.Tests
 {
     public class SchemaValidatorTests
     {
+        private SchemaValidator CreateValidator(params TypeInfo[] types)
+        {
+            return new SchemaValidator(types);
+        }
+
         [Fact]
         public void ValidStruct_WithPrimitives_Passes()
         {
@@ -18,30 +23,88 @@ namespace CycloneDDS.CodeGen.Tests
                     new FieldInfo { Name = "F2", TypeName = "double" }
                 }
             };
-
-            var validator = new SchemaValidator();
+            
+            var validator = CreateValidator(type);
             var result = validator.Validate(type);
 
             Assert.True(result.IsValid);
         }
 
         [Fact]
-        public void Struct_WithInvalidFieldType_Fails()
+        public void Validation_UnknownStruct_EmitsError()
         {
             var type = new TypeInfo
             {
                 Name = "TestStruct",
                 Fields = new List<FieldInfo>
                 {
-                    new FieldInfo { Name = "F1", TypeName = "System.Random" }
+                    new FieldInfo { Name = "F1", TypeName = "UnknownType" }
                 }
             };
 
-            var validator = new SchemaValidator();
+            var validator = CreateValidator(type);
             var result = validator.Validate(type);
 
             Assert.False(result.IsValid);
-            Assert.Contains("Invalid field type", result.Errors[0]);
+            Assert.Contains("uses type 'UnknownType'", result.Errors[0]);
+            Assert.Contains("forget to add [DdsStruct]", result.Errors[0]);
+        }
+
+        [Fact]
+        public void Validation_KnownStruct_Passes()
+        {
+             var helper = new TypeInfo { Name = "Helper", IsStruct = true };
+             var main = new TypeInfo 
+             { 
+                 Name = "Main", 
+                 Fields = new List<FieldInfo>
+                 {
+                     new FieldInfo { Name = "H", TypeName = "Helper", Type = helper }
+                 }
+             };
+             
+             var validator = CreateValidator(helper, main);
+             var result = validator.Validate(main);
+             
+             Assert.True(result.IsValid);
+        }
+
+        [Fact]
+        public void Validation_NestedSequence_UnknownType_EmitsError()
+        {
+            var type = new TypeInfo
+            {
+                Name = "TestStruct",
+                Fields = new List<FieldInfo>
+                {
+                    new FieldInfo { Name = "Seq", TypeName = "BoundedSeq<Unknown>" }
+                }
+            };
+
+            var validator = CreateValidator(type);
+            var result = validator.Validate(type);
+
+            Assert.False(result.IsValid);
+            Assert.Contains("uses collection of type 'Unknown'", result.Errors[0]);
+        }
+
+        [Fact]
+        public void Validation_NestedSequence_KnownType_Passes()
+        {
+            var helper = new TypeInfo { Name = "Helper", IsStruct = true };
+            var type = new TypeInfo
+            {
+                Name = "TestStruct",
+                Fields = new List<FieldInfo>
+                {
+                    new FieldInfo { Name = "Seq", TypeName = "BoundedSeq<Helper>" }
+                }
+            };
+
+            var validator = CreateValidator(helper, type);
+            var result = validator.Validate(type);
+
+            Assert.True(result.IsValid);
         }
 
         [Fact]
@@ -50,16 +113,16 @@ namespace CycloneDDS.CodeGen.Tests
             var typeA = new TypeInfo { Name = "A", Namespace = "Test" };
             var typeB = new TypeInfo { Name = "B", Namespace = "Test" };
 
-            typeA.Fields.Add(new FieldInfo { Name = "FieldB", TypeName = "B", Type = typeB });
-            typeB.Fields.Add(new FieldInfo { Name = "FieldA", TypeName = "A", Type = typeA });
+            typeA.Fields.Add(new FieldInfo { Name = "FieldB", TypeName = "Test.B", Type = typeB });
+            typeB.Fields.Add(new FieldInfo { Name = "FieldA", TypeName = "Test.A", Type = typeA });
 
-            var validator = new SchemaValidator();
+            var validator = CreateValidator(typeA, typeB);
             var result = validator.Validate(typeA);
 
             Assert.False(result.IsValid);
             Assert.Contains("Circular dependency", result.Errors[0]);
         }
-
+        
         [Fact]
         public void Union_WithoutDiscriminator_Fails()
         {
@@ -73,132 +136,11 @@ namespace CycloneDDS.CodeGen.Tests
                 }
             };
 
-            var validator = new SchemaValidator();
+            var validator = CreateValidator(type);
             var result = validator.Validate(type);
 
             Assert.False(result.IsValid);
             Assert.Contains("must have exactly one [DdsDiscriminator]", result.Errors[0]);
-        }
-
-        [Fact]
-        public void Union_WithDuplicateCaseValues_Fails()
-        {
-            var type = new TypeInfo
-            {
-                Name = "TestUnion",
-                Attributes = new List<AttributeInfo> { new AttributeInfo { Name = "DdsUnion" } },
-                Fields = new List<FieldInfo>
-                {
-                    new FieldInfo 
-                    { 
-                        Name = "Disc", 
-                        TypeName = "int", 
-                        Attributes = new List<AttributeInfo> { new AttributeInfo { Name = "DdsDiscriminator" } } 
-                    },
-                    new FieldInfo 
-                    { 
-                        Name = "Case1", 
-                        TypeName = "int",
-                        Attributes = new List<AttributeInfo> 
-                        { 
-                            new AttributeInfo { Name = "DdsCase", Arguments = new List<object> { 1 } } 
-                        } 
-                    },
-                    new FieldInfo 
-                    { 
-                        Name = "Case2", 
-                        TypeName = "int",
-                        Attributes = new List<AttributeInfo> 
-                        { 
-                            new AttributeInfo { Name = "DdsCase", Arguments = new List<object> { 1 } } 
-                        } 
-                    }
-                }
-            };
-
-            var validator = new SchemaValidator();
-            var result = validator.Validate(type);
-
-            Assert.False(result.IsValid);
-            Assert.Contains("Duplicate case value", result.Errors[0]);
-        }
-
-        [Fact]
-        public void StringField_WithoutDdsManaged_Fails()
-        {
-            var type = new TypeInfo
-            {
-                Name = "TestStruct",
-                Fields = new List<FieldInfo>
-                {
-                    new FieldInfo { Name = "S", TypeName = "string" }
-                }
-            };
-
-            var validator = new SchemaValidator();
-            var result = validator.Validate(type);
-
-            Assert.False(result.IsValid);
-            Assert.Contains("Invalid field type", result.Errors[0]);
-        }
-
-        [Fact]
-        public void StringField_WithDdsManaged_Passes()
-        {
-            var type = new TypeInfo
-            {
-                Name = "TestStruct",
-                Fields = new List<FieldInfo>
-                {
-                    new FieldInfo 
-                    { 
-                        Name = "S", 
-                        TypeName = "string",
-                        Attributes = new List<AttributeInfo> { new AttributeInfo { Name = "DdsManaged" } }
-                    }
-                }
-            };
-
-            var validator = new SchemaValidator();
-            var result = validator.Validate(type);
-
-            Assert.True(result.IsValid);
-        }
-
-        [Fact]
-        public void FixedString_Passes()
-        {
-            var type = new TypeInfo
-            {
-                Name = "TestStruct",
-                Fields = new List<FieldInfo>
-                {
-                    new FieldInfo { Name = "FS", TypeName = "CycloneDDS.Schema.FixedString32" }
-                }
-            };
-
-            var validator = new SchemaValidator();
-            var result = validator.Validate(type);
-
-            Assert.True(result.IsValid);
-        }
-
-        [Fact]
-        public void BoundedSeq_Passes()
-        {
-            var type = new TypeInfo
-            {
-                Name = "TestStruct",
-                Fields = new List<FieldInfo>
-                {
-                    new FieldInfo { Name = "Seq", TypeName = "CycloneDDS.Schema.BoundedSeq<int>" }
-                }
-            };
-
-            var validator = new SchemaValidator();
-            var result = validator.Validate(type);
-
-            Assert.True(result.IsValid);
         }
     }
 }

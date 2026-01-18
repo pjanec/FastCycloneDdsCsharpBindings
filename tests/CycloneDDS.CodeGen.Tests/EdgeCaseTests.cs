@@ -25,7 +25,7 @@ namespace EdgeCase {
             code += emitter.EmitSerializer(type, false) + "\n" + demitter.EmitDeserializer(type, false) + "\n" +
                     GenerateTestHelper("EdgeCase", "StrStruct");
 
-            var assembly = CompileToAssembly(code, "EdgeCaseString");
+            var assembly = CompileToAssembly("EdgeCaseString", code);
             var t = assembly.GetType("EdgeCase.StrStruct");
             var inst = Activator.CreateInstance(t);
             SetField(inst, "S", "");
@@ -57,7 +57,7 @@ namespace EdgeCase {
             code += emitter.EmitSerializer(type, false) + "\n" + demitter.EmitDeserializer(type, false) + "\n" +
                     GenerateTestHelper("EdgeCase", "AllNull");
 
-            var assembly = CompileToAssembly(code, "EdgeCaseNull");
+            var assembly = CompileToAssembly("EdgeCaseNull", code);
             var t = assembly.GetType("EdgeCase.AllNull");
             var inst = Activator.CreateInstance(t); // defaults are null
             
@@ -88,7 +88,7 @@ namespace EdgeCase {
             code += emitter.EmitSerializer(type, false) + "\n" + demitter.EmitDeserializer(type, false) + "\n" +
                     GenerateTestHelper("EdgeCase", "MaxSeq");
 
-            var assembly = CompileToAssembly(code, "EdgeCaseMaxSeq");
+            var assembly = CompileToAssembly("EdgeCaseMaxSeq", code);
             var t = assembly.GetType("EdgeCase.MaxSeq");
             var inst = Activator.CreateInstance(t);
             
@@ -143,7 +143,7 @@ namespace EdgeCase {{
             code += typesEmit;
             code += GenerateTestHelper("EdgeCase", "L10");
 
-            var assembly = CompileToAssembly(code, "EdgeCaseDeep");
+            var assembly = CompileToAssembly("EdgeCaseDeep", code);
             var tL10 = assembly.GetType("EdgeCase.L10");
             
             object current = Activator.CreateInstance(assembly.GetType("EdgeCase.L0"));
@@ -199,7 +199,7 @@ namespace EdgeCase {
             code += emitter.EmitSerializer(unionType, false) + "\n" + demitter.EmitDeserializer(unionType, false) + "\n" +
                     GenerateTestHelper("EdgeCase", "UDefault");
 
-            var assembly = CompileToAssembly(code, "EdgeCaseUDef");
+            var assembly = CompileToAssembly("EdgeCaseUDef", code);
             var t = assembly.GetType("EdgeCase.UDefault");
             var inst = Activator.CreateInstance(t);
             SetField(inst, "D", 5); // 5 not in cases, selects Default logic?
@@ -252,7 +252,7 @@ namespace EdgeCase {
                     emitter.EmitSerializer(structType, false) + "\n" + demitter.EmitDeserializer(structType, false) + "\n" +
                     GenerateTestHelper("EdgeCase", "SOptU");
 
-            var assembly = CompileToAssembly(code, "EdgeCaseOptU");
+            var assembly = CompileToAssembly("EdgeCaseOptU", code);
             var tStruct = assembly.GetType("EdgeCase.SOptU");
             var tUnion = assembly.GetType("EdgeCase.USimple");
             
@@ -300,7 +300,7 @@ namespace EdgeCase {
             code += emitter.EmitSerializer(type, false) + "\n" + demitter.EmitDeserializer(type, false) + "\n" +
                     GenerateTestHelper("EdgeCase", "Zeros");
 
-            var assembly = CompileToAssembly(code, "EdgeCaseZeros");
+            var assembly = CompileToAssembly("EdgeCaseZeros", code);
             var t = assembly.GetType("EdgeCase.Zeros");
             var inst = Activator.CreateInstance(t); // All 0 by default
             
@@ -332,7 +332,7 @@ namespace EdgeCase {
             code += emitter.EmitSerializer(type, false) + "\n" + demitter.EmitDeserializer(type, false) + "\n" +
                     GenerateTestHelper("EdgeCase", "Unicode");
 
-            var assembly = CompileToAssembly(code, "EdgeCaseUnicode");
+            var assembly = CompileToAssembly("EdgeCaseUnicode", code);
             var t = assembly.GetType("EdgeCase.Unicode");
             var inst = Activator.CreateInstance(t);
             string val = "Hello 世界 🌍";

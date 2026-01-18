@@ -2,39 +2,25 @@
 
 **Version:** 2.0 (Serdata Approach)  
 **Date:** 2026-01-16  
-**Status:** Planning Phase - Clean Slate
+
 
 This document provides the master task list for the **serdata-based** implementation of FastCycloneDDS C# bindings. This is a clean-slate approach replacing the old plain-C native struct marshalling with high-performance CDR serialization.
 
----
-
-## Task Status Legend
-
-- 🔴 **Not Started** - Task has not begun
-- 🟡 **In Progress** - Task is actively being worked on
-- 🟢 **Completed** - Task is finished and tested
-- 🔵 **Blocked** - Task is blocked by dependencies
-
+This is not tracking the task status, only defining the tasks. There is a dedicated TASK-TRACKER.md document for tracking the status.
 ---
 
 
-## Overview: 6 Stages, 43 Tasks
 
-**Total Estimated Effort:** 117-157 person-days (6-8 months with 1 developer)
-
-**Critical Path:** Stage 1 → Stage 2 (+ S023, S024, **S025**) → Stage 3 → **Stage 3.75** → Stage 5 (Core + Advanced IDL + Extended API: ~83-109 days)
-
----
 
 ## STAGE 1: Foundation - CDR Core (CRITICAL PATH)
 
 **Goal:** Build and validate the foundational CDR serialization primitives **before** any code generation.
 
 **Duration:** 12-16 days  
-**Status:** 🟢 Completed
+
 
 ### FCDC-S001: CycloneDDS.Core Package Setup
-**Status:** 🟢 Completed  
+
 **Priority:** Critical  
 **Estimated Effort:** 1 day  
 **Dependencies:** None
@@ -50,7 +36,7 @@ Create the `CycloneDDS.Core` package (`net8.0` target) with project structure, b
 ---
 
 ### FCDC-S002: CdrWriter Implementation
-**Status:** 🟢 Completed  
+
 **Priority:** Critical  
 **Estimated Effort:** 3-4 days  
 **Dependencies:** FCDC-S001
@@ -79,7 +65,7 @@ Implement the core `CdrWriter ref struct` that wraps `IBufferWriter<byte>` and p
 ---
 
 ### FCDC-S003: CdrReader Implementation
-**Status:** 🟢 Completed  
+
 **Priority:** Critical  
 **Estimated Effort:** 3-4 days  
 **Dependencies:** FCDC-S001
@@ -107,7 +93,7 @@ Implement the core `CdrReader ref struct` that wraps `ReadOnlySpan<byte>` and pr
 ---
 
 ### FCDC-S004: CdrSizeCalculator Utilities
-**Status:** 🟢 Completed  
+
 **Priority:** Critical  
 **Estimated Effort:** 2 days  
 **Dependencies:** FCDC-S001
@@ -132,7 +118,7 @@ Implement static utility methods for calculating serialized sizes with alignment
 ---
 
 ### FCDC-S005: Golden Rig Integration Test (VALIDATION GATE)
-**Status:** 🟢 Completed  
+
 **Priority:** **CRITICAL - BLOCKING**  
 **Estimated Effort:** 3-5 days  
 **Dependencies:** FCDC-S002, FCDC-S003, FCDC-S004
@@ -187,10 +173,10 @@ Create a validation suite that proves C# CDR serialization produces **byte-ident
 **Goal:** Generate XCDR2-compliant serialization code from C# schema types.
 
 **Duration:** 20-25 days  
-**Status:** 🔵 Blocked (depends on Stage 1)
+
 
 ### FCDC-S006: Schema Package Migration
-**Status:** 🔴 Not Started  
+
 **Priority:** Critical  
 **Estimated Effort:** 1-2 days  
 **Dependencies:** None (parallel with Stage 1)
@@ -215,7 +201,7 @@ Copy and adapt schema definitions from `old_implem/src/CycloneDDS.Schema`.
 ---
 
 ### FCDC-S007: CLI Tool Generator Infrastructure
-**Status:** 🔴 Not Started  
+
 **Priority:** Critical  
 **Estimated Effort:** 3-4 days  
 **Dependencies:** FCDC-S006, **FCDC-S005** (golden rig must pass)
@@ -256,7 +242,7 @@ Reuse and adapt the existing CLI tool (`CycloneDDS.CodeGen`) infrastructure from
 ---
 
 ### FCDC-S008: Schema Validator
-**Status:** 🔴 Not Started  
+
 **Priority:** Critical  
 **Estimated Effort:** 3-4 days  
 **Dependencies:** FCDC-S007
@@ -295,7 +281,7 @@ Validate schema types for XCDR2 appendable compliance and detect breaking change
 ---
 
 ### FCDC-S008b: IDL Compiler Orchestration
-**Status:** 🔴 Not Started  
+
 **Priority:** High  
 **Estimated Effort:** 2 days  
 **Dependencies:** FCDC-S007
@@ -322,7 +308,7 @@ Implement logic within the CLI tool to manage the external Cyclone IDL compiler 
 ---
 
 ### FCDC-S009: IDL Text Emitter (Discovery Only)
-**Status:** 🔴 Not Started  
+
 **Priority:** High  
 **Estimated Effort:** 2-3 days  
 **Dependencies:** FCDC-S007
@@ -352,7 +338,7 @@ Generate IDL files for topic type discovery/registration with Cyclone DDS.
 ---
 
 ### FCDC-S009b: Descriptor Parser (CppAst Replacement)
-**Status:** 🔴 Not Started  
+
 **Priority:** High  
 **Estimated Effort:** 3-4 days  
 **Dependencies:** FCDC-S008b
@@ -387,7 +373,7 @@ Regex fails if `idlc` changes whitespace, indentation, or macro usage. CppAst pa
 ---
 
 ### FCDC-S010: Serializer Code Emitter - Fixed Types
-**Status:** 🔴 Not Started  
+
 **Priority:** Critical  
 **Estimated Effort:** 5-6 days  
 **Dependencies:** FCDC-S007, **FCDC-S005**
@@ -533,7 +519,7 @@ This is the **single source of truth** for alignment. Both `CdrWriter` and `CdrS
 ---
 
 ### FCDC-S011: Serializer Code Emitter - Variable Types
-**Status:** 🔴 Not Started  
+
 **Priority:** Critical  
 **Estimated Effort:** 6-7 days  
 **Dependencies:** FCDC-S010
@@ -735,7 +721,7 @@ writer.WriteByte(0); // NUL terminator
 ---
 
 ### FCDC-S012: Deserializer Code Emitter + View Structs
-**Status:** 🔴 Not Started  
+
 **Priority:** Critical  
 **Estimated Effort:** 5-6 days  
 **Dependencies:** FCDC-S011
@@ -797,7 +783,7 @@ public ref struct SensorDataView
 ---
 
 ### FCDC-S013: Union Support
-**Status:** 🔴 Not Started  
+
 **Priority:** High  
 **Estimated Effort:** 4-5 days  
 **Dependencies:** FCDC-S011
@@ -854,7 +840,7 @@ public int GetSerializedSize(int currentOffset)
 ---
 
 ### FCDC-S014: Optional Members Support
-**Status:** 🔴 Not Started  
+
 **Priority:** Medium  
 **Estimated Effort:** 2-3 days  
 **Dependencies:** FCDC-S011
@@ -944,7 +930,7 @@ Comprehensive testing of all generated code patterns.
 ---
 
 ### FCDC-S023: Nested Struct Support ([DdsStruct] Attribute)
-**Status:** 🔴 Not Started  
+
 **Priority:** HIGH  
 **Estimated Effort:** 2-3 days  
 **Dependencies:** Stage 2 Complete (Generator Infrastructure)
@@ -1019,7 +1005,7 @@ public partial struct RobotPath
 ---
 
 ### FCDC-S024: Type-Level [DdsManaged] Attribute
-**Status:** 🔴 Not Started  
+
 **Priority:** MEDIUM  
 **Estimated Effort:** 1 day  
 **Dependencies:** FCDC-S015 ([DdsManaged] Support exists), Stage 2 Complete
@@ -1100,7 +1086,7 @@ if (IsManagedFieldType(field.TypeName))
 ---
 
 ### FCDC-S025: Advanced IDL Generation Control
-**Status:** 🔴 Not Started  
+
 **Priority:** **CRITICAL** (Essential for real-world DDS systems)  
 **Estimated Effort:** 5-7 days  
 **Dependencies:** FCDC-S009 (IDL Emitter exists), Stage 2 Complete
@@ -1267,10 +1253,10 @@ Assembly B references A, uses Point → auto-generates `#include "Point.idl"`.
 **Goal:** Integrate generated serializers with Cyclone DDS via serdata APIs.
 
 **Duration:** 18-24 days  
-**Status:** 🔵 Blocked (depends on Stage 2)
+
 
 ### FCDC-S017: Runtime Package Setup + P/Invoke
-**Status:** 🔴 Not Started  
+
 **Priority:** Critical  
 **Estimated Effort:** 2 days  
 **Dependencies:** None (parallel)
@@ -1306,7 +1292,7 @@ static extern int dds_take_cdr(
 ---
 
 ### FCDC-S018: DdsParticipant Migration
-**Status:** 🔴 Not Started  
+
 **Priority:** Critical  
 **Estimated Effort:** 1 day  
 **Dependencies:** FCDC-S017
@@ -1329,7 +1315,7 @@ Copy `DdsParticipant.cs` from `old_implem/src/CycloneDDS.Runtime/`.
 ---
 
 ### FCDC-S019: Arena Enhancement for CDR
-**Status:** 🔴 Not Started  
+
 **Priority:** High  
 **Estimated Effort:** 2-3 days  
 **Dependencies:** FCDC-S017
@@ -1353,7 +1339,7 @@ Copy and enhance `Arena.cs` from old_implem for CDR buffer management.
 ---
 
 ### FCDC-S020: DdsWriter<T> (Serdata-Based)
-**Status:** 🔴 Not Started  
+
 **Priority:** Critical  
 **Estimated Effort:** 4-5 days  
 **Dependencies:** FCDC-S017, FCDC-S018, **FCDC-S010** (serializer generation)
@@ -1406,7 +1392,7 @@ public class DdsWriter<T> : IDisposable where T : IDdsSerializable
 ---
 
 ### FCDC-S021: DdsReader<T> + ViewScope
-**Status:** 🔴 Not Started  
+
 **Priority:** Critical  
 **Estimated Effort:** 5-6 days  
 **Dependencies:** FCDC-S017, FCDC-S018, **FCDC-S012** (deserializer generation)
@@ -1463,7 +1449,7 @@ public ref struct ViewScope<TView>
 ---
 
 ### FCDC-S022: End-to-End Integration Tests (VALIDATION GATE)
-**Status:** 🔴 Not Started  
+
 **Priority:** **CRITICAL - BLOCKING**  
 **Estimated Effort:** 5-7 days  
 **Dependencies:** FCDC-S020, FCDC-S021
@@ -1632,7 +1618,7 @@ Implement DDS instance lifecycle operations for keyed topics, enabling proper in
 **Goal:** Add essential DDS features with modern .NET idioms (type auto-discovery, async/await, events, filtering, discovery) plus optional sender tracking.
 
 **Duration:** 15-23 days (8 tasks: 1 foundation + 5 extended API + 2 sender tracking)  
-**Status:** 🔴 Ready to Start  
+
 **Design References:**  
 - `docs/EXTENDED-DDS-API-DESIGN.md` - Core extended API features
 - `docs/SENDER-TRACKING-DESIGN.md` - Sender tracking specification
@@ -1644,7 +1630,7 @@ Implement DDS instance lifecycle operations for keyed topics, enabling proper in
 ---
 
 ### FCDC-EXT00: Type Auto-Discovery & Topic Management
-**Status:** 🔴 Not Started  
+
 **Priority:** **CRITICAL** (Foundation for all other EXT tasks)  
 **Estimated Effort:** 2-3 days  
 **Dependencies:** FCDC-S020 (DdsWriter exists), FCDC-S021 (DdsReader exists)
@@ -1694,7 +1680,7 @@ Eliminate manual descriptor passing by auto-discovering type metadata from gener
 ---
 
 ### FCDC-EXT01: Read vs Take with Condition Masks
-**Status:** 🔴 Not Started  
+
 **Priority:** **CRITICAL**  
 **Estimated Effort:** 2-3 days  
 **Dependencies:** FCDC-S021 (DdsReader exists)
@@ -1735,7 +1721,7 @@ Add non-destructive `Read()` and state filtering to `DdsReader`. Enables "observ
 ---
 
 ### FCDC-EXT02: Async/Await Support (WaitDataAsync)
-**Status:** 🔴 Not Started  
+
 **Priority:** **CRITICAL**  
 **Estimated Effort:** 3-4 days  
 **Dependencies:** FCDC-S021 (DdsReader exists)
@@ -1780,7 +1766,7 @@ Bridge DDS listeners to .NET `async/await` via `TaskCompletionSource`. Enables n
 ---
 
 ### FCDC-EXT03: Content Filtering (Reader-Side Predicates)
-**Status:** 🔴 Not Started  
+
 **Priority:** High  
 **Estimated Effort:** 1-2 days  
 **Dependencies:** FCDC-EXT01 (ViewScope infrastructure)
@@ -1825,7 +1811,7 @@ Add client-side filtering using C# lambda expressions on `TView` struct. Filters
 ---
 
 ### FCDC-EXT04: Status & Discovery (Events)
-**Status:** 🔴 Not Started  
+
 **Priority:** High  
 **Estimated Effort:** 2-3 days  
 **Dependencies:** FCDC-EXT02 (async infrastructure), FCDC-S020, FCDC-S021
@@ -1870,7 +1856,7 @@ Map DDS status callbacks to C# `event EventHandler<TStatus>`. Expose connectivit
 ---
 
 ### FCDC-EXT05: Instance Management (Keyed Topics)
-**Status:** 🔴 Not Started  
+
 **Priority:** Medium  
 **Estimated Effort:** 2-3 days  
 **Dependencies:** FCDC-EXT01 (Read/Take infrastructure), FCDC-S020, FCDC-S021
@@ -1915,7 +1901,7 @@ Enable O(1) lookup and filtering by instance handle for keyed topics. Critical f
 ---
 
 ### FCDC-EXT06: Sender Tracking Infrastructure
-**Status:** 🔴 Not Started  
+
 **Priority:** Medium  
 **Estimated Effort:** 2-3 days  
 **Dependencies:** FCDC-S020 (DdsWriter), FCDC-S021 (DdsReader), FCDC-EXT02 (Async/Await)
@@ -1964,7 +1950,7 @@ Implement optional sender tracking feature allowing attribution of each received
 ---
 
 ### FCDC-EXT07: Sender Tracking Integration
-**Status:** 🔴 Not Started  
+
 **Priority:** Medium  
 **Estimated Effort:** 1-2 days  
 **Dependencies:** FCDC-EXT06 (Sender tracking infrastructure)
@@ -2035,11 +2021,11 @@ Integrate sender tracking into DdsParticipant, DdsWriter, DdsReader, and ViewSco
 **Goal:** Full XCDR2 appendable support with schema evolution.
 
 **Duration:** 10-14 days  
-**Status:** 🔵 Deferred (Stage 3.75 takes priority)
+
 **Note:** Stage 3.75 Extended API features are now higher priority than evolution support.
 
 ### FCDC-S023: DHEADER Fast/Robust Path Optimization
-**Status:** 🔴 Not Started  
+
 **Priority:** Medium (downgraded from High)  
 **Estimated Effort:** 3-4 days  
 **Dependencies:** FCDC-S012, **FCDC-S022**
@@ -2062,7 +2048,7 @@ Optimize generated deserializers with fast-path vs robust-path branching.
 ---
 
 ### FCDC-S024: Schema Evolution Validation
-**Status:** 🔴 Not Started  
+
 **Priority:** High  
 **Estimated Effort:** 2-3 days  
 **Dependencies:** FCDC-S008
@@ -2088,7 +2074,7 @@ Implement build-time validation to detect breaking schema changes.
 ---
 
 ### FCDC-S025: Cross-Version Compatibility Tests
-**Status:** 🔴 Not Started  
+
 **Priority:** High  
 **Estimated Effort:** 3-4 days  
 **Dependencies:** FCDC-S023, FCDC-S024
@@ -2112,7 +2098,7 @@ Test schema evolution scenarios (V1 ↔ V2 compatibility).
 ---
 
 ### FCDC-S026: XCDR2 Specification Compliance Audit
-**Status:** 🔴 Not Started  
+
 **Priority:** Medium  
 **Estimated Effort:** 2-3 days  
 **Dependencies:** FCDC-S023
@@ -2142,10 +2128,10 @@ Audit implementation against OMG XCDR2 specification.
 **Goal:** Polish, performance, documentation, packaging.
 
 **Duration:** 15-20 days  
-**Status:** 🔵 Blocked (depends on Stage 4)
+
 
 ### FCDC-S027: Performance Benchmarks
-**Status:** 🔴 Not Started  
+
 **Priority:** High  
 **Estimated Effort:** 4-5 days  
 **Dependencies:** **FCDC-S022**
@@ -2186,7 +2172,7 @@ Comprehensive performance benchmarking with BenchmarkDotNet.
 ---
 
 ### FCDC-S028: XCDR2 Serializer Design Document
-**Status:** 🔴 Not Started  
+
 **Priority:** High  
 **Estimated Effort:** 3-4 days  
 **Dependencies:** FCDC-S023
@@ -2211,7 +2197,7 @@ Create detailed design document for XCDR2 serialization implementation.
 ---
 
 ### FCDC-S029: NuGet Packaging \u0026 Build Integration
-**Status:** 🔴 Not Started  
+
 **Priority:** High  
 **Estimated Effort:** 3-4 days  
 **Dependencies:** All previous tasks
@@ -2241,7 +2227,7 @@ Package all components as NuGet packages with proper dependencies.
 ---
 
 ### FCDC-S030: Documentation \u0026 Examples
-**Status:** 🔴 Not Started  
+
 **Priority:** High  
 **Estimated Effort:** 4-5 days  
 **Dependencies:** FCDC-S029
@@ -2280,12 +2266,12 @@ Comprehensive user documentation and example projects.
 ## STAGE 6: Advanced Optimizations (Performance++)
 
 **Goal:** Extended type support and block copy optimizations for maximum performance  
-**Status:** 🔴 Not Started  
+
 **Duration:** 16-21 days  
 **Reference:** [ADVANCED-OPTIMIZATIONS-DESIGN.md](ADVANCED-OPTIMIZATIONS-DESIGN.md)
 
 ### FCDC-ADV01: Custom Type Support (Guid, DateTime)
-**Status:** 🔴 Not Started  
+
 **Priority:** Medium  
 **Estimated Effort:** 3-4 days  
 **Dependencies:** FCDC-S002, FCDC-S003, FCDC-S004, FCDC-S007
@@ -2334,7 +2320,7 @@ Add built-in serialization support for common .NET types: `Guid` and `DateTime`.
 ---
 
 ### FCDC-ADV02: System.Numerics Support
-**Status:** 🔴 Not Started  
+
 **Priority:** Medium  
 **Estimated Effort:** 2-3 days  
 **Dependencies:** FCDC-ADV01
@@ -2379,7 +2365,7 @@ Add built-in support for `System.Numerics` math types for robotics/graphics appl
 ---
 
 ### FCDC-ADV03: Array Support (`T[]`)
-**Status:** 🔴 Not Started  
+
 **Priority:** Medium  
 **Estimated Effort:** 2-3 days  
 **Dependencies:** FCDC-S010, FCDC-S011, FCDC-S012, FCDC-S015
@@ -2423,7 +2409,7 @@ Add support for native C# arrays (`T[]`) with `[DdsManaged]` attribute.
 ---
 
 ### FCDC-ADV04: Dictionary Support (`Dictionary<K,V>`)
-**Status:** 🔴 Not Started  
+
 **Priority:** Medium  
 **Estimated Effort:** 4-5 days  
 **Dependencies:** FCDC-S010, FCDC-S011, FCDC-S012, FCDC-S015
@@ -2490,7 +2476,7 @@ Add support for `Dictionary<K,V>` with `[DdsManaged]` attribute.
 ---
 
 ### FCDC-ADV05: Block Copy Optimization (`[DdsOptimize]`)
-**Status:** 🔴 Not Started  
+
 **Priority:** Medium  
 **Estimated Effort:** 5-6 days  
 **Dependencies:** FCDC-ADV02, FCDC-ADV03, FCDC-S015
@@ -2580,36 +2566,5 @@ public List<OpenCV.Point2f> Features;
 
 ---
 
-## Summary Statistics
-
-**Total Tasks:** 35  
-**Total Estimated Effort:** 101-131 person-days  
-
-**By Stage:**
-- Stage 1 (Foundation): 12-16 days (**Blocking**, 5 tasks)
-- Stage 2 (Code Gen): 20-25 days (11 tasks)
-- Stage 3 (Runtime): 18-24 days (**Blocking**, 6 tasks)
-- Stage 4 (XCDR2): 10-14 days (4 tasks)
-- Stage 5 (Polish): 15-20 days (4 tasks)
-- Stage 6 (Advanced Optimizations): 16-21 days (5 tasks)
-
-**Critical Path (MVP):** Stages 1-3 = ~50-65 days  
-**Production Readiness:** All Stages = ~85-110 days
-
-**Validation Gates:**
-1. **FCDC-S005** (Golden Rig) → Blocks Stage 2
-2. **FCDC-S022** (Integration Tests) → Blocks Stage 4
-
----
-
-## Next Steps
-
-1. ✅ Review this task breakdown
-2. ✅ Prioritize Stage 1 (Foundation) tasks
-3. ▶ **START:** FCDC-S001 (CycloneDDS.Core package setup)
-4. ▶ Build CDR primitives (S002-S004)
-5. ▶ **VALIDATE:** Golden Rig (S005) before proceeding
-
----
 
 **Critical Success Factor:** Do not skip validation gates (Golden Rig, Integration Tests). These ensure correctness before building on top.

@@ -81,11 +81,8 @@ namespace CycloneDDS.CodeGen
 
                     if (IsOptional(field))
                     {
-                        // Optional logic handles its own existence?
-                        // Usually logic depends on context. For Appendable, optional fields are in the stream?
-                        // Optional logic emits "EMHEADER" check or bitmask?
-                        // Code I saw earlier used EMHEADER.
-                        EmitOptionalReader(sb, field, fieldId);
+                        // Optional logic
+                        EmitOptionalReader(sb, type, field, fieldId);
                     }
                     else
                     {
@@ -95,7 +92,7 @@ namespace CycloneDDS.CodeGen
                             sb.AppendLine("            {");
                         }
                         
-                        string readCall = GetReadCall(field);
+                        string readCall = GetReadCall(type, field);
                         sb.AppendLine($"                {readCall};");
                         
                         if (IsAppendable(type))
@@ -126,7 +123,7 @@ namespace CycloneDDS.CodeGen
             sb.AppendLine("    }");
         }
 
-        private void EmitOptionalReader(StringBuilder sb, FieldInfo field, int fieldId)
+        private void EmitOptionalReader(StringBuilder sb, TypeInfo type, FieldInfo field, int fieldId)
         {
             string baseType = GetBaseType(field.TypeName);
             var nonOptField = new FieldInfo { Name = field.Name, TypeName = baseType, Attributes = field.Attributes, Type = field.Type };
@@ -152,7 +149,7 @@ namespace CycloneDDS.CodeGen
             
             sb.AppendLine("                if (isPresent)");
             sb.AppendLine("                {");
-            sb.AppendLine($"                    {GetReadCall(nonOptField)};");
+            sb.AppendLine($"                    {GetReadCall(type, nonOptField)};");
             sb.AppendLine("                }");
             sb.AppendLine("                else");
             sb.AppendLine("                {");
@@ -172,7 +169,7 @@ namespace CycloneDDS.CodeGen
             // Read Discriminator
             sb.AppendLine($"            if (reader.Position < endPos)");
             sb.AppendLine("            {");
-            sb.AppendLine($"                {GetReadCall(discriminator)};");
+            sb.AppendLine($"                {GetReadCall(type, discriminator)};");
             sb.AppendLine("            }");
 
             sb.AppendLine($"            switch (({GetDiscriminatorCastType(discriminator.TypeName)})view.{discriminator.Name})");
@@ -187,7 +184,7 @@ namespace CycloneDDS.CodeGen
                     {
                         sb.AppendLine($"                case {val}:");
                     }
-                    sb.AppendLine($"                    if (reader.Position < endPos) {{ {GetReadCall(field)}; }}");
+                    sb.AppendLine($"                    if (reader.Position < endPos) {{ {GetReadCall(type, field)}; }}");
                     sb.AppendLine("                    break;");
                 }
             }
@@ -196,7 +193,7 @@ namespace CycloneDDS.CodeGen
             if (defaultField != null)
             {
                 sb.AppendLine("                default:");
-                sb.AppendLine($"                    if (reader.Position < endPos) {{ {GetReadCall(defaultField)}; }}");
+                sb.AppendLine($"                    if (reader.Position < endPos) {{ {GetReadCall(type, defaultField)}; }}");
                 sb.AppendLine("                    break;");
             }
             else
@@ -353,14 +350,19 @@ namespace CycloneDDS.CodeGen
             return $"{typeName}View";
         }
         
-        private string GetReadCall(FieldInfo field)
+        private bool ShouldUseManagedDeserialization(TypeInfo type, FieldInfo field)
+        {
+            return type.HasAttribute("DdsManaged") || field.HasAttribute("DdsManaged");
+        }
+
+        private string GetReadCall(TypeInfo type, FieldInfo field)
         {
             int align = GetAlignment(field.TypeName);
             string alignCall = align > 1 ? $"reader.Align({align}); " : "";
             
             if (field.TypeName == "string")
             {
-                if (field.HasAttribute("DdsManaged"))
+                if (ShouldUseManagedDeserialization(type, field))
                     return $"reader.Align(4); view.{field.Name} = reader.ReadString()";
                 return $"reader.Align(4); view.{field.Name} = Encoding.UTF8.GetString(reader.ReadStringBytes().ToArray())";
             }
