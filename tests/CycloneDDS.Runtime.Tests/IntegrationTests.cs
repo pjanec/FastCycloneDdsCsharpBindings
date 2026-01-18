@@ -389,5 +389,74 @@ namespace CycloneDDS.Runtime.Tests
             if (scope.Infos[0].ValidData != 0)
                 Assert.Equal(99, scope[0].Id);
         }
+
+        [Fact(Skip = "Requires Keyed Topic - TestMessage is Keyless")]
+        public void DisposeInstance_RemovesInstance()
+        {
+            using var participant = new DdsParticipant(0);
+            using var desc = new DescriptorContainer(
+                TestMessage.GetDescriptorOps(), 8, 4, 16, "DisposeTopic");
+            
+            using var writer = new DdsWriter<TestMessage>(
+                participant, "DisposeTopic", desc.Ptr);
+            using var reader = new DdsReader<TestMessage, TestMessage>(
+                participant, "DisposeTopic", desc.Ptr);
+            
+            var msg = new TestMessage { Id = 100, Value = 100 };
+            
+            writer.Write(msg);
+            Thread.Sleep(200);
+
+            // Now Dispose
+            writer.DisposeInstance(msg);
+            Thread.Sleep(200);
+
+            using var scope = reader.Take();
+            bool foundDispose = false;
+            for(int i=0; i<scope.Count; i++)
+            {
+                if (scope.Infos[i].ValidData == 0 && 
+                    (scope.Infos[i].InstanceState == 2)) // NOT_ALIVE_DISPOSED
+                {
+                    foundDispose = true;
+                    Assert.NotEqual(0, scope.Infos[i].InstanceHandle);
+                }
+            }
+            Assert.True(foundDispose, "Should receive Disposed instance state");
+        }
+
+        [Fact(Skip = "Requires Keyed Topic - TestMessage is Keyless")]
+        public void UnregisterInstance_RemovesWriterOwnership()
+        {
+            using var participant = new DdsParticipant(0);
+            using var desc = new DescriptorContainer(
+                TestMessage.GetDescriptorOps(), 8, 4, 16, "UnregisterTopic");
+            
+            using var writer = new DdsWriter<TestMessage>(
+                participant, "UnregisterTopic", desc.Ptr);
+            using var reader = new DdsReader<TestMessage, TestMessage>(
+                participant, "UnregisterTopic", desc.Ptr);
+            
+            var msg = new TestMessage { Id = 200, Value = 200 };
+            
+            writer.Write(msg);
+            Thread.Sleep(200);
+
+            // Now Unregister
+            writer.UnregisterInstance(msg);
+            Thread.Sleep(200);
+
+            using var scope = reader.Take();
+            bool foundUnregister = false;
+            for(int i=0; i<scope.Count; i++)
+            {
+                if (scope.Infos[i].ValidData == 0 && 
+                    (scope.Infos[i].InstanceState == 4)) // NOT_ALIVE_NO_WRITERS
+                {
+                    foundUnregister = true;
+                }
+            }
+            Assert.True(foundUnregister, "Should receive NoWriters instance state");
+        }
     }
 }

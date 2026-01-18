@@ -1207,6 +1207,106 @@ Comprehensive end-to-end tests validating the complete pipeline.
 
 ---
 
+### FCDC-S022b: Instance Lifecycle Management (Dispose/Unregister)
+**Priority:** ⚠️ **HIGH** (Production Requirement)  
+**Estimated Effort:** 2-3 days  
+**Dependencies:** FCDC-S020 (DdsWriter complete) ✅
+
+**Description:**  
+Implement DDS instance lifecycle operations for keyed topics, enabling proper instance disposal and ownership management.
+
+**Operations to Implement:**
+1. **DisposeInstance(T)** - Mark instance as deleted/dead
+2. **UnregisterInstance(T)** - Writer stops updating instance (releases ownership)
+
+**Architecture:**
+- Reuse existing Write() serialization path
+- Add new native API calls: `dds_dispose_serdata`, `dds_unregister_serdata`
+- Unified implementation via `PerformOperation(sample, operation)` pattern
+- Maintain zero-allocation guarantee
+
+**Use Cases:**
+- Resource cleanup (dispose deleted entities)
+- Graceful shutdown (unregister on app exit)
+- Ownership transfer (exclusive ownership QoS)
+- Instance lifecycle tracking (reader state management)
+
+**Implementation Steps:**
+
+1. **Native Extension:**
+   - Export `dds_dispose_serdata` in ddsc.dll
+   - Export `dds_unregister_serdata` in ddsc.dll
+   - Rebuild cyclone-bin
+
+2. **P/Invoke Layer:**
+   ```csharp
+   // DdsApi.cs
+   [DllImport("ddsc")]
+   public static extern int dds_dispose_serdata(DdsEntity writer, IntPtr serdata);
+   
+   [DllImport("ddsc")]
+   public static extern int dds_unregister_serdata(DdsEntity writer, IntPtr serdata);
+   ```
+
+3. **DdsWriter Enhancement:**
+   ```csharp
+   private enum DdsOperation { Write, Dispose, Unregister }
+   
+   private void PerformOperation(in T sample, DdsOperation op) { ... }
+   
+   public void Write(in T sample) => PerformOperation(sample, DdsOperation.Write);
+   public void DisposeInstance(in T sample) => PerformOperation(sample, DdsOperation.Dispose);
+   public void UnregisterInstance(in T sample) => PerformOperation(sample, DdsOperation.Unregister);
+   ```
+
+**Deliverables:**
+- `Src/CycloneDDS.Runtime/DdsWriter.cs` - Add DisposeInstance(), UnregisterInstance()
+- `Src/CycloneDDS.Runtime/Interop/DdsApi.cs` - Add P/Invoke declarations
+- `tests/CycloneDDS.Runtime.Tests/DdsWriterLifecycleTests.cs` - 7 unit tests
+- `tests/CycloneDDS.Runtime.Tests/InstanceLifecycleIntegrationTests.cs` - 4 integration tests
+- `docs/INSTANCE-LIFECYCLE-DESIGN.md` - ✅ Complete
+- Update `Src/CycloneDDS.Runtime/README.md` with examples
+
+**Test Requirements (11 tests):**
+
+**Unit Tests (7):**
+1. DisposeInstance_ValidSample_Succeeds
+2. DisposeInstance_AfterWrite_SendsDisposalMessage
+3. UnregisterInstance_ValidSample_Succeeds
+4. UnregisterInstance_AfterWrite_SendsUnregisterMessage
+5. DisposeInstance_NonKeySample_IgnoresNonKeyFields
+6. DisposeInstance_AfterWriterDispose_Throws
+7. UnregisterInstance_MultipleWriters_HandlesCorrectly
+
+**Integration Tests (4):**
+1. WriteDisposeRead_VerifiesInstanceStateNotAliveDisposed
+2. WriteUnregisterRead_VerifiesInstanceStateNotAliveNoWriters
+3. MultipleWritersUnregister_VerifiesOwnership
+4. DisposeInstance_ZeroAllocation_1000Operations
+
+**Success Criteria:**
+- ✅ All 11 tests passing
+- ✅ Zero GC allocations verified (same as Write)
+- ✅ Reader instance states correct (NOT_ALIVE_DISPOSED, NOT_ALIVE_NO_WRITERS)
+- ✅ Ownership transfer works (multiple writers)
+- ✅ Documentation with usage examples
+
+**Performance Target:**
+- Dispose/Unregister: ~40 bytes/1000 operations (same as Write)
+
+**Design Reference:**
+- `docs/INSTANCE-LIFECYCLE-DESIGN.md` (complete architecture)
+- `docs/design-talk.md` lines 5106-5412 (detailed discussion)
+
+**Why HIGH Priority:**
+1. Production systems require proper lifecycle management
+2. Prevents reader resource leaks (stale instances accumulate)
+3. Critical for graceful shutdown (avoid reader timeouts)
+4. Required for exclusive ownership patterns
+5. Low complexity (extends existing Write pattern)
+
+---
+
 ## STAGE 4: XCDR2 Compliance \u0026 Evolution
 
 **Goal:** Full XCDR2 appendable support with schema evolution.

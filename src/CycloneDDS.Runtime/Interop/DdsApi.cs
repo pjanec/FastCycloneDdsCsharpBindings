@@ -112,6 +112,16 @@ namespace CycloneDDS.Runtime.Interop
             IntPtr serdata);
 
         [DllImport(DLL_NAME)]
+        public static extern int dds_dispose_serdata(
+            DdsEntity writer,
+            IntPtr serdata);
+
+        [DllImport(DLL_NAME)]
+        public static extern int dds_unregister_serdata(
+            DdsEntity writer,
+            IntPtr serdata);
+
+        [DllImport(DLL_NAME)]
         public static extern int dds_takecdr(
             int reader, // Changed from DdsEntity to int
             [In, Out] IntPtr[] samples, 

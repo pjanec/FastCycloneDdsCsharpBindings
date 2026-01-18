@@ -89,7 +89,7 @@ namespace CycloneDDS.Runtime
              }
         }
 
-        public void Write(in T sample)
+        private void PerformOperation(in T sample, Func<DdsApi.DdsEntity, IntPtr, int> operation)
         {
             if (_writerHandle == null) throw new ObjectDisposedException(nameof(DdsWriter<T>));
 
@@ -105,7 +105,7 @@ namespace CycloneDDS.Runtime
             {
                 // 3. Serialize (ZERO ALLOC via new Span overload)
                 var span = buffer.AsSpan(0, totalSize);
-                var cdr = new CdrWriter(span);  // ✅ No wrapper allocation!
+                var cdr = new CdrWriter(span); 
                 
                 // Write CDR Header (XCDR1 format)
                 // CDR Identifier: 0x0001 (LE) or 0x0000 (BE)
@@ -129,7 +129,6 @@ namespace CycloneDDS.Runtime
                 cdr.WriteByte(0x00);
                 
                 _serializer!(sample, ref cdr);
-                // For fixed buffer, Complete() is no-op but good practice
                 cdr.Complete();
                 
                 // 4. Write to DDS via Serdata
@@ -139,7 +138,6 @@ namespace CycloneDDS.Runtime
                     {
                         IntPtr dataPtr = (IntPtr)p;
                         
-                        // Create serdata from CDR bytes using the topic entity to get sertype
                         IntPtr serdata = DdsApi.dds_create_serdata_from_cdr(
                             _topicHandle.NativeHandle,
                             dataPtr,
@@ -150,22 +148,11 @@ namespace CycloneDDS.Runtime
                              throw new DdsException(DdsApi.DdsReturnCode.Error, "dds_create_serdata_from_cdr failed");
                         }
                             
-                        try
+                        // Operation consumes ref
+                        int ret = operation(_writerHandle.NativeHandle, serdata);
+                        if (ret < 0)
                         {
-                            int ret = DdsApi.dds_writecdr(_writerHandle.NativeHandle, serdata);
-                            if (ret < 0)
-                            {
-                                throw new DdsException((DdsApi.DdsReturnCode)ret, $"dds_writecdr failed: {ret}");
-                            }
-                        }
-                        // dds_writecdr consumes the reference to serdata on success (and most failure paths),
-                        // so we must NOT unref it here to avoid double-free.
-                        // Ideally, we would detect if dds_writecdr *didn't* consume it (e.g. lock failure),
-                        // but that requires native changes to be robust. 
-                        // Only leak is on rare lock failure.
-                        finally
-                        {
-                             // No-op
+                            throw new DdsException((DdsApi.DdsReturnCode)ret, $"DDS operation failed: {ret}");
                         }
                     }
                 }
@@ -174,6 +161,43 @@ namespace CycloneDDS.Runtime
             {
                 Arena.Return(buffer);
             }
+        }
+
+        public void Write(in T sample)
+        {
+            PerformOperation(sample, DdsApi.dds_writecdr);
+        }
+
+        /// <summary>
+        /// Dispose an instance.
+        /// Marks the instance as NOT_ALIVE_DISPOSED in the reader.
+        /// </summary>
+        /// <param name="sample">Sample containing the key to dispose (non-key fields ignored)</param>
+        /// <remarks>
+        /// For keyed topics only. The key fields identify which instance to dispose.
+        /// Non-key fields are serialized but ignored by CycloneDDS.
+        /// This operation maintains the zero-allocation guarantee.
+        /// </remarks>
+        public void DisposeInstance(in T sample)
+        {
+            PerformOperation(sample, DdsApi.dds_dispose_serdata);
+        }
+
+        /// <summary>
+        /// Unregister an instance (writer releases ownership).
+        /// Notifies readers that this writer will no longer update the instance.
+        /// Reader instance state will transition to NOT_ALIVE_NO_WRITERS if no other writers exist.
+        /// </summary>
+        /// <param name="sample">Sample containing the key to unregister (non-key fields ignored)</param>
+        /// <remarks>
+        /// Useful for graceful shutdown or ownership transfer scenarios.
+        /// For keyed topics only. The key fields identify which instance to unregister.
+        /// Non-key fields are serialized but ignored by CycloneDDS.
+        /// This operation maintains the zero-allocation guarantee.
+        /// </remarks>
+        public void UnregisterInstance(in T sample)
+        {
+            PerformOperation(sample, DdsApi.dds_unregister_serdata);
         }
         
         public void Dispose()

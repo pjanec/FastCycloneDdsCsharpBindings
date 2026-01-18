@@ -5103,3 +5103,309 @@ Yes, it works together. By adding the **Whitelist** check in the middle of the p
 
 This gives you maximum flexibility for your high-performance production environment.
 ---
+
+how to send a disposal sample?
+----
+To send a disposal message (which tells Subscribers that a specific instance Key is no longer valid/alive), you need to hook into the **`dds_dispose_serdata`** API.
+
+Since you are already building a custom `ddsc.dll` to expose the serdata creation APIs, you simply need to expose the disposal API as well.
+
+Here is the implementation plan.
+
+### 1. Native Export (Recompile required)
+
+Ensure `dds_dispose_serdata` is exported in your custom `ddsc.dll`.
+
+**File:** `src/core/ddsc/src/dds_writer.c`
+Find `dds_dispose_serdata` and ensure it has `DDS_EXPORT`:
+
+```c
+DDS_EXPORT dds_return_t dds_dispose_serdata (dds_entity_t writer, dds_serdata_t *sd)
+{
+  return write_impl (writer, sd, 0, DDS_CMD_DISPOSE);
+}
+
+DDS_EXPORT dds_return_t dds_unregister_serdata (dds_entity_t writer, dds_serdata_t *sd)
+{
+  return write_impl (writer, sd, 0, DDS_CMD_UNREGISTER);
+}
+```
+
+### 2. C# P/Invoke (`DdsApi.cs`)
+
+Add the import definitions.
+
+```csharp
+internal static partial class DdsApi
+{
+    [DllImport("ddsc", CallingConvention = CallingConvention.Cdecl)]
+    public static extern int dds_dispose_serdata(DdsEntity writer, IntPtr serdata);
+
+    [DllImport("ddsc", CallingConvention = CallingConvention.Cdecl)]
+    public static extern int dds_unregister_serdata(DdsEntity writer, IntPtr serdata);
+}
+```
+
+### 3. C# `DdsWriter.cs` Implementation
+
+Add a `Dispose` method. The logic is nearly identical to `Write`, except it calls the dispose API at the end.
+
+**Note on Efficiency:** Technically, you only need to serialize the **Key** fields for a disposal. However, reusing the existing `_serializer` (which serializes everything) is the safest and simplest zero-alloc path. Cyclone DDS will simply ignore the non-key fields during the dispose operation.
+
+```csharp
+public void Dispose(in T sample)
+{
+    if (_writerHandle == null) throw new ObjectDisposedException(nameof(DdsWriter<T>));
+
+    // 1. Get Size (Includes body + header)
+    int payloadSize = _sizer!(sample, 4); 
+    int totalSize = payloadSize + 4;
+
+    // 2. Rent Buffer
+    byte[] buffer = Arena.Rent(totalSize);
+    
+    try
+    {
+        // 3. Serialize (Zero Alloc)
+        var span = buffer.AsSpan(0, totalSize);
+        var cdr = new CdrWriter(span);
+        
+        // Header (XCDR1 LE)
+        cdr.WriteByte(0x00); cdr.WriteByte(0x01); cdr.WriteByte(0x00); cdr.WriteByte(0x00);
+        
+        _serializer!(sample, ref cdr);
+        
+        // 4. Create & Dispose
+        unsafe
+        {
+            fixed (byte* p = buffer)
+            {
+                IntPtr serdata = DdsApi.dds_create_serdata_from_cdr(
+                    _topicHandle.NativeHandle,
+                    (IntPtr)p,
+                    (uint)totalSize);
+
+                if (serdata == IntPtr.Zero) throw new DdsException(DdsApi.DdsReturnCode.Error, "Creation failed");
+
+                try
+                {
+                    // >>> CALL DISPOSE INSTEAD OF WRITE <<<
+                    int ret = DdsApi.dds_dispose_serdata(_writerHandle.NativeHandle, serdata);
+                    if (ret < 0) throw new DdsException((DdsApi.DdsReturnCode)ret, "Dispose failed");
+                }
+                finally
+                {
+                    // Cyclone increments ref if successful, we release our local ref
+                    // Note: Check if dds_dispose_serdata consumes ref on failure (usually no)
+                    DdsApi.ddsi_serdata_unref(serdata);
+                }
+            }
+        }
+    }
+    finally
+    {
+        Arena.Return(buffer);
+    }
+}
+```
+
+### 4. User Usage
+
+```csharp
+// 1. Define type with Key
+[DdsTopic("Sensor")]
+public partial struct SensorData
+{
+    [DdsKey] public int Id; // <--- Critical!
+    public double Value;
+}
+
+// 2. Usage
+using var writer = new DdsWriter<SensorData>(...);
+
+// Update
+writer.Write(new SensorData { Id = 1, Value = 100 });
+
+// Dispose (Deletes the instance from the system)
+// Value is ignored, only Id (Key) matters
+writer.Dispose(new SensorData { Id = 1, Value = 0 }); 
+```
+
+### 5. Unregister vs Dispose
+
+You can implement `Unregister` exactly the same way using `dds_unregister_serdata`.
+
+*   **Dispose:** "This instance is dead/deleted." (Reader gets `InstanceState = NotAliveDisposed`)
+*   **Unregister:** "I am no longer updating this instance, but it might still exist." (Reader gets `InstanceState = NotAliveNoWriters`)
+----
+Implementing `Unregister` follows the exact same architectural pattern as `Write` and `Dispose`. You are essentially serializing the key data into a `serdata` blob and telling the middleware to perform a specific action (Unregister) with it.
+
+### 1. Native Export (Action Required)
+
+Ensure `dds_unregister_serdata` is exported in your custom `ddsc.dll`.
+
+**File:** `src/core/ddsc/src/dds_writer.c`
+Check that this function has `DDS_EXPORT` (it usually sits right next to `dds_dispose_serdata`):
+
+```c
+DDS_EXPORT dds_return_t dds_unregister_serdata (dds_entity_t writer, dds_serdata_t *sd)
+{
+  return write_impl (writer, sd, 0, DDS_CMD_UNREGISTER);
+}
+```
+
+### 2. C# P/Invoke Update
+
+Add the declaration to `DdsApi.cs`.
+
+```csharp
+// Src/CycloneDDS.Runtime/Interop/DdsApi.cs
+internal static partial class DdsApi
+{
+    // ... existing imports ...
+
+    [DllImport("ddsc", CallingConvention = CallingConvention.Cdecl)]
+    public static extern int dds_unregister_serdata(
+        DdsEntity writer, 
+        IntPtr serdata);
+}
+```
+
+### 3. Implementation in `DdsWriter.cs`
+
+To keep the code clean and maintainable—and because `Write`, `Dispose`, and `Unregister` share 95% of the logic—I recommend refactoring the serialization core into a private helper method.
+
+However, to ensure **Absolute Zero Allocation** (avoiding delegate creation or closure capturing), it is often safer in high-performance C# to duplicate the setup logic or use an `enum` switch which the JIT can optimize away.
+
+Here is the implementation of `Unregister` (copying the pattern to ensure zero-alloc safety):
+
+```csharp
+public void Unregister(in T sample)
+{
+    if (_writerHandle == null) throw new ObjectDisposedException(nameof(DdsWriter<T>));
+
+    // 1. Get Size (Keys are sufficient, but full serialization is safer/easier)
+    // Start at offset 4 for the header
+    int payloadSize = _sizer!(sample, 4); 
+    int totalSize = payloadSize + 4;
+
+    // 2. Rent Buffer
+    byte[] buffer = Arena.Rent(totalSize);
+    
+    try
+    {
+        // 3. Serialize
+        var span = buffer.AsSpan(0, totalSize);
+        var cdr = new CdrWriter(span);
+        
+        // Write Header (XCDR1 LE: 00 01 00 00)
+        cdr.WriteByte(0x00); cdr.WriteByte(0x01); cdr.WriteByte(0x00); cdr.WriteByte(0x00);
+        
+        _serializer!(sample, ref cdr);
+        cdr.Complete();
+        
+        // 4. Native Operation
+        unsafe
+        {
+            fixed (byte* p = buffer)
+            {
+                // Create Serdata handle
+                IntPtr serdata = DdsApi.dds_create_serdata_from_cdr(
+                    _topicHandle.NativeHandle,
+                    (IntPtr)p,
+                    (uint)totalSize);
+
+                if (serdata == IntPtr.Zero) 
+                    throw new DdsException(DdsApi.DdsReturnCode.Error, "Creation failed");
+
+                try
+                {
+                    // >>> SPECIFIC UNREGISTER CALL <<<
+                    int ret = DdsApi.dds_unregister_serdata(_writerHandle.NativeHandle, serdata);
+                    
+                    if (ret < 0) 
+                        throw new DdsException((DdsApi.DdsReturnCode)ret, $"Unregister failed: {ret}");
+                }
+                finally
+                {
+                    // Release our reference
+                    DdsApi.ddsi_serdata_unref(serdata);
+                }
+            }
+        }
+    }
+    finally
+    {
+        Arena.Return(buffer);
+    }
+}
+```
+
+### 4. Code Refactoring (Optional but Recommended)
+
+If you find maintaining `Write`, `Dispose`, and `Unregister` separate is too repetitive, you can use an Enum-based helper. The JIT is usually smart enough to inline this and remove the branch cost if the method is `private`.
+
+```csharp
+private enum DdsOperation { Write, Dispose, Unregister }
+
+private void WriteImpl(in T sample, DdsOperation op)
+{
+    // ... Arena Rent & Serialization Logic (Same as above) ...
+
+    unsafe {
+        fixed (byte* p = buffer) {
+            IntPtr serdata = DdsApi.dds_create_serdata_from_cdr(...);
+            
+            try {
+                int ret = 0;
+                switch (op) {
+                    case DdsOperation.Write:
+                        ret = DdsApi.dds_writecdr(_writerHandle.NativeHandle, serdata);
+                        break;
+                    case DdsOperation.Dispose:
+                        ret = DdsApi.dds_dispose_serdata(_writerHandle.NativeHandle, serdata);
+                        break;
+                    case DdsOperation.Unregister:
+                        ret = DdsApi.dds_unregister_serdata(_writerHandle.NativeHandle, serdata);
+                        break;
+                }
+                // ... check ret ...
+            }
+            finally {
+                DdsApi.ddsi_serdata_unref(serdata);
+            }
+        }
+    }
+    // ... Return buffer ...
+}
+
+public void Write(in T sample) => WriteImpl(sample, DdsOperation.Write);
+public void Dispose(in T sample) => WriteImpl(sample, DdsOperation.Dispose);
+public void Unregister(in T sample) => WriteImpl(sample, DdsOperation.Unregister);
+```
+
+### 5. Semantics: What happens when you Unregister?
+
+1.  **Network:** A specific message is sent to all Readers indicating that *this* DataWriter is giving up ownership of the instance defined by the Key.
+2.  **Readers:**
+    *   If **Ownership Strength** is Exclusive (`EXCLUSIVE_OWNERSHIP_QOS`): The Reader will switch to the next highest strength Writer (failover).
+    *   If **Shared** (default): The instance state changes to `NOT_ALIVE_NO_WRITERS` *only if* no other writers are alive for that instance.
+3.  **Memory:** It releases resources associated with that instance in the Writer's local history cache.
+
+### 6. Example Usage
+
+```csharp
+// 1. Writer comes online
+var writer = new DdsWriter<RobotState>(...);
+
+// 2. Writer sends data (Key: RobotID=5)
+writer.Write(new RobotState { RobotID = 5, Status = "Moving" });
+
+// 3. Writer goes offline gracefully
+// This tells readers "I am gone", preventing them from waiting for heartbeats
+writer.Unregister(new RobotState { RobotID = 5 });
+
+// 4. Clean up
+writer.Dispose();
+```
+----
