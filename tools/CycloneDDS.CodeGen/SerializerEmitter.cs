@@ -661,15 +661,15 @@ namespace CycloneDDS.CodeGen
                 "byte" or "uint8" or "sbyte" or "int8" or "bool" or "boolean" => 1,
                 "short" or "int16" or "ushort" or "uint16" => 2,
                 "int" or "int32" or "uint" or "uint32" or "float" or
-                "vector2" or "system.numerics.vector2" or
-                "vector3" or "system.numerics.vector3" or
-                "vector4" or "system.numerics.vector4" or
-                "quaternion" or "system.numerics.quaternion" or
-                "matrix4x4" or "system.numerics.matrix4x4" => 4,
+                "system.numerics.vector2" or
+                "system.numerics.vector3" or
+                "system.numerics.vector4" or
+                "system.numerics.quaternion" or
+                "system.numerics.matrix4x4" => 4,
                 "long" or "int64" or "ulong" or "uint64" or "double" or
-                "datetime" or "system.datetime" or "timespan" or "system.timespan" or
-                "datetimeoffset" or "system.datetimeoffset" => 8,
-                "guid" or "system.guid" => 1,
+                "system.datetime" or "system.timespan" or
+                "system.datetimeoffset" => 8,
+                "system.guid" => 1,
                 _ => 1
             };
         }
