@@ -119,7 +119,7 @@ module Test {
             
             try {
                 var runner = new IdlcRunner();
-                runner.IdlcPathOverride = @"d:\Work\FastCycloneDdsCsharpBindings\cyclone-bin\Release\idlc.exe";
+                runner.IdlcPathOverride = @"d:\Work\FastCycloneDdsCsharpBindings\cyclone-compiled\bin\idlc.exe";
                 var result = runner.RunIdlc(tempIdl, Path.GetTempPath());
                 Assert.NotEqual(0, result.ExitCode);
             }

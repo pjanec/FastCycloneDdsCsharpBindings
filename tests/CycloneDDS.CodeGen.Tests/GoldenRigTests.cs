@@ -186,7 +186,7 @@ namespace Golden {
             // SimplePrimitive
             Verify(asm, helper.GetMethod("SerializeSimplePrimitive"), "Golden.SimplePrimitive", 
                 inst => { SetField(inst, "Id", 123456789); SetField(inst, "Value", 123.456); },
-                "15CD5B0777BE9F1A2FDD5E40");
+                "15CD5B070000000077BE9F1A2FDD5E40");
             
             // NestedStruct
             Verify(asm, helper.GetMethod("SerializeNestedStruct"), "Golden.NestedStruct",

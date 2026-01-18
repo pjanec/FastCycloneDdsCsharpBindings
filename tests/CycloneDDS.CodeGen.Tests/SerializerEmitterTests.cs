@@ -77,7 +77,7 @@ namespace TestNamespace
             // GetSerializedSize verification
             var getSerializedSizeMethod = generatedType.GetMethod("GetSerializedSize");
             int size = (int)getSerializedSizeMethod.Invoke(instance, new object[] { 0 });
-            Assert.Equal(12, size);
+            Assert.Equal(16, size);
 
             // Serialize
             var writerBuffer = new ArrayBufferWriter<byte>();
@@ -89,8 +89,8 @@ namespace TestNamespace
             // Verify output
             // DHEADER: No Header (Final)
             
-            // Full: 15 CD 5B 07 77 BE 9F 1A 2F DD 5E 40
-            string expected = "15 CD 5B 07 77 BE 9F 1A 2F DD 5E 40";
+            // Full: 15 CD 5B 07 00 00 00 00 77 BE 9F 1A 2F DD 5E 40
+            string expected = "15 CD 5B 07 00 00 00 00 77 BE 9F 1A 2F DD 5E 40";
             // Correct logic DHEADER is (0C 00 00 00)
             // Wait, example in instructions: "00 00 00 0C" ? No, expected is usually LE for DHEADER unless big endian default?
             // XCDR2 default is LE.

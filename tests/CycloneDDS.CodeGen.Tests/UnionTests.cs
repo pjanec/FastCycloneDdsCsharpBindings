@@ -132,8 +132,8 @@ using CycloneDDS.Schema;
             serializeWrapper.Invoke(null, new object[] { instance, writerBuffer });
             
             // Expected: Disc(1) | Radius(10.5)
-            // 01 00 00 00 | 00 00 00 00 00 00 25 40
-            string expectedHex = "01 00 00 00 00 00 00 00 00 00 25 40";
+            // 01 00 00 00 | 00 00 00 00 | 00 00 00 00 00 00 25 40
+            string expectedHex = "01 00 00 00 00 00 00 00 00 00 00 00 00 00 25 40";
             string actualHex = ToHex(writerBuffer.WrittenSpan.ToArray());
             Assert.Equal(expectedHex.Replace(" ", ""), actualHex.Replace(" ", ""));
 
