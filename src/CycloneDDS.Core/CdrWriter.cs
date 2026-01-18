@@ -200,6 +200,69 @@ namespace CycloneDDS.Core
             _buffered += fixedSize;
         }
 
+        public void WriteGuid(Guid value)
+        {
+            EnsureSize(16);
+            value.TryWriteBytes(_span.Slice(_buffered));
+            _buffered += 16;
+        }
+
+        public void WriteDateTime(DateTime value)
+        {
+            WriteInt64(value.Ticks);
+        }
+
+        public void WriteDateTimeOffset(DateTimeOffset value)
+        {
+            // Serialize as 16 bytes: Ticks (8) + OffsetMinutes (2) + Padding (6)
+            // Alignment required is 8.
+            EnsureSize(16);
+            BinaryPrimitives.WriteInt64LittleEndian(_span.Slice(_buffered), value.Ticks);
+            BinaryPrimitives.WriteInt16LittleEndian(_span.Slice(_buffered + 8), (short)value.Offset.TotalMinutes);
+            _span.Slice(_buffered + 10, 6).Clear(); // Padding
+            _buffered += 16;
+        }
+
+        public void WriteTimeSpan(TimeSpan value)
+        {
+            WriteInt64(value.Ticks);
+        }
+
+        public void WriteVector2(System.Numerics.Vector2 value)
+        {
+            EnsureSize(8);
+            System.Runtime.InteropServices.MemoryMarshal.Write(_span.Slice(_buffered), ref value);
+            _buffered += 8;
+        }
+
+        public void WriteVector3(System.Numerics.Vector3 value)
+        {
+            EnsureSize(12);
+            System.Runtime.InteropServices.MemoryMarshal.Write(_span.Slice(_buffered), ref value);
+            _buffered += 12;
+        }
+
+        public void WriteVector4(System.Numerics.Vector4 value)
+        {
+            EnsureSize(16);
+            System.Runtime.InteropServices.MemoryMarshal.Write(_span.Slice(_buffered), ref value);
+            _buffered += 16;
+        }
+
+        public void WriteQuaternion(System.Numerics.Quaternion value)
+        {
+            EnsureSize(16);
+            System.Runtime.InteropServices.MemoryMarshal.Write(_span.Slice(_buffered), ref value);
+            _buffered += 16;
+        }
+
+        public void WriteMatrix4x4(System.Numerics.Matrix4x4 value)
+        {
+            EnsureSize(64);
+            System.Runtime.InteropServices.MemoryMarshal.Write(_span.Slice(_buffered), ref value);
+            _buffered += 64;
+        }
+
         public void PatchUInt32(int position, uint value)
         {
             // Check if position is in the currently buffered span

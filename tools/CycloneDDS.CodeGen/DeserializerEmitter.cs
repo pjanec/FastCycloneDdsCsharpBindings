@@ -364,7 +364,12 @@ namespace CycloneDDS.CodeGen
                     return $"reader.Align(4); view.{field.Name} = reader.ReadString()";
                 return $"reader.Align(4); view.{field.Name} = Encoding.UTF8.GetString(reader.ReadStringBytes().ToArray())";
             }
-            
+
+            if (field.TypeName.EndsWith("[]"))
+            {
+                 return EmitArrayReader(field);
+            }
+
             if (field.TypeName.StartsWith("BoundedSeq"))
             {
                 return EmitSequenceReader(field);
@@ -387,6 +392,67 @@ namespace CycloneDDS.CodeGen
             return $"{alignCall}view.{field.Name} = {field.TypeName}.Deserialize(ref reader)";
         }
         
+        private string EmitArrayReader(FieldInfo field)
+        {
+            string elementType = field.TypeName.Substring(0, field.TypeName.Length - 2);
+            string fieldAccess = $"view.{field.Name}";
+
+            if (TypeMapper.IsBlittable(elementType))
+            {
+                 int align = GetAlignment(elementType);
+                 return $@"reader.Align(4);
+            int length{field.Name} = (int)reader.ReadUInt32();
+            if (length{field.Name} > 0)
+            {{
+                reader.Align({align});
+                var bytes = reader.ReadFixedBytes(length{field.Name} * {TypeMapper.GetSize(elementType)});
+                {fieldAccess} = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, {elementType}>(bytes).ToArray();
+            }}
+            else
+            {{
+                {fieldAccess} = System.Array.Empty<{elementType}>();
+            }}";
+            }
+
+            // Fallback loop
+            string writerMethod = TypeMapper.GetWriterMethod(elementType);
+            string readMethod = writerMethod?.Replace("Write", "Read");
+            if (readMethod == "ReadBool") readMethod = "ReadBoolean";
+            
+             if (readMethod != null)
+             {
+                 return $@"reader.Align(4);
+            int length{field.Name} = (int)reader.ReadUInt32();
+            {fieldAccess} = new {elementType}[length{field.Name}];
+            for (int i = 0; i < length{field.Name}; i++)
+            {{
+                reader.Align({GetAlignment(elementType)});
+                {fieldAccess}[i] = reader.{readMethod}();
+            }}";
+             }
+             
+             if (elementType == "string")
+             {
+                 return $@"reader.Align(4);
+            int length{field.Name} = (int)reader.ReadUInt32();
+            {fieldAccess} = new string[length{field.Name}];
+            for (int i = 0; i < length{field.Name}; i++)
+            {{
+                reader.Align(4);
+                {fieldAccess}[i] = reader.ReadString();
+            }}";
+             }
+
+             // Nested
+             return $@"reader.Align(4);
+            int length{field.Name} = (int)reader.ReadUInt32();
+            {fieldAccess} = new {elementType}[length{field.Name}];
+            for (int i = 0; i < length{field.Name}; i++)
+            {{
+                {fieldAccess}[i] = {elementType}.Deserialize(ref reader);
+            }}";
+        }
+
         private string EmitSequenceReader(FieldInfo field)
         {
             var boundsAttr = field.GetAttribute("DdsBounds");
@@ -512,31 +578,31 @@ namespace CycloneDDS.CodeGen
 
         private int GetAlignment(string typeName)
         {
-            // Same as SerializerEmitter
-             if (typeName == "string") return 4;
-            if (typeName.StartsWith("BoundedSeq") || typeName.Contains("BoundedSeq<")) return 4;
+            if (typeName == "string") return 4;
+            if (typeName.StartsWith("BoundedSeq") || typeName.Contains("BoundedSeq<") || typeName.EndsWith("[]")) return 4;
             if (typeName.Contains("FixedString")) return 1;
             
             return typeName.ToLower() switch
             {
                 "byte" or "uint8" or "sbyte" or "int8" or "bool" or "boolean" => 1,
                 "short" or "int16" or "ushort" or "uint16" => 2,
-                "int" or "int32" or "uint" or "uint32" or "float" => 4,
-                "long" or "int64" or "ulong" or "uint64" or "double" => 4,
+                "int" or "int32" or "uint" or "uint32" or "float" or
+                "vector2" or "system.numerics.vector2" or
+                "vector3" or "system.numerics.vector3" or
+                "vector4" or "system.numerics.vector4" or
+                "quaternion" or "system.numerics.quaternion" or
+                "matrix4x4" or "system.numerics.matrix4x4" => 4,
+                "long" or "int64" or "ulong" or "uint64" or "double" or
+                "datetime" or "system.datetime" or "timespan" or "system.timespan" => 8,
+                "guid" or "system.guid" => 1,
+                "datetimeoffset" or "system.datetimeoffset" => 8,
                 _ => 1
             };
         }
         
         private int GetSize(string typeName)
         {
-            return typeName.ToLower() switch
-            {
-                "byte" or "uint8" or "sbyte" or "int8" or "bool" or "boolean" => 1,
-                "short" or "int16" or "ushort" or "uint16" => 2,
-                "int" or "int32" or "uint" or "uint32" or "float" => 4,
-                "long" or "int64" or "ulong" or "uint64" or "double" => 8,
-                _ => 1
-            };
+            return TypeMapper.GetSize(typeName);
         }
 
         private string ExtractSequenceElementType(string typeName)
@@ -609,11 +675,7 @@ namespace CycloneDDS.CodeGen
 
         private bool IsPrimitive(string typeName)
         {
-            return typeName.ToLower() is 
-                "byte" or "uint8" or "sbyte" or "int8" or "bool" or "boolean" or
-                "short" or "int16" or "ushort" or "uint16" or
-                "int" or "int32" or "uint" or "uint32" or "float" or
-                "long" or "int64" or "ulong" or "uint64" or "double";
+            return TypeMapper.IsBlittable(typeName);
         }
 
         private int GetFieldId(FieldInfo field, int defaultId)

@@ -154,6 +154,78 @@ namespace CycloneDDS.Core
             return span;
         }
 
+        public Guid ReadGuid()
+        {
+            if (_position + 16 > _data.Length)
+                throw new IndexOutOfRangeException();
+            
+            var value = new Guid(_data.Slice(_position, 16));
+            _position += 16;
+            return value;
+        }
+
+        public DateTime ReadDateTime()
+        {
+            return new DateTime(ReadInt64());
+        }
+
+        public DateTimeOffset ReadDateTimeOffset()
+        {
+             long ticks = ReadInt64();
+             short offsetMin = ReadInt16();
+             // padding 6 bytes
+             if (_position + 6 > _data.Length) 
+                 throw new IndexOutOfRangeException();
+             _position += 6;
+             
+             return new DateTimeOffset(ticks, TimeSpan.FromMinutes(offsetMin));
+        }
+
+        public TimeSpan ReadTimeSpan()
+        {
+            return new TimeSpan(ReadInt64());
+        }
+
+        public System.Numerics.Vector2 ReadVector2()
+        {
+             if (_position + 8 > _data.Length) throw new IndexOutOfRangeException();
+             var val = System.Runtime.InteropServices.MemoryMarshal.Read<System.Numerics.Vector2>(_data.Slice(_position));
+             _position += 8;
+             return val;
+        }
+
+        public System.Numerics.Vector3 ReadVector3()
+        {
+             if (_position + 12 > _data.Length) throw new IndexOutOfRangeException();
+             var val = System.Runtime.InteropServices.MemoryMarshal.Read<System.Numerics.Vector3>(_data.Slice(_position));
+             _position += 12;
+             return val;
+        }
+
+        public System.Numerics.Vector4 ReadVector4()
+        {
+             if (_position + 16 > _data.Length) throw new IndexOutOfRangeException();
+             var val = System.Runtime.InteropServices.MemoryMarshal.Read<System.Numerics.Vector4>(_data.Slice(_position));
+             _position += 16;
+             return val;
+        }
+
+        public System.Numerics.Quaternion ReadQuaternion()
+        {
+             if (_position + 16 > _data.Length) throw new IndexOutOfRangeException();
+             var val = System.Runtime.InteropServices.MemoryMarshal.Read<System.Numerics.Quaternion>(_data.Slice(_position));
+             _position += 16;
+             return val;
+        }
+
+        public System.Numerics.Matrix4x4 ReadMatrix4x4()
+        {
+             if (_position + 64 > _data.Length) throw new IndexOutOfRangeException();
+             var val = System.Runtime.InteropServices.MemoryMarshal.Read<System.Numerics.Matrix4x4>(_data.Slice(_position));
+             _position += 64;
+             return val;
+        }
+
         public void Seek(int position)
         {
             if (position < 0 || position > _data.Length)

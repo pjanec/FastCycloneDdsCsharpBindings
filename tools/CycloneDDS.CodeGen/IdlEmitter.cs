@@ -128,6 +128,28 @@ namespace CycloneDDS.CodeGen
             if (typeName == "bool" || typeName == "System.Boolean") return ("boolean", "");
             if (typeName == "char" || typeName == "System.Char") return ("char", "");
             
+            // New Standard Types
+            if (typeName == "Guid" || typeName == "System.Guid") return ("octet", "[16]");
+            if (typeName == "DateTime" || typeName == "System.DateTime") return ("int64", "");
+            if (typeName == "DateTimeOffset" || typeName == "System.DateTimeOffset") return ("octet", "[16]");
+            if (typeName == "TimeSpan" || typeName == "System.TimeSpan") return ("int64", ""); // Ticks
+            
+            // System.Numerics
+            if (typeName == "Vector2" || typeName == "System.Numerics.Vector2") return ("float", "[2]");
+            if (typeName == "Vector3" || typeName == "System.Numerics.Vector3") return ("float", "[3]");
+            if (typeName == "Vector4" || typeName == "System.Numerics.Vector4") return ("float", "[4]");
+            if (typeName == "Quaternion" || typeName == "System.Numerics.Quaternion") return ("float", "[4]");
+            if (typeName == "Matrix4x4" || typeName == "System.Numerics.Matrix4x4") return ("float", "[16]");
+
+            // Arrays
+            if (typeName.EndsWith("[]"))
+            {
+                var elementTypeName = typeName.Substring(0, typeName.Length - 2);
+                var innerField = new FieldInfo { TypeName = elementTypeName };
+                var (innerIdl, innerSuffix) = MapType(innerField);
+                return ($"sequence<{innerIdl}>", "");
+            }
+
             // BoundedSeq
             if (typeName.Contains("BoundedSeq<"))
             {

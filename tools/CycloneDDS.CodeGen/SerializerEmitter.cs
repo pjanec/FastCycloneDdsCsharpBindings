@@ -391,6 +391,11 @@ namespace CycloneDDS.CodeGen
                  return EmitSequenceSizer(field);
             }
 
+            if (field.TypeName.EndsWith("[]"))
+            {
+                 return EmitArraySizer(field);
+            }
+
             // 3. Fixed Strings
             if (field.TypeName.Contains("FixedString"))
             {
@@ -437,6 +442,11 @@ namespace CycloneDDS.CodeGen
                  return EmitSequenceWriter(field);
             }
 
+            if (field.TypeName.EndsWith("[]"))
+            {
+                 return EmitArrayWriter(field);
+            }
+
             if (field.TypeName.Contains("FixedString"))
             {
                  var size = new string(field.TypeName.Where(char.IsDigit).ToArray());
@@ -454,6 +464,93 @@ namespace CycloneDDS.CodeGen
             {
                 return $"{fieldAccess}.Serialize(ref writer)";
             }
+        }
+
+        private string EmitArraySizer(FieldInfo field)
+        {
+            string fieldAccess = $"this.{ToPascalCase(field.Name)}";
+            string elementType = field.TypeName.Substring(0, field.TypeName.Length - 2);
+
+            if (TypeMapper.IsBlittable(elementType))
+            {
+                int align = GetAlignment(elementType);
+                int size = TypeMapper.GetSize(elementType);
+                
+                return $@"sizer.Align(4); sizer.WriteUInt32(0); // Length
+            if ({fieldAccess}.Length > 0)
+            {{
+                sizer.Align({align});
+                sizer.Skip({fieldAccess}.Length * {size});
+            }}";
+            }
+            
+            // Loop code similar to sequence
+            string sizerMethod = TypeMapper.GetSizerMethod(elementType);
+            if (sizerMethod != null)
+            {
+                string dummy = "0";
+                if (sizerMethod == "WriteBool") dummy = "false";
+                int align = GetAlignment(elementType);
+                return $@"sizer.Align(4); sizer.WriteUInt32(0); // Length
+                for (int i = 0; i < {fieldAccess}.Length; i++)
+                {{
+                    sizer.Align({align}); sizer.{sizerMethod}({dummy});
+                }}";
+            }
+            
+            if (elementType == "string") 
+            {
+                return $@"sizer.Align(4); sizer.WriteUInt32(0);
+            for (int i = 0; i < {fieldAccess}.Length; i++)
+            {{
+                sizer.Align(4); sizer.WriteString({fieldAccess}[i]);
+            }}";
+            }
+             
+            // Nested structs
+            return $@"sizer.Align(4); sizer.WriteUInt32(0);
+            for (int i = 0; i < {fieldAccess}.Length; i++)
+            {{
+                sizer.Skip({fieldAccess}[i].GetSerializedSize(sizer.Position));
+            }}";
+        }
+        
+        private string EmitArrayWriter(FieldInfo field)
+        {
+            string fieldAccess = $"this.{ToPascalCase(field.Name)}";
+            string elementType = field.TypeName.Substring(0, field.TypeName.Length - 2);
+
+            if (TypeMapper.IsBlittable(elementType))
+            {
+                int align = GetAlignment(elementType);
+                return $@"writer.Align(4);
+            writer.WriteUInt32((uint){fieldAccess}.Length);
+            if ({fieldAccess}.Length > 0)
+            {{
+                writer.Align({align});
+                var span = {fieldAccess}.AsSpan();
+                var byteSpan = System.Runtime.InteropServices.MemoryMarshal.AsBytes(span);
+                writer.WriteBytes(byteSpan);
+            }}";
+            }
+            
+            // Loop fallback
+            string writerMethod = TypeMapper.GetWriterMethod(elementType);
+            int alignEl = GetAlignment(elementType);
+            string loopBody;
+            if (writerMethod != null)
+                loopBody = $"writer.Align({alignEl}); writer.{writerMethod}({fieldAccess}[i]);";
+            else if (elementType == "string")
+                loopBody = $"writer.Align(4); writer.WriteString({fieldAccess}[i]);";
+            else
+                loopBody = $"var item = {fieldAccess}[i]; item.Serialize(ref writer);";
+
+            return $@"writer.Align(4); 
+            writer.WriteUInt32((uint){fieldAccess}.Length);
+            for (int i = 0; i < {fieldAccess}.Length; i++)
+            {{
+                {loopBody}
+            }}";
         }
 
         private string EmitSequenceSizer(FieldInfo field)
@@ -556,15 +653,23 @@ namespace CycloneDDS.CodeGen
         private int GetAlignment(string typeName)
         {
             if (typeName == "string") return 4;
-            if (typeName.StartsWith("BoundedSeq") || typeName.Contains("BoundedSeq<")) return 4;
+            if (typeName.StartsWith("BoundedSeq") || typeName.EndsWith("[]")) return 4;
             if (typeName.Contains("FixedString")) return 1;
             
             return typeName.ToLower() switch
             {
                 "byte" or "uint8" or "sbyte" or "int8" or "bool" or "boolean" => 1,
                 "short" or "int16" or "ushort" or "uint16" => 2,
-                "int" or "int32" or "uint" or "uint32" or "float" => 4,
-                "long" or "int64" or "ulong" or "uint64" or "double" => 4,
+                "int" or "int32" or "uint" or "uint32" or "float" or
+                "vector2" or "system.numerics.vector2" or
+                "vector3" or "system.numerics.vector3" or
+                "vector4" or "system.numerics.vector4" or
+                "quaternion" or "system.numerics.quaternion" or
+                "matrix4x4" or "system.numerics.matrix4x4" => 4,
+                "long" or "int64" or "ulong" or "uint64" or "double" or
+                "datetime" or "system.datetime" or "timespan" or "system.timespan" or
+                "datetimeoffset" or "system.datetimeoffset" => 8,
+                "guid" or "system.guid" => 1,
                 _ => 1
             };
         }

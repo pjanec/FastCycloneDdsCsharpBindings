@@ -97,6 +97,16 @@ namespace CycloneDDS.Core
         {
             _cursor += 2;
         }
+
+        public void WriteGuid(Guid value) => _cursor += 16;
+        public void WriteDateTime(DateTime value) => _cursor += 8;
+        public void WriteDateTimeOffset(DateTimeOffset value) => _cursor += 16;
+        public void WriteTimeSpan(TimeSpan value) => _cursor += 8;
+        public void WriteVector2(System.Numerics.Vector2 value) => _cursor += 8;
+        public void WriteVector3(System.Numerics.Vector3 value) => _cursor += 12;
+        public void WriteVector4(System.Numerics.Vector4 value) => _cursor += 16;
+        public void WriteQuaternion(System.Numerics.Quaternion value) => _cursor += 16;
+        public void WriteMatrix4x4(System.Numerics.Matrix4x4 value) => _cursor += 64;
         
         /// <summary>
         /// Returns size delta from initial offset.
