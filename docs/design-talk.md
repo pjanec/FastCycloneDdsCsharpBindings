@@ -8948,3 +8948,315 @@ using var writer = new DdsWriter<SensorData>(participant, "SensorData", volatile
 **Add this task to `SERDATA-TASK-MASTER.md`:**
 *   **Task FCDC-EXT00:** Implement `DdsTypeSupport` and `TopicCache` in `DdsParticipant`. (Priority: Critical, Dependency for S020/S021 updates).
 ---
+
+
+
+
+what if i need to use my custom csharp struct/class as a data member in the topic class (marked with DdsTopic attribbute). is that supported out of the box? this feature is of high importance. do i need to mark my aux non-topic class/struct with any attributes? Such struct is not a topic data struct itself, it is just an aux struct to be used for example in sequences etc.
+---
+Yes, this is a **high-priority feature** and it works perfectly with the architecture, provided you follow specific rules.
+
+### 1. The Short Answer
+**Yes, it is supported.**
+To use a custom struct as a field inside a Topic, you must:
+1.  Define it as a **`partial struct`** (so code can be generated for it).
+2.  Mark it with an attribute so the Code Generator finds it.
+
+Currently, the Code Generator only looks for `[DdsTopic]`. Using `[DdsTopic]` on a nested struct works technicaly, but it implies semantics (Keys, Endpoints) that might not exist.
+
+**Recommendation:** We should introduce a specific attribute **`[DdsStruct]`** (or `[DdsType]`) to mark these helper structures.
+
+---
+
+### 2. How to use it (Elegant Way)
+
+#### Step A: Define the Nested Struct
+It does **not** need keys. It just needs to be a `partial struct` so the serializer can be injected.
+
+```csharp
+using CycloneDDS.Schema;
+
+// Mark as a DDS-compatible type (but not a top-level Topic)
+[DdsStruct] 
+public partial struct Point3D
+{
+    public double X;
+    public double Y;
+    public double Z;
+}
+```
+
+#### Step B: Use it in a Topic
+```csharp
+[DdsTopic("RobotPath")]
+public partial struct RobotPath
+{
+    [DdsKey]
+    public int RobotId;
+
+    public Point3D StartLocation; // Nested fixed struct
+    
+    // Even sequences of custom structs work!
+    public BoundedSeq<Point3D> Waypoints; 
+}
+```
+
+---
+
+### 3. Required Changes to Support This
+
+To make this work "Out of the Box" with your current CodeGen implementation, we need two small changes:
+
+#### 1. Add `DdsStructAttribute` to Schema
+**File:** `src/CycloneDDS.Schema/Attributes/TypeLevel/DdsStructAttribute.cs`
+```csharp
+[AttributeUsage(AttributeTargets.Struct | AttributeTargets.Class, AllowMultiple = false)]
+public sealed class DdsStructAttribute : Attribute
+{
+    // Marker only
+}
+```
+
+#### 2. Update `SchemaDiscovery.cs`
+Update the discovery logic to look for `[DdsStruct]` in addition to `[DdsTopic]`.
+
+**File:** `tools/CycloneDDS.CodeGen/SchemaDiscovery.cs`
+```csharp
+// Inside the loop checking symbols
+bool isTopic = HasAttribute(typeSymbol, "CycloneDDS.Schema.DdsTopicAttribute");
+bool isStruct = HasAttribute(typeSymbol, "CycloneDDS.Schema.DdsStructAttribute"); // <--- NEW
+bool isEnum = typeSymbol.TypeKind == TypeKind.Enum;
+
+if (isTopic || isStruct || isEnum)
+{
+    // ... extract type info ...
+}
+```
+
+#### 3. Update `IdlEmitter.cs`
+Ensure `[DdsStruct]` types generate standard IDL structs but **without** the `@appendable` annotation if you want them to be strictly simple (though XCDR2 usually defaults to appendable for everything; keeping them consistent is safest).
+
+---
+
+### 4. Performance Implications (Zero-Alloc)
+
+This approach maintains your **Zero-Allocation** philosophy perfectly.
+
+1.  **Code Gen:** The generator creates `Serialize(ref CdrWriter)` for `Point3D`.
+2.  **Parent Call:** `RobotPath.Serialize` simply calls `this.StartLocation.Serialize(ref writer)`.
+3.  **Inlining:** Because `Point3D` is a `struct` and the method is generated code, the JIT will likely **inline** the serialization of `Point3D` directly into `RobotPath`, resulting in a single tight loop of instructions.
+4.  **No Boxing:** Since it's a `struct`, there is no GC overhead.
+
+### 5. Task List Update
+
+I will add **Task FCDC-EXT08: Nested Struct Support** to the tracker.
+
+*   Add `DdsStructAttribute`.
+*   Update Generator to discover these types.
+*   Update `SerializerEmitter` to verify recursive calls work (they should already, based on `TypeMapper` logic).
+*   Test case: `Struct A` contains `Struct B` contains `Struct C`.
+
+### Does this meet your needs?
+This allows you to compose complex data models cleanly without polluting them with "Topic" semantics where they don't belong.
+---
+The code generator should check the field data types and emit errors if the struct/class used inside a DdsTopic-marked struct/class or inside another DdsStruct-marked struct/class are not marked properly or not part of the built-in ones.
+---
+This is a crucial validation step. Without it, if a user nests a plain struct inside a topic, the generator might silently fail to generate serialization code for the inner struct, leading to compile-time errors in the generated code (missing `Serialize` method) or runtime issues.
+
+Here is the design to implement strict type checking and the `[DdsStruct]` attribute.
+
+### 1. New Attribute: `[DdsStruct]`
+
+Add this to `CycloneDDS.Schema`. This tells the generator: "Generate serialization code for this type, even though it's not a top-level Topic."
+
+**File:** `src/CycloneDDS.Schema/Attributes/TypeLevel/DdsStructAttribute.cs`
+```csharp
+using System;
+
+namespace CycloneDDS.Schema
+{
+    /// <summary>
+    /// Marks a struct or class as a DDS data type that can be nested within Topics.
+    /// Triggers code generation for serialization but does not define a Topic.
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Struct | AttributeTargets.Class, AllowMultiple = false)]
+    public sealed class DdsStructAttribute : Attribute
+    {
+    }
+}
+```
+
+---
+
+### 2. Update `SchemaDiscovery.cs`
+
+Update the discovery logic to accept types marked with `[DdsStruct]` into the generation pipeline.
+
+**File:** `tools/CycloneDDS.CodeGen/SchemaDiscovery.cs`
+
+```csharp
+// Inside the loop iterating type symbols
+bool isTopic = HasAttribute(typeSymbol, "CycloneDDS.Schema.DdsTopicAttribute");
+bool isStruct = HasAttribute(typeSymbol, "CycloneDDS.Schema.DdsStructAttribute"); // <--- NEW
+bool isEnum = typeSymbol.TypeKind == TypeKind.Enum;
+
+if (isTopic || isStruct || isEnum)
+{
+    var typeInfo = new TypeInfo 
+    { 
+        Name = typeSymbol.Name,
+        Namespace = typeSymbol.ContainingNamespace?.ToDisplayString() ?? string.Empty,
+        IsEnum = isEnum,
+        IsTopic = isTopic, // Store differentiation if needed for IDL generation
+        Attributes = ExtractAttributes(typeSymbol)
+    };
+    // ... extract fields ...
+    topics.Add(typeInfo);
+}
+```
+
+---
+
+### 3. Update `SchemaValidator.cs` (The Enforcement Logic)
+
+This is the core of your request. The validator needs a "Registry" of all known valid types found during discovery. It must reject any field that refers to a user type *not* in that registry.
+
+**File:** `tools/CycloneDDS.CodeGen/SchemaValidator.cs`
+
+```csharp
+public class SchemaValidator
+{
+    private readonly HashSet<string> _knownTypeNames;
+
+    public SchemaValidator(IEnumerable<TypeInfo> discoveredTypes)
+    {
+        // Store FullNames of all valid generated types
+        _knownTypeNames = new HashSet<string>(
+            discoveredTypes.Select(t => t.FullName)
+        );
+    }
+
+    public ValidationResult Validate(TypeInfo type)
+    {
+        var errors = new List<string>();
+
+        foreach (var field in type.Fields)
+        {
+            ValidateFieldType(field, type.Name, errors);
+        }
+
+        // ... existing circular dependency checks ...
+
+        return new ValidationResult(errors);
+    }
+
+    private void ValidateFieldType(FieldInfo field, string containerName, List<string> errors)
+    {
+        string typeName = field.TypeName;
+
+        // 1. Handle Nullable (T?)
+        if (typeName.EndsWith("?"))
+        {
+            typeName = typeName.Substring(0, typeName.Length - 1);
+        }
+
+        // 2. Handle Primitives (Built-in)
+        if (TypeMapper.IsPrimitive(typeName)) return;
+
+        // 3. Handle Special Wrappers
+        if (typeName.Contains("FixedString")) return;
+
+        // 4. Handle Collections (BoundedSeq or Managed List)
+        if (typeName.StartsWith("BoundedSeq<") || typeName.StartsWith("List<"))
+        {
+            // Extract Inner Type: BoundedSeq<MyStruct> -> MyStruct
+            string innerType = ExtractGenericArgument(typeName);
+            
+            // Recursively validate the inner type
+            if (!IsValidUserType(innerType) && !TypeMapper.IsPrimitive(innerType) && innerType != "string")
+            {
+                errors.Add($"Field '{containerName}.{field.Name}' uses a collection of type '{innerType}', which is not a valid DDS type. " +
+                           $"Mark '{innerType}' with [DdsStruct] or [DdsTopic].");
+            }
+            return;
+        }
+
+        // 5. Handle Managed Strings
+        if (typeName == "string")
+        {
+            if (!field.HasAttribute("DdsManaged"))
+                errors.Add($"Field '{containerName}.{field.Name}' is a string but missing [DdsManaged].");
+            return;
+        }
+
+        // 6. User Types (The strict check)
+        if (!IsValidUserType(typeName))
+        {
+            errors.Add($"Field '{containerName}.{field.Name}' uses type '{typeName}', which is not a valid DDS type. " +
+                       $"Did you forget to add [DdsStruct] or [DdsTopic] to '{typeName}'?");
+        }
+    }
+
+    private bool IsValidUserType(string typeName)
+    {
+        // Check if the type exists in the list of types we discovered
+        return _knownTypeNames.Contains(typeName);
+    }
+
+    private string ExtractGenericArgument(string typeName)
+    {
+        int start = typeName.IndexOf('<') + 1;
+        int end = typeName.LastIndexOf('>');
+        if (start > 0 && end > start)
+        {
+            return typeName.Substring(start, end - start).Trim();
+        }
+        return typeName;
+    }
+}
+```
+
+### 4. Integration in `CodeGenerator.cs`
+
+You must pass the discovered types to the validator.
+
+```csharp
+public void Generate(string sourceDir, string outputDir)
+{
+    var topics = _discovery.DiscoverTopics(sourceDir);
+    
+    // Pass ALL discovered types to the validator so it knows what exists
+    var validator = new SchemaValidator(topics);
+
+    foreach (var type in topics)
+    {
+        var result = validator.Validate(type);
+        if (!result.IsValid)
+        {
+            // Stop and report errors
+            foreach(var err in result.Errors) Console.Error.WriteLine(err);
+            continue; 
+        }
+        // ... generate ...
+    }
+}
+```
+
+### 5. Task List Update
+
+Add **FCDC-EXT08** to `SERDATA-TASK-MASTER.md` inside **Stage 3.75**.
+
+#### FCDC-EXT08: Nested Struct Support & Strict Validation
+**Priority:** High
+**Description:**
+1.  Add `[DdsStruct]` attribute.
+2.  Update Discovery to find `[DdsStruct]` types.
+3.  Update Validator to index all found types (`[DdsTopic]`, `[DdsStruct]`, `enum`).
+4.  Implement strict field validation: emit error if a field's type is not in the discovered index or a known primitive.
+5.  Support nested generics validation (e.g., check `T` in `BoundedSeq<T>`).
+
+**Tests:**
+*   `Validation_UnknownStruct_EmitsError`: Struct A uses Struct B. B has no attribute. Expect error.
+*   `Validation_KnownStruct_Passes`: Struct A uses Struct B. B has `[DdsStruct]`. Expect success.
+*   `Validation_NestedSequence_UnknownType_EmitsError`: `BoundedSeq<UnknownType>`. Expect error.
+---

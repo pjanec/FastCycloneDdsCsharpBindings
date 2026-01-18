@@ -18,11 +18,11 @@ This document provides the master task list for the **serdata-based** implementa
 ---
 
 
-## Overview: 6 Stages, 40 Tasks
+## Overview: 6 Stages, 41 Tasks
 
-**Total Estimated Effort:** 109-146 person-days (5.5-7 months with 1 developer)
+**Total Estimated Effort:** 111-149 person-days (5.5-7.5 months with 1 developer)
 
-**Critical Path:** Stage 1 → Stage 2 → Stage 3 → **Stage 3.75** → Stage 5 (Core + Extended API + Sender Tracking: ~75-98 days)
+**Critical Path:** Stage 1 → Stage 2 (+ S023) → Stage 3 → **Stage 3.75** → Stage 5 (Core + Nested Structs + Extended API: ~77-101 days)
 
 ---
 
@@ -940,6 +940,81 @@ Comprehensive testing of all generated code patterns.
 **Validation:**
 - 100% pass rate
 - Code coverage > 90%
+
+---
+
+### FCDC-S023: Nested Struct Support ([DdsStruct] Attribute)
+**Status:** 🔴 Not Started  
+**Priority:** HIGH  
+**Estimated Effort:** 2-3 days  
+**Dependencies:** Stage 2 Complete (Generator Infrastructure)
+
+**Description:**  
+Add support for custom helper structs nested within DDS topics using a new `[DdsStruct]` attribute. Implement strict type validation to ensure all nested types are properly marked.
+
+**Design Reference:** `NESTED-STRUCT-SUPPORT-DESIGN.md`
+
+**Implementation Steps:**
+1. Add `DdsStructAttribute` to `CycloneDDS.Schema`
+2. Update `SchemaDiscovery.cs` to discover `[DdsStruct]` types
+3. Build type registry in `SchemaValidator.cs`
+4. Implement strict field type validation (check against registry)
+5. Support recursive validation for collections (e.g., `BoundedSeq<CustomStruct>`)
+6. Update `CodeGenerator.cs` to validate before emitting
+7. Update `IdlEmitter.cs` to emit `[DdsStruct]` types correctly
+
+**Deliverables:**
+- `Src/CycloneDDS.Schema/Attributes/TypeLevel/DdsStructAttribute.cs` (NEW)
+- Updated `tools/CycloneDDS.CodeGen/SchemaDiscovery.cs`
+- Updated `tools/CycloneDDS.CodeGen/SchemaValidator.cs`
+- Updated `tools/CycloneDDS.CodeGen/CodeGenerator.cs`
+- Updated `tools/CycloneDDS.CodeGen/IdlEmitter.cs`
+
+**Tests (Minimum 7):**
+- `Discovery_DdsStruct_Found`
+  - Define struct with `[DdsStruct]`
+  - Success: Type discovered by generator
+- `Validation_UnknownStruct_EmitsError`
+  - Struct A uses Struct B (no attribute on B)
+  - Success: Clear error message emitted
+- `Validation_KnownStruct_Passes`
+  - Struct A uses Struct B (B has `[DdsStruct]`)
+  - Success: No validation errors
+- `Validation_NestedSequence_UnknownType_EmitsError`
+  - Field: `BoundedSeq<UnknownStruct>`
+  - Success: Error emitted
+- `Validation_NestedSequence_KnownType_Passes`
+  - Field: `BoundedSeq<KnownStruct>` (marked with `[DdsStruct]`)
+  - Success: No errors
+- `CodeGen_NestedStruct_Compiles`
+  - Topic with nested `[DdsStruct]` field
+  - Success: Generated code compiles
+- `Roundtrip_NestedStruct_Preserves`
+  - Topic with `Point3D` field (X=1, Y=2, Z=3)
+  - Success: Round-trip preserves values
+
+**Validation:**
+- ✅ `[DdsStruct]` types generate serialization code
+- ✅ Unknown nested types emit clear error messages
+- ✅ Supports arbitrary nesting depth
+- ✅ Zero-allocation maintained (struct method inlining)
+
+**Example Usage:**
+```csharp
+[DdsStruct]
+public partial struct Point3D
+{
+    public double X, Y, Z;
+}
+
+[DdsTopic("RobotPath")]
+public partial struct RobotPath
+{
+    [DdsKey] public int RobotId;
+    public Point3D StartLocation;              // Nested struct
+    public BoundedSeq<Point3D> Waypoints;      // Collection of structs
+}
+```
 
 ---
 
