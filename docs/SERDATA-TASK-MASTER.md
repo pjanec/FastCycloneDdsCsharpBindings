@@ -18,11 +18,11 @@ This document provides the master task list for the **serdata-based** implementa
 ---
 
 
-## Overview: 6 Stages, 41 Tasks
+## Overview: 6 Stages, 42 Tasks
 
-**Total Estimated Effort:** 111-149 person-days (5.5-7.5 months with 1 developer)
+**Total Estimated Effort:** 112-150 person-days (5.5-7.5 months with 1 developer)
 
-**Critical Path:** Stage 1 → Stage 2 (+ S023) → Stage 3 → **Stage 3.75** → Stage 5 (Core + Nested Structs + Extended API: ~77-101 days)
+**Critical Path:** Stage 1 → Stage 2 (+ S023, S024) → Stage 3 → **Stage 3.75** → Stage 5 (Core + Enhancements + Extended API: ~78-102 days)
 
 ---
 
@@ -1013,6 +1013,87 @@ public partial struct RobotPath
     [DdsKey] public int RobotId;
     public Point3D StartLocation;              // Nested struct
     public BoundedSeq<Point3D> Waypoints;      // Collection of structs
+}
+```
+
+---
+
+### FCDC-S024: Type-Level [DdsManaged] Attribute
+**Status:** 🔴 Not Started  
+**Priority:** MEDIUM  
+**Estimated Effort:** 1 day  
+**Dependencies:** FCDC-S015 ([DdsManaged] Support exists), Stage 2 Complete
+
+**Description:**  
+Allow `[DdsManaged]` to be applied at the type level (struct/class) instead of just per-field, making it more convenient for types that are fully managed (e.g., logging, UI data).
+
+**Rationale:**
+Avoid verbose field-level annotations when entire type uses managed fields (strings, lists).
+
+**Current Behavior (Verbose):**
+```csharp
+[DdsTopic("LogEvent")]
+public partial struct LogEvent
+{
+    [DdsKey] public int Id;
+    [DdsManaged] public string Message;     // Must mark each field
+    [DdsManaged] public List<string> Tags;  // Must mark each field
+}
+```
+
+**Desired Behavior (Convenient):**
+```csharp
+[DdsTopic("LogEvent")]
+[DdsManaged]  // ← Type-level: applies to all managed fields
+public partial struct LogEvent
+{
+    [DdsKey] public int Id;
+    public string Message;      // Inherits [DdsManaged] from type
+    public List<string> Tags;   // Inherits [DdsManaged] from type
+}
+```
+
+**Implementation Steps:**
+1. Update `ManagedTypeValidator.cs` to check parent type's attributes
+2. Implement `IsManagedContext(TypeInfo type, FieldInfo field)` helper
+3. Update validation logic: pass if field OR type has `[DdsManaged]`
+4. Update `SerializerEmitter.cs` to check type-level attribute
+5. Update `DeserializerEmitter.cs` to check type-level attribute
+6. Add XML documentation explaining inheritance behavior
+
+**Deliverables:**
+- Updated `tools/CycloneDDS.CodeGen/ManagedTypeValidator.cs`
+- Updated `tools/CycloneDDS.CodeGen/SerializerEmitter.cs`
+- Updated `tools/CycloneDDS.CodeGen/DeserializerEmitter.cs`
+
+**Tests (Minimum 3):**
+- `TypeManaged_StringField_NoFieldAttribute_Validates`
+  - Type has `[DdsManaged]`, field is `string` without attribute
+  - Success: No validation errors
+- `TypeManaged_GeneratedCode_Compiles`
+  - Type with `[DdsManaged]`, multiple string/list fields
+  - Success: Generated serializer compiles and works
+- `TypeManaged_Roundtrip_Preserves`
+  - Type with `[DdsManaged]`, strings "Hello", lists [1,2,3]
+  - Success: Round-trip preserves all data
+
+**Validation:**
+- ✅ Type-level attribute applies to all managed fields
+- ✅ Field-level attribute still works (explicit override)
+- ✅ Validation error if neither type nor field has attribute
+- ✅ Generated code identical to field-level approach
+
+**Validator Logic:**
+```csharp
+bool isTypeManaged = type.HasAttribute("DdsManaged");
+bool isFieldManaged = field.HasAttribute("DdsManaged");
+
+if (IsManagedFieldType(field.TypeName))
+{
+    if (!isTypeManaged && !isFieldManaged)
+    {
+        Error: "Mark field or container type with [DdsManaged]"
+    }
 }
 ```
 

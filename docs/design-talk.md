@@ -9260,3 +9260,102 @@ Add **FCDC-EXT08** to `SERDATA-TASK-MASTER.md` inside **Stage 3.75**.
 *   `Validation_KnownStruct_Passes`: Struct A uses Struct B. B has `[DdsStruct]`. Expect success.
 *   `Validation_NestedSequence_UnknownType_EmitsError`: `BoundedSeq<UnknownType>`. Expect error.
 ---
+
+
+
+
+
+
+
+If i need my whole class to be considered 'managed' (using managed data types), is it enough to add [DdsManaged] attribute just to the class which should allow for ommitting those per each field, for convenience?
+---
+Yes, that is a perfectly valid and elegant design choice. It aligns with the **"Progressive Disclosure"** principle: keep it strict by default for performance, but make it easy to opt-in for convenience when raw speed isn't the priority.
+
+Since the `DdsManagedAttribute` is already defined with `AttributeTargets.Struct | AttributeTargets.Class`, we just need to ensure the **Validator** respects this inheritance.
+
+### How it looks (User Code)
+
+This is much cleaner for "Business Data" where GC overhead is acceptable:
+
+```csharp
+[DdsTopic("LogEvents")]
+[DdsManaged] // <--- Acts as a global opt-in for this type
+public partial struct LogEvent
+{
+    [DdsKey]
+    public int Id;
+
+    // No [DdsManaged] needed here anymore!
+    public string Message; 
+    
+    // No [DdsManaged] needed here either!
+    public List<string> Tags; 
+}
+```
+
+### Implementation Changes
+
+We need to update **`ManagedTypeValidator.cs`** to check the parent type's attributes before complaining about a field.
+
+**File:** `tools/CycloneDDS.CodeGen/ManagedTypeValidator.cs`
+
+```csharp
+public List<ValidationMessage> Validate(TypeInfo type)
+{
+    var diagnostics = new List<ValidationMessage>();
+    
+    if (type == null) return diagnostics;
+
+    // 1. Check if the WHOLE TYPE is marked as managed
+    bool isTypeManaged = HasDdsManagedAttribute(type);
+    
+    foreach (var field in type.Fields ?? Enumerable.Empty<FieldInfo>())
+    {
+        if (IsManagedFieldType(field.TypeName))
+        {
+            // 2. Pass validation if Field has attribute OR Type has attribute
+            bool fieldHasAttr = HasDdsManagedAttribute(field);
+            
+            if (!isTypeManaged && !fieldHasAttr)
+            {
+                diagnostics.Add(new ValidationMessage
+                {
+                    Severity = ValidationSeverity.Error,
+                    Message = $"Field '{field.Name}' in type '{type.Name}' uses managed type '{field.TypeName}'. " +
+                              $"You must mark either the field or the struct/class with [DdsManaged] to acknowledge GC allocations."
+                });
+            }
+        }
+    }
+    
+    return diagnostics;
+}
+```
+
+### Design Notes
+
+1.  **Strictness vs. Convenience:** This maintains the safety net. You still cannot *accidentally* use a `string` in a performance-critical struct without explicitly adding an attribute (either on the field or the struct).
+2.  **Code Generation:** The `SerializerEmitter` and `DeserializerEmitter` do not need changes regarding *validity*, but they need to know if they should generate code for `string`/`List`. Currently, they check `field.HasAttribute("DdsManaged")`.
+    *   **Crucial Update:** You must update the Emitters to check `type.HasAttribute("DdsManaged")` as well when deciding *how* to generate the field serialization code.
+
+**Update `SerializerEmitter.cs` (and Deserializer):**
+
+```csharp
+private bool IsManagedContext(TypeInfo type, FieldInfo field)
+{
+    return type.HasAttribute("DdsManaged") || field.HasAttribute("DdsManaged");
+}
+
+// In GetSizerCall / GetWriterCall:
+if (field.TypeName == "string")
+{
+    if (IsManagedContext(type, field))
+    {
+        return $"sizer.Align(4); sizer.WriteString(this.{ToPascalCase(field.Name)})";
+    }
+    // else: Logic falls through, Validator would have caught this error earlier
+}
+```
+
+ add this refinement to **Task FCDC-S015 ([DdsManaged] Support)** in the tracker.
+---
