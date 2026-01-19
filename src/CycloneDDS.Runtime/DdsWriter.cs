@@ -3,6 +3,8 @@ using System.Reflection;
 using System.Reflection.Emit;
 using System.Buffers;
 using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
 using CycloneDDS.Core;
 using CycloneDDS.Runtime.Interop;
 using CycloneDDS.Runtime.Memory;
@@ -15,6 +17,14 @@ namespace CycloneDDS.Runtime
         private DdsApi.DdsEntity _topicHandle;
         private DdsParticipant? _participant;
         private readonly string _topicName;
+
+        // Async/Events
+        private IntPtr _listener = IntPtr.Zero;
+        private GCHandle _paramHandle;
+        private readonly object _listenerLock = new object();
+        private readonly DdsApi.DdsOnPublicationMatched _publicationMatchedHandler;
+        private volatile TaskCompletionSource<bool>? _waitForReaderTaskSource;
+        private EventHandler<DdsApi.DdsPublicationMatchedStatus>? _publicationMatched;
 
         // Delegates for high-performance invocation
         private delegate void SerializeDelegate(in T sample, ref CdrWriter writer);
@@ -38,6 +48,8 @@ namespace CycloneDDS.Runtime
 
         public DdsWriter(DdsParticipant participant, string topicName, IntPtr qos = default)
         {
+            _publicationMatchedHandler = OnPublicationMatched;
+
             if (_sizer == null || _serializer == null)
             {
                 throw new InvalidOperationException($"Type {typeof(T).Name} does not exhibit expected DDS generated methods (Serialize, GetSerializedSize).");
@@ -191,8 +203,105 @@ namespace CycloneDDS.Runtime
             PerformOperation(sample, DdsApi.dds_unregister_serdata);
         }
         
+        public event EventHandler<DdsApi.DdsPublicationMatchedStatus>? PublicationMatched
+        {
+            add 
+            {
+                lock(_listenerLock) {
+                    _publicationMatched += value;
+                    EnsureListenerAttached();
+                }
+            }
+            remove 
+            {
+                lock(_listenerLock) {
+                    _publicationMatched -= value;
+                }
+            }
+        }
+        
+        public DdsApi.DdsPublicationMatchedStatus CurrentStatus 
+        {
+            get
+            {
+                 if (_writerHandle == null) throw new ObjectDisposedException(nameof(DdsWriter<T>));
+                 DdsApi.dds_get_publication_matched_status(_writerHandle.NativeHandle.Handle, out var status);
+                 return status;
+            }
+        }
+
+        public async Task<bool> WaitForReaderAsync(TimeSpan timeout = default)
+        {
+            if (CurrentStatus.CurrentCount > 0) return true;
+            
+            EnsureListenerAttached();
+            
+             if (CurrentStatus.CurrentCount > 0) return true;
+             
+             var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+             _waitForReaderTaskSource = tcs;
+             
+             if (CurrentStatus.CurrentCount > 0) 
+             {
+                 _waitForReaderTaskSource = null;
+                 return true;
+             }
+             
+             using var timeoutCts = new CancellationTokenSource(timeout == default ? TimeSpan.FromMilliseconds(-1) : timeout);
+             using (timeoutCts.Token.Register(() => tcs.TrySetResult(false))) 
+             {
+                  return await tcs.Task;
+             }
+        }
+
+        private void EnsureListenerAttached()
+        {
+             if (_listener != IntPtr.Zero) return;
+             
+             lock (_listenerLock)
+             {
+                 if (_listener != IntPtr.Zero) return;
+                 
+                 _paramHandle = GCHandle.Alloc(this);
+                 _listener = DdsApi.dds_create_listener(GCHandle.ToIntPtr(_paramHandle));
+                 DdsApi.dds_lset_publication_matched(_listener, _publicationMatchedHandler);
+                 
+                 if (_writerHandle != null)
+                 {
+                     DdsApi.dds_writer_set_listener(_writerHandle.NativeHandle, _listener);
+                 }
+             }
+        }
+
+        // [MonoPInvokeCallback(typeof(DdsApi.DdsOnPublicationMatched))]
+        private static void OnPublicationMatched(int writer, ref DdsApi.DdsPublicationMatchedStatus status, IntPtr arg)
+        {
+             if (arg == IntPtr.Zero) return;
+             try
+             {
+                 var handle = GCHandle.FromIntPtr(arg);
+                 if (handle.IsAllocated && handle.Target is DdsWriter<T> self)
+                 {
+                     self._publicationMatched?.Invoke(self, status);
+                     
+                     if (status.CurrentCount > 0)
+                     {
+                         self._waitForReaderTaskSource?.TrySetResult(true);
+                     }
+                 }
+             }
+             catch { }
+        }
+
         public void Dispose()
         {
+            if (_listener != IntPtr.Zero)
+            {
+                DdsApi.dds_delete_listener(_listener);
+                _listener = IntPtr.Zero;
+            }
+            if (_paramHandle.IsAllocated) _paramHandle.Free();
+
             _writerHandle?.Dispose();
             _writerHandle = null;
             _topicHandle = DdsApi.DdsEntity.Null;

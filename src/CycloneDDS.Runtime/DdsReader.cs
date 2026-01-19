@@ -3,6 +3,10 @@ using System.Buffers;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using CycloneDDS.Core;
 using CycloneDDS.Runtime.Interop;
 using CycloneDDS.Runtime.Memory;
@@ -17,7 +21,47 @@ namespace CycloneDDS.Runtime
         private DdsEntityHandle? _readerHandle;
         private DdsApi.DdsEntity _topicHandle;
         private DdsParticipant? _participant;
+
+        // Async support
+        private IntPtr _listener = IntPtr.Zero;
+        private GCHandle _paramHandle;
+        private volatile TaskCompletionSource<bool>? _waitTaskSource;
+        private readonly DdsApi.DdsOnDataAvailable _dataAvailableHandler;
+        private readonly DdsApi.DdsOnSubscriptionMatched _subscriptionMatchedHandler;
+        private readonly object _listenerLock = new object();
         
+        // Filtering
+        private volatile Predicate<TView>? _filter;
+        
+        // Events
+        private EventHandler<DdsApi.DdsSubscriptionMatchedStatus>? _subscriptionMatched;
+        public event EventHandler<DdsApi.DdsSubscriptionMatchedStatus>? SubscriptionMatched
+        {
+            add 
+            { 
+                lock(_listenerLock) {
+                    _subscriptionMatched += value; 
+                    EnsureListenerAttached(); 
+                }
+            }
+            remove 
+            { 
+                lock(_listenerLock) {
+                    _subscriptionMatched -= value; 
+                }
+            }
+        }
+        
+        public DdsApi.DdsSubscriptionMatchedStatus CurrentStatus
+        {
+            get
+            {
+                if (_readerHandle == null) throw new ObjectDisposedException(nameof(DdsReader<T, TView>));
+                DdsApi.dds_get_subscription_matched_status(_readerHandle.NativeHandle.Handle, out var status);
+                return status;
+            }
+        }
+
         private static readonly DeserializeDelegate<TView>? _deserializer;
         
         static DdsReader()
@@ -39,6 +83,8 @@ namespace CycloneDDS.Runtime
 
         public DdsReader(DdsParticipant participant, string topicName, IntPtr qos = default)
         {
+            _dataAvailableHandler = OnDataAvailable;
+            _subscriptionMatchedHandler = OnSubscriptionMatched;
             if (_deserializer == null) 
                  throw new InvalidOperationException($"Type {typeof(T).Name} missing Deserialize method.");
 
@@ -57,6 +103,11 @@ namespace CycloneDDS.Runtime
                   throw new DdsException(rc, $"Failed to create reader for '{topicName}'");
              }
              _readerHandle = new DdsEntityHandle(reader);
+        }
+
+        public void SetFilter(Predicate<TView>? filter)
+        {
+            _filter = filter;
         }
 
         public ViewScope<TView> Take(int maxSamples = 32)
@@ -116,16 +167,149 @@ namespace CycloneDDS.Runtime
                  
                  if (count == (int)DdsApi.DdsReturnCode.NoData)
                  {
-                     return new ViewScope<TView>(_readerHandle.NativeHandle, null, null, 0, null);
+                     return new ViewScope<TView>(_readerHandle.NativeHandle, null, null, 0, null, _filter);
                  }
                  throw new DdsException((DdsApi.DdsReturnCode)count, $"dds_{(isTake ? "take" : "read")}cdr failed: {count}");
              }
              
-             return new ViewScope<TView>(_readerHandle.NativeHandle, samples, infos, count, _deserializer);
+             return new ViewScope<TView>(_readerHandle.NativeHandle, samples, infos, count, _deserializer, _filter);
+        }
+
+        private bool HasData()
+        {
+            try 
+            {
+                using var scope = Read(1);
+                return scope.Count > 0;
+            }
+            catch { return false; }
+        }
+
+        public async Task<bool> WaitDataAsync(CancellationToken cancellationToken = default)
+        {
+             if (_readerHandle == null) throw new ObjectDisposedException(nameof(DdsReader<T, TView>));
+             
+             EnsureListenerAttached();
+             
+             var tcs = _waitTaskSource;
+             if (tcs == null || tcs.Task.IsCompleted)
+             {
+                 tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                 _waitTaskSource = tcs;
+             }
+             
+             // Check if data is already available (Race Condition fix)
+             // Note: This effectively 'peeks' at the data and may mark it as Read.
+             if (HasData()) return true;
+
+             using (cancellationToken.Register(() => tcs.TrySetCanceled()))
+             {
+                 try
+                 {
+                    return await tcs.Task;
+                 }
+                 catch (TaskCanceledException)
+                 {
+                    if (cancellationToken.IsCancellationRequested) throw;
+                    return true;
+                 }
+             }
+        }
+        
+        private void EnsureListenerAttached()
+        {
+             if (_listener != IntPtr.Zero) return;
+             
+             lock (_listenerLock)
+             {
+                 if (_listener != IntPtr.Zero) return;
+                 
+                 _paramHandle = GCHandle.Alloc(this);
+                 _listener = DdsApi.dds_create_listener(GCHandle.ToIntPtr(_paramHandle));
+                 DdsApi.dds_lset_data_available(_listener, _dataAvailableHandler);
+                 DdsApi.dds_lset_subscription_matched(_listener, _subscriptionMatchedHandler);
+                 
+                 if (_readerHandle != null)
+                 {
+                     DdsApi.dds_reader_set_listener(_readerHandle.NativeHandle, _listener);
+                 }
+             }
+        }
+        
+        private static void OnSubscriptionMatched(int reader, ref DdsApi.DdsSubscriptionMatchedStatus status, IntPtr arg)
+        {
+             if (arg == IntPtr.Zero) return;
+             try
+             {
+                 var handle = GCHandle.FromIntPtr(arg);
+                 if (handle.IsAllocated && handle.Target is DdsReader<T, TView> self)
+                 {
+                     self._subscriptionMatched?.Invoke(self, status);
+                 }
+             }
+             catch { }
+        }
+
+        private static void OnDataAvailable(int reader, IntPtr arg)
+        {
+             if (arg == IntPtr.Zero) return;
+             try
+             {
+                 var handle = GCHandle.FromIntPtr(arg);
+                 if (handle.IsAllocated && handle.Target is DdsReader<T, TView> self)
+                 {
+                     self._waitTaskSource?.TrySetResult(true);
+                 }
+             }
+             catch { }
+        }
+
+        private TView[] TakeBatch()
+        {
+            using var scope = Take();
+            if (scope.Count == 0) return Array.Empty<TView>();
+            var batch = new TView[scope.Count];
+            for (int i = 0; i < scope.Count; i++)
+            {
+                batch[i] = scope[i];
+            }
+            return batch;
+        }
+
+        public async IAsyncEnumerable<TView> StreamAsync([EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                // Check for data before waiting to handle pre-existing samples
+                var batch = TakeBatch();
+                if (batch.Length > 0)
+                {
+                    foreach (var item in batch) yield return item;
+                    continue; 
+                }
+
+                await WaitDataAsync(cancellationToken);
+                
+                // After wait, try take again
+                batch = TakeBatch();
+                 foreach (var item in batch) yield return item;
+            }
         }
 
         public void Dispose()
         {
+            if (_listener != IntPtr.Zero)
+            {
+                // Unset listener from reader first? 
+                if (_readerHandle != null)
+                {
+                     // dds_reader_set_listener(_readerHandle.NativeHandle, IntPtr.Zero); // Optional based on impl
+                }
+                DdsApi.dds_delete_listener(_listener);
+                _listener = IntPtr.Zero;
+            }
+            if (_paramHandle.IsAllocated) _paramHandle.Free();
+
             _readerHandle?.Dispose();
             _readerHandle = null;
             _topicHandle = DdsApi.DdsEntity.Null;
@@ -157,19 +341,55 @@ namespace CycloneDDS.Runtime
         private DdsApi.DdsSampleInfo[]? _infos;
         private int _count;
         private DeserializeDelegate<TView>? _deserializer;
+        private Predicate<TView>? _filter;
         
         public ReadOnlySpan<DdsApi.DdsSampleInfo> Infos => _infos != null ? _infos.AsSpan(0, _count) : ReadOnlySpan<DdsApi.DdsSampleInfo>.Empty;
 
-        internal ViewScope(DdsApi.DdsEntity reader, IntPtr[]? samples, DdsApi.DdsSampleInfo[]? infos, int count, DeserializeDelegate<TView>? deserializer)
+        internal ViewScope(DdsApi.DdsEntity reader, IntPtr[]? samples, DdsApi.DdsSampleInfo[]? infos, int count, DeserializeDelegate<TView>? deserializer, Predicate<TView>? filter)
         {
             _reader = reader;
             _samples = samples;
             _infos = infos;
             _count = count;
             _deserializer = deserializer;
+            _filter = filter;
         }
         
         public int Count => _count;
+
+        public Enumerator GetEnumerator() => new Enumerator(this, _filter);
+
+        public ref struct Enumerator
+        {
+             private ViewScope<TView> _scope;
+             private Predicate<TView>? _filter;
+             private int _index;
+             private TView _current;
+
+             internal Enumerator(ViewScope<TView> scope, Predicate<TView>? filter)
+             {
+                 _scope = scope;
+                 _filter = filter;
+                 _index = -1;
+                 _current = default;
+             }
+             
+             public bool MoveNext()
+             {
+                 while (++_index < _scope.Count)
+                 {
+                     TView item = _scope[_index];
+                     if (_filter == null || _filter(item))
+                     {
+                         _current = item;
+                         return true;
+                     }
+                 }
+                 return false;
+             }
+             
+             public TView Current => _current;
+        }
 
         public TView this[int index]
         {

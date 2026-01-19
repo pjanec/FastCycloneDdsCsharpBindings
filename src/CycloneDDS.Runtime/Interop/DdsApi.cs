@@ -62,6 +62,26 @@ namespace CycloneDDS.Runtime.Interop
             public UIntPtr iov_len; // Was uint, must be size_t (UIntPtr)
             public IntPtr iov_base;
         }
+
+        // Listener Delegate
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void DdsOnDataAvailable(int reader, IntPtr arg);
+        
+        // Listener
+        [DllImport(DLL_NAME)]
+        public static extern IntPtr dds_create_listener(IntPtr arg);
+
+        [DllImport(DLL_NAME)]
+        public static extern void dds_delete_listener(IntPtr listener);
+
+        [DllImport(DLL_NAME)]
+        public static extern void dds_lset_data_available(IntPtr listener, DdsOnDataAvailable callback);
+
+        [DllImport(DLL_NAME, EntryPoint = "dds_set_listener")]
+        public static extern int dds_reader_set_listener(DdsEntity reader, IntPtr listener);
+
+        [DllImport(DLL_NAME, EntryPoint = "dds_set_listener")]
+        public static extern int dds_writer_set_listener(DdsEntity writer, IntPtr listener);
         
         // Participant
         [DllImport(DLL_NAME)]
@@ -240,9 +260,61 @@ namespace CycloneDDS.Runtime.Interop
             uint n,
             [In] short[] values);
 
+        [DllImport(DLL_NAME)]
+        public static extern void dds_qset_history(IntPtr qos, int kind, int depth);
+
+        public const int DDS_HISTORY_KEEP_LAST = 0;
+        public const int DDS_HISTORY_KEEP_ALL = 1;
+
         public const uint DDS_DATA_REPRESENTATION_XCDR1 = 0;
         public const uint DDS_DATA_REPRESENTATION_XCDR2 = 1;
 
+        // Status Structs
+        [StructLayout(LayoutKind.Sequential)]
+        public struct DdsPublicationMatchedStatus
+        {
+            public uint TotalCount;
+            public int TotalCountChange;
+            public uint CurrentCount;
+            public int CurrentCountChange;
+            public long LastSubscriptionHandle;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct DdsSubscriptionMatchedStatus
+        {
+            public uint TotalCount;
+            public int TotalCountChange;
+            public uint CurrentCount;
+            public int CurrentCountChange;
+            public long LastPublicationHandle;
+        }
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void DdsOnPublicationMatched(int writer, ref DdsPublicationMatchedStatus status, IntPtr arg);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        public delegate void DdsOnSubscriptionMatched(int reader, ref DdsSubscriptionMatchedStatus status, IntPtr arg);
+
+        [DllImport(DLL_NAME)]
+        public extern static void dds_lset_publication_matched(IntPtr listener, DdsOnPublicationMatched callback);
+
+        [DllImport(DLL_NAME)]
+        public extern static void dds_lset_subscription_matched(IntPtr listener, DdsOnSubscriptionMatched callback);
+
+        [DllImport(DLL_NAME)]
+        public extern static int dds_get_publication_matched_status(int writer, out DdsPublicationMatchedStatus status);
+
+        [DllImport(DLL_NAME)]
+        public extern static int dds_get_subscription_matched_status(int reader, out DdsSubscriptionMatchedStatus status);
+        
+        [DllImport(DLL_NAME)]
+        public extern static int dds_get_status_changes(int entity, out uint status);
+
+        public const uint DDS_DATA_AVAILABLE_STATUS = (1u << 8);
+        public const uint DDS_PUBLICATION_MATCHED_STATUS = (1u << 11);
+        public const uint DDS_SUBSCRIPTION_MATCHED_STATUS = (1u << 12);
+        
         // Cleanup
         [DllImport(DLL_NAME)]
         public static extern int dds_delete(DdsEntity entity);

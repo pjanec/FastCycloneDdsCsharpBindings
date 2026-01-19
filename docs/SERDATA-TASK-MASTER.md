@@ -1617,7 +1617,7 @@ Implement DDS instance lifecycle operations for keyed topics, enabling proper in
 
 **Goal:** Add essential DDS features with modern .NET idioms (type auto-discovery, async/await, events, filtering, discovery) plus optional sender tracking.
 
-**Duration:** 15-23 days (8 tasks: 1 foundation + 5 extended API + 2 sender tracking)  
+**Duration:** 16-24 days (8 tasks: 1 foundation + 5 extended API + 2 sender tracking)  
 
 **Design References:**  
 - `docs/EXTENDED-DDS-API-DESIGN.md` - Core extended API features
@@ -1858,45 +1858,104 @@ Map DDS status callbacks to C# `event EventHandler<TStatus>`. Expose connectivit
 ### FCDC-EXT05: Instance Management (Keyed Topics)
 
 **Priority:** Medium  
-**Estimated Effort:** 2-3 days  
-**Dependencies:** FCDC-EXT01 (Read/Take infrastructure), FCDC-S020, FCDC-S021
+**Estimated Effort:** 3-4 days  
+**Dependencies:** FCDC-EXT01 (Read/Take infrastructure), FCDC-S020, FCDC-S021, FCDC-S022b (Instance lifecycle from BATCH-14)
 
 **Description:**  
-Enable O(1) lookup and filtering by instance handle for keyed topics. Critical for systems tracking many objects (e.g., fleet management, air traffic control).
+Enable O(1) lookup and filtering by instance handle for keyed topics. Critical for systems tracking many objects (e.g., fleet management, air traffic control). This task completes the instance lifecycle work started in FCDC-S022b by adding keyed test types and comprehensive verification of instance operations.
 
 **Design Reference:** `EXTENDED-DDS-API-DESIGN.md` Section 8
 
 **Implementation Steps:**
-1. Create `DdsInstanceHandle` struct in `CycloneDDS.Runtime`
-2. Add instance P/Invoke (`dds_lookup_instance`, `dds_take_instance`, `dds_read_instance`) to `DdsApi.cs`
-3. Implement `DdsReader.LookupInstance(in T keySample)` using temporary serdata
-4. Implement `DdsReader.TakeInstance(handle, maxSamples)`
-5. Implement `DdsReader.ReadInstance(handle, maxSamples)`
-6. Add internal `ReadOrTakeInstance` helper
+1. Create keyed test type `KeyedTestMessage` with `[DdsKey]` attribute in test project
+2. Create `DdsInstanceHandle` struct in `CycloneDDS.Runtime`
+3. Add instance P/Invoke (`dds_lookup_instance`, `dds_take_instance`, `dds_read_instance`) to `DdsApi.cs`
+4. Implement `DdsReader.LookupInstance(in T keySample)` using temporary serdata
+5. Implement `DdsReader.TakeInstance(handle, maxSamples)`
+6. Implement `DdsReader.ReadInstance(handle, maxSamples)`
+7. Add internal `ReadOrTakeInstance` helper
+8. Re-enable and fix the 3 skipped tests from BATCH-18 (IntegrationTests.cs lines 365-428)
 
 **Deliverables:**
+- `tests/CycloneDDS.Runtime.Tests/KeyedTestMessage.cs` (NEW - keyed test type)
 - `Src/CycloneDDS.Runtime/DdsInstanceHandle.cs`
 - Updated `Src/CycloneDDS.Runtime/Interop/DdsApi.cs`
 - Updated `Src/CycloneDDS.Runtime/DdsReader.cs`
+- Updated `tests/CycloneDDS.Runtime.Tests/IntegrationTests.cs` (re-enable 3 skipped tests)
 
-**Tests (Minimum 3):**
+**Keyed Test Type Definition:**
+```csharp
+[DdsTopic("KeyedTestTopic")]
+public partial struct KeyedTestMessage
+{
+    [DdsKey, DdsId(0)]
+    public int SensorId;   // Key field for instance identification
+    
+    [DdsId(1)]
+    public int Value;      // Data field
+}
+```
+
+**Tests (Minimum 9):**
+
+**A. Instance Lookup & Filtering (3 tests):**
 - `LookupInstance_ReturnsValidHandle`
-  - Write sample with `Id=5`
-  - Lookup with key `{Id=5}`
+  - Write sample with `SensorId=5`
+  - Lookup with key `{SensorId=5}`
   - Success: Returns non-Nil handle
 - `TakeInstance_OnlyReturnsMatchingData`
-  - Write `Id=1` and `Id=2`
-  - Lookup handle for `Id=1`, TakeInstance
-  - Success: Only `Id=1` returned, `Id=2` remains in cache
+  - Write `SensorId=1` and `SensorId=2`
+  - Lookup handle for `SensorId=1`, TakeInstance
+  - Success: Only `SensorId=1` returned, `SensorId=2` remains in cache
 - `LookupInstance_UnknownKey_ReturnsNil`
-  - Never written `Id=999`
-  - Lookup `{Id=999}`
+  - Never written `SensorId=999`
+  - Lookup `{SensorId=999}`
   - Success: Returns `DdsInstanceHandle.Nil`
+
+**B. Instance Lifecycle (3 tests from BATCH-18 - currently skipped):**
+- `DisposeInstance_ValidSample_MarksDisposed`
+  - Create writer/reader with `KeyedTestMessage`
+  - Write sample: `{SensorId=1, Value=100}`
+  - Call `writer.DisposeInstance({SensorId=1, Value=0})`
+  - Reader takes samples
+  - Success: `info.InstanceState == DdsInstanceState.NotAliveDisposed`
+- `UnregisterInstance_ValidSample_ReleasesOwnership`
+  - Create writer/reader with `KeyedTestMessage`
+  - Write sample: `{SensorId=2, Value=200}`
+  - Call `writer.UnregisterInstance({SensorId=2, Value=0})`
+  - Reader takes samples
+  - Success: `info.InstanceState == DdsInstanceState.NotAliveNoWriters`
+- `InstanceLifecycle_MultipleInstances_TrackedSeparately`
+  - Write 3 instances: SensorId=1, 2, 3
+  - Dispose SensorId=2
+  - Take all samples
+  - Success: Only instance 2 marked as DISPOSED, others ALIVE
+
+**C. Multi-Instance Operations (3 additional tests):**
+- `ReadInstance_NonDestructive_DataRemains`
+  - Write `SensorId=1`, `SensorId=2`
+  - Lookup instance 1, ReadInstance
+  - ReadInstance again
+  - Success: Both reads return same data
+- `MultipleInstances_IndependentLifecycles`
+  - Write 5 instances (SensorId 1-5)
+  - Take instance 1, dispose instance 3, unregister instance 5
+  - Success: Instance states correct (ALIVE for 2,4; DISPOSED for 3; NO_WRITERS for 5; taken for 1)
+- `InstanceHandle_PersistsAcrossUpdates`
+  - Write `{SensorId=10, Value=100}`
+  - Lookup handle H1
+  - Write `{SensorId=10, Value=200}` (update)
+  - Lookup handle H2
+  - Success: H1 == H2 (same instance)
 
 **Validation:**
 - ✅ Lookup returns correct handles
 - ✅ Instance-specific take filters correctly (O(1) access)
 - ✅ Unknown instances return Nil handle
+- ✅ DisposeInstance marks correct instance state
+- ✅ UnregisterInstance releases writer ownership
+- ✅ Multiple instances tracked independently
+- ✅ Instance handles persist across updates
 
 ---
 
@@ -1997,9 +2056,11 @@ Integrate sender tracking into DdsParticipant, DdsWriter, DdsReader, and ViewSco
 ### Stage 3.75 Success Criteria
 
 **Functional:**
-- ✅ All 29 tests pass (4 auto-discovery + 17 extended API + 8 sender tracking)
+- ✅ All 35 tests pass (6 auto-discovery + 3 read/take + 18 extended API + 8 sender tracking)
+  - Note: FCDC-EXT05 includes 9 tests (3 original + 3 from BATCH-18 + 3 additional)
 - ✅ No breaking changes to existing APIs
 - ✅ All new APIs work with zero-copy core
+- ✅ Keyed topic instance lifecycle fully verified (re-enables 3 skipped tests from BATCH-18)
 
 **Performance:**
 - ✅ Zero-Copy path remains allocation-free

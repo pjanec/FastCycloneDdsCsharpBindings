@@ -95,7 +95,7 @@
 ## Stage 3.75: Extended DDS API - Modern C# Idioms ⏳
 
 **Goal:** Type auto-discovery + essential DDS features (async/await, events, filtering, discovery, sender tracking)  
-**Status:** ⏳ **ACTIVE** (2/8 tasks complete, BATCH-19 next)  
+**Status:** ⏳ **ACTIVE** (5/8 tasks complete, 62.5% done)  
 **Design:**  
 - [Extended DDS API Design](../docs/EXTENDED-DDS-API-DESIGN.md)  
 - [Sender Tracking Design](../docs/SENDER-TRACKING-DESIGN.md)  
@@ -103,16 +103,16 @@
 
 **Strategic Note:** These features represent core DDS functionality that users expect in a complete implementation. They provide the foundation for modern, production-ready .NET applications using DDS.
 
-- [x] **FCDC-EXT00** Type Auto-Discovery & Topic Management → [details](../docs/SERDATA-TASK-MASTER.md#fcdc-ext00-type-auto-discovery--topic-management) 🔴 **CRITICAL** (Foundation) ✅ **BATCH-18**
-- [x] **FCDC-EXT01** Read vs Take with Condition Masks → [details](../docs/SERDATA-TASK-MASTER.md#fcdc-ext01-read-vs-take-with-condition-masks) 🔴 **CRITICAL** ✅ **BATCH-18**
-- [ ] **FCDC-EXT02** Async/Await Support (WaitDataAsync) → [details](../docs/SERDATA-TASK-MASTER.md#fcdc-ext02-asyncawait-support-waitdataasync) 🔴 **CRITICAL**
-- [ ] **FCDC-EXT03** Content Filtering (Reader-Side Predicates) → [details](../docs/SERDATA-TASK-MASTER.md#fcdc-ext03-content-filtering-reader-side-predicates) 🟡 **HIGH**
-- [ ] **FCDC-EXT04** Status & Discovery (Events) → [details](../docs/SERDATA-TASK-MASTER.md#fcdc-ext04-status--discovery-events) 🟡 **HIGH**
-- [ ] **FCDC-EXT05** Instance Management (Keyed Topics) → [details](../docs/SERDATA-TASK-MASTER.md#fcdc-ext05-instance-management-keyed-topics) 🟢 **MEDIUM**
+- [x] **FCDC-EXT00** Type Auto-Discovery & Topic Management → [details](../docs/SERDATA-TASK-MASTER.md#fcdc-ext00-type-auto-discovery--topic-management) ✅ **BATCH-18**
+- [x] **FCDC-EXT01** Read vs Take with Condition Masks → [details](../docs/SERDATA-TASK-MASTER.md#fcdc-ext01-read-vs-take-with-condition-masks) ✅ **BATCH-18**
+- [x] **FCDC-EXT02** Async/Await Support (WaitDataAsync) → [details](../docs/SERDATA-TASK-MASTER.md#fcdc-ext02-asyncawait-support-waitdataasync) ✅ **BATCH-19**
+- [x] **FCDC-EXT03** Content Filtering (Reader-Side Predicates) → [details](../docs/SERDATA-TASK-MASTER.md#fcdc-ext03-content-filtering-reader-side-predicates) ✅ **BATCH-19**
+- [x] **FCDC-EXT04** Status & Discovery (Events) → [details](../docs/SERDATA-TASK-MASTER.md#fcdc-ext04-status--discovery-events) ✅ **BATCH-19**
+- [ ] **FCDC-EXT05** Instance Management (Keyed Topics) → [details](../docs/SERDATA-TASK-MASTER.md#fcdc-ext05-instance-management-keyed-topics) 🟢 **MEDIUM** (includes 3 skipped tests from BATCH-18)
 - [ ] **FCDC-EXT06** Sender Tracking Infrastructure → [details](../docs/SERDATA-TASK-MASTER.md#fcdc-ext06-sender-tracking-infrastructure) 🟢 **MEDIUM**
 - [ ] **FCDC-EXT07** Sender Tracking Integration → [details](../docs/SERDATA-TASK-MASTER.md#fcdc-ext07-sender-tracking-integration) 🟢 **MEDIUM**
 
-**Batches:** **BATCH-18 ✅** (FCDC-EXT00, EXT01), BATCH-19 🔜 (FCDC-EXT02)
+**Batches:** **BATCH-18 ✅** (FCDC-EXT00, EXT01), **BATCH-19 ✅** (FCDC-EXT02, EXT03, EXT04)
 
 **Key Features:**
 - **Type auto-discovery:** No manual descriptor passing (auto-detect via reflection, cache topics)
@@ -120,17 +120,18 @@
 - Modern async/await pattern (WaitDataAsync, StreamAsync)
 - Lambda-based content filtering (SetFilter with Predicate<TView>) - JIT optimized
 - Discovery events (PublicationMatched, SubscriptionMatched, LivelinessChanged)
-- O(1) keyed topic lookups (LookupInstance, TakeInstance)
+- O(1) keyed topic lookups (LookupInstance, TakeInstance, ReadInstance) with full instance lifecycle
 - Optional sender tracking (AppDomainId, ProcessId, ComputerName per sample) - zero overhead when disabled
 
 **Success Criteria:**
-- ✅ All 29 new tests pass (4 auto-discovery + 17 extended API + 8 sender tracking)
+- ✅ All 35 new tests pass (6 auto-discovery + 3 read/take + 18 extended API + 8 sender tracking)
 - ✅ Zero-Copy path remains allocation-free
 - ✅ No breaking changes to existing APIs
 - ✅ Opt-in features have zero overhead when disabled
 - ✅ No manual descriptor passing required
+- ✅ Keyed topic instance lifecycle fully verified (re-enables 3 skipped tests from BATCH-18)
 
-**Total Estimated Effort:** 15-23 days (8 tasks)
+**Total Estimated Effort:** 16-24 days (8 tasks)
 
 ---
 
@@ -262,23 +263,30 @@
 ## Progress Statistics
 
 **Total Tasks:** 43 (32 original + 3 enhancements + 6 extended API + 2 sender tracking)  
-**Completed:** 28 tasks ✅  
-**Remaining:** 15 tasks (8 in Stage 3.75 + 2 in Stage 4-Deferred + 5 in Stage 5-6)
+**Completed:** 31 tasks ✅  
+**Remaining:** 12 tasks (3 in Stage 3.75 + 2 in Stage 4-Deferred + 5 in Stage 5-6 + 2 in Stage 6)
 
-**Current Focus:** 🎉 **Stage 2 COMPLETE!** Stage 3.75 (Extended DDS API) 🔴 Ready to Start
+**Current Focus:** 🚀 **Stage 3.75 Extended DDS API** (5/8 complete - Async + Events + Filtering done!)
 
-**Test Count:** 113 passing tests (57 Core + 10 Schema + 46 CodeGen)  
+**Test Count:** 213+ passing tests (57 Core + 10 Schema + 89 CodeGen + 57 Runtime)  
 **Validation Gates Passed:** 3/3 (Golden Rig ✅, Union Interop ✅, Optional EMHEADER ✅)
 
-**Estimated Progress:** ~65% complete (28/43 tasks)  
+**Estimated Progress:** ~72% complete (31/43 tasks)  
 - Stage 1: 100% ✅ (5/5 tasks)
-- Stage 2: **100% ✅ (17/17 tasks) - COMPLETE!** 🎉
+- Stage 2: 100% ✅ (17/17 tasks) - COMPLETE! 🎉
 - Stage 3: 100% ✅ (7/7 tasks)
 - Stage 3.5: 100% ✅ (1/1 task)
 - Stage 4 (Performance): 100% ✅ (4/4 tasks)
-- **Stage 3.75 (Auto-Discovery + Extended API + Sender Tracking): 0% 🔴 (0/8 tasks) ← NEXT**
+- **Stage 3.75 (Extended API): 62.5% ⏳ (5/8 tasks)** ← ACTIVE
+  - ✅ Type Auto-Discovery (BATCH-18)
+  - ✅ Read vs Take (BATCH-18)
+  - ✅ Async/Await (BATCH-19)
+  - ✅ Content Filtering (BATCH-19)
+  - ✅ Status & Discovery Events (BATCH-19)
+  - 🔜 Instance Management (EXT05)
+  - 🔜 Sender Tracking (EXT06, EXT07)
 - Stage 4-Deferred: 50% (1/2 already implemented)
-- Stage 5: 0% 🔵 (0/3 tasks)
+- Stage 5: 0% 🔵 (0/4 tasks)
 
 **Milestones Achieved:**
 - 🎉 Union support VERIFIED with byte-perfect C/C# interop
@@ -443,19 +451,20 @@
 
 ## Current Batch Status
 
-**Latest:** BATCH-18 (Stage 3.75 - Type Auto-Discovery + Read vs Take API)  
+**Latest:** BATCH-19 (Stage 3.75 - Async/Await + Content Filtering + Status Events)  
 **Completed:** 2026-01-19  
 **Status:** ✅ **APPROVED** (Exceptional quality)  
-**Review:** `.dev-workstream/reviews/BATCH-18-REVIEW.md`
+**Review:** `.dev-workstream/reviews/BATCH-19-REVIEW.md`
 
 **Achievements:**
-- Type auto-discovery eliminates manual descriptor passing
-- Read/Take APIs with state filtering (non-destructive reads)
-- Topic lifecycle management with caching
-- 44 tests passing (6 auto-discovery + 3 read/take + 35 integration)
-- Proactive fix for DescriptorHelper AccessViolationException
+- Async/await support with lazy listeners, GC pinning, race condition handling
+- Content filtering with zero-allocation predicates
+- Status & discovery events (PublicationMatched, SubscriptionMatched)
+- WaitForReaderAsync helper solves "lost first message" problem
+- 57 tests passing (13 new: 5 async + 3 filtering + 5 discovery)
+- Production-ready async patterns with proper cleanup
 
-**Next Planned:** BATCH-19 - Async/Await Support (FCDC-EXT02)
+**Next Planned:** BATCH-20 - Instance Management (FCDC-EXT05) or Sender Tracking (FCDC-EXT06+EXT07)
 
 ---
 
@@ -475,6 +484,26 @@
 
 **Quality:** Exceptional - 10/10  
 **Breaking Changes:** Removed descriptor parameter from DdsWriter/DdsReader constructors
+
+---
+
+### ✅ BATCH-19 (Stage 3.75 - Async/Await + Content Filtering + Status Events)
+**Completed:** 2026-01-19  
+**Tasks:** FCDC-EXT02, FCDC-EXT03, FCDC-EXT04  
+**Review:** `.dev-workstream/reviews/BATCH-19-REVIEW.md`  
+**Results:**  
+- ✅ **Async/Await**: WaitDataAsync() and StreamAsync() with lazy listener attachment
+- ✅ **Race Condition Fix**: HasData() check prevents hang when data already available
+- ✅ **GC Safety**: Proper GCHandle pinning prevents delegate collection
+- ✅ **Content Filtering**: SetFilter(Predicate<TView>) with zero-allocation enumerator filtering
+- ✅ **Discovery Events**: PublicationMatched, SubscriptionMatched with lazy listeners
+- ✅ **WaitForReaderAsync**: Solves "lost first message" problem with multiple status checks
+- ✅ **Thread Safety**: Volatile fields, double-checked locking, proper synchronization
+- ✅ **Tests**: 57 passing (13 new: 5 async + 3 filtering + 5 discovery)
+- ✅ **Test Quality**: Excellent - all tests verify actual behavior (event firing, async completion, counts)
+
+**Quality:** Exceptional - 10/10 ⭐⭐⭐⭐⭐  
+**Technical Highlights:** Production-ready async patterns, proper memory management, clean event implementation
 
 ---
 
