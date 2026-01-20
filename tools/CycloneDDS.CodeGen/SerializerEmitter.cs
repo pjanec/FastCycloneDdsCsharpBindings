@@ -57,6 +57,12 @@ namespace CycloneDDS.CodeGen
 
         private void EmitGetSerializedSize(StringBuilder sb, TypeInfo type)
         {
+            sb.AppendLine("        public int GetSerializedSize(int currentOffset)");
+            sb.AppendLine("        {");
+            sb.AppendLine("            return GetSerializedSize(currentOffset, false);");
+            sb.AppendLine("        }");
+            sb.AppendLine();
+            
             sb.AppendLine("        public int GetSerializedSize(int currentOffset, bool isXcdr2 = false)");
             sb.AppendLine("        {");
             sb.AppendLine("            var sizer = new CdrSizer(currentOffset);");

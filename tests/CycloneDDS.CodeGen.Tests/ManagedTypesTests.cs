@@ -341,6 +341,7 @@ using CycloneDDS.Schema;
             {
                 Name = "ManagedListStruct",
                 Namespace = "TestManaged",
+                Extensibility = CycloneDDS.Schema.DdsExtensibilityKind.Final,
                 Attributes = new List<AttributeInfo> { new AttributeInfo { Name = "DdsManaged" } },
                 Fields = new List<FieldInfo>
                 {

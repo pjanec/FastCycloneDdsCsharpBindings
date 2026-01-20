@@ -23,6 +23,7 @@ namespace CycloneDDS.CodeGen.Tests
             {
                 Name = "SimplePrimitive",
                 Namespace = "TestNamespace",
+                Extensibility = CycloneDDS.Schema.DdsExtensibilityKind.Final,
                 Fields = new List<FieldInfo>
                 {
                     new FieldInfo { Name = "Id", TypeName = "int" },
@@ -75,7 +76,7 @@ namespace TestNamespace
             generatedType.GetField("Value").SetValue(instance, 123.456);
             
             // GetSerializedSize verification
-            var getSerializedSizeMethod = generatedType.GetMethod("GetSerializedSize");
+            var getSerializedSizeMethod = generatedType.GetMethod("GetSerializedSize", new Type[] { typeof(int) });
             int size = (int)getSerializedSizeMethod.Invoke(instance, new object[] { 0 });
             Assert.Equal(16, size);
 

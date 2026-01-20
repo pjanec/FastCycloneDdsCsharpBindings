@@ -23,6 +23,7 @@ namespace CycloneDDS.CodeGen.Tests
             {
                 Name = "Shape",
                 Namespace = "UnionNamespace",
+                Extensibility = CycloneDDS.Schema.DdsExtensibilityKind.Final,
                 Attributes = new List<AttributeInfo> { new AttributeInfo { Name = "DdsUnion" } },
                 Fields = new List<FieldInfo>
                 {

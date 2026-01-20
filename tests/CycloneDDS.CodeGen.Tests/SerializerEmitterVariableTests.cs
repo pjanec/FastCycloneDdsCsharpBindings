@@ -23,6 +23,7 @@ namespace CycloneDDS.CodeGen.Tests
             {
                 Name = "MessageData",
                 Namespace = "TestNamespace",
+                Extensibility = CycloneDDS.Schema.DdsExtensibilityKind.Final,
                 Fields = new List<FieldInfo>
                 {
                     new FieldInfo { Name = "Id", TypeName = "int" },
@@ -74,7 +75,7 @@ namespace TestNamespace
             generatedType.GetField("Message").SetValue(instance, "Hello"); // 5 chars + NUL = 6 bytes. Aligned 4.
             
             // Size: Id (4) + String Length (4) + String (6) = 14.
-            var getSerializedSizeMethod = generatedType.GetMethod("GetSerializedSize");
+            var getSerializedSizeMethod = generatedType.GetMethod("GetSerializedSize", new Type[] { typeof(int) });
             int size = (int)getSerializedSizeMethod.Invoke(instance, new object[] { 0 });
             Assert.Equal(14, size); 
 
@@ -101,6 +102,7 @@ namespace TestNamespace
             {
                 Name = "SeqData",
                 Namespace = "TestNamespace",
+                Extensibility = CycloneDDS.Schema.DdsExtensibilityKind.Final,
                 Fields = new List<FieldInfo>
                 {
                     new FieldInfo { Name = "Numbers", TypeName = "BoundedSeq<int>" }
@@ -151,7 +153,7 @@ namespace TestNamespace
             generatedType.GetField("Numbers").SetValue(instance, seqInstance);
             
             // Size: SeqLen (4) + 2*4 = 12.
-            var getSerializedSizeMethod = generatedType.GetMethod("GetSerializedSize");
+            var getSerializedSizeMethod = generatedType.GetMethod("GetSerializedSize", new Type[] { typeof(int) });
             int size = (int)getSerializedSizeMethod.Invoke(instance, new object[] { 0 });
             Assert.Equal(12, size);
             
@@ -177,6 +179,7 @@ namespace TestNamespace
             {
                 Name = "InnerData",
                 Namespace = "TestNamespace",
+                Extensibility = CycloneDDS.Schema.DdsExtensibilityKind.Final,
                 Fields = new List<FieldInfo>
                 {
                     new FieldInfo { Name = "Text", TypeName = "string", Attributes = new List<AttributeInfo> { new AttributeInfo { Name = "DdsManaged" } } }
@@ -187,6 +190,7 @@ namespace TestNamespace
             {
                 Name = "OuterData",
                 Namespace = "TestNamespace",
+                Extensibility = CycloneDDS.Schema.DdsExtensibilityKind.Final,
                 Fields = new List<FieldInfo>
                 {
                     new FieldInfo { Name = "Inner", TypeName = "InnerData", Type = nestedType }
@@ -246,7 +250,7 @@ namespace TestNamespace
             // Inner Total = 8.
             // Outer Total = 8.
             
-            var getSerializedSizeMethod = outerTypeGenerated.GetMethod("GetSerializedSize");
+            var getSerializedSizeMethod = outerTypeGenerated.GetMethod("GetSerializedSize", new Type[] { typeof(int) });
             int size = (int)getSerializedSizeMethod.Invoke(outerInstance, new object[] { 0 });
             Assert.Equal(8, size);
             

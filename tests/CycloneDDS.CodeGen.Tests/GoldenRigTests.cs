@@ -19,6 +19,7 @@ namespace CycloneDDS.CodeGen.Tests
             // SimplePrimitive
             var tSimple = new TypeInfo {
                 Name = "SimplePrimitive", Namespace = "Golden",
+                Extensibility = CycloneDDS.Schema.DdsExtensibilityKind.Final,
                 Fields = new List<FieldInfo> {
                     new FieldInfo { Name = "id", TypeName = "int" },
                     new FieldInfo { Name = "value", TypeName = "double" }
@@ -28,6 +29,7 @@ namespace CycloneDDS.CodeGen.Tests
             // Nested
             var tNested = new TypeInfo {
                 Name = "Nested", Namespace = "Golden",
+                Extensibility = CycloneDDS.Schema.DdsExtensibilityKind.Final,
                 Fields = new List<FieldInfo> {
                     new FieldInfo { Name = "a", TypeName = "int" },
                     new FieldInfo { Name = "b", TypeName = "double" }
@@ -37,6 +39,7 @@ namespace CycloneDDS.CodeGen.Tests
             // NestedStruct
             var tNestedStruct = new TypeInfo {
                 Name = "NestedStruct", Namespace = "Golden",
+                Extensibility = CycloneDDS.Schema.DdsExtensibilityKind.Final,
                 Fields = new List<FieldInfo> {
                     new FieldInfo { Name = "byte_field", TypeName = "byte" },
                     new FieldInfo { Name = "nested", TypeName = "Nested", Type = tNested }
@@ -46,6 +49,7 @@ namespace CycloneDDS.CodeGen.Tests
             // FixedString
             var tFixedString = new TypeInfo {
                 Name = "FixedString", Namespace = "Golden",
+                Extensibility = CycloneDDS.Schema.DdsExtensibilityKind.Final,
                 Fields = new List<FieldInfo> {
                     new FieldInfo { Name = "message", TypeName = "FixedString32" }
                 }
@@ -54,6 +58,7 @@ namespace CycloneDDS.CodeGen.Tests
             // UnboundedString
             var tUnbounded = new TypeInfo {
                 Name = "UnboundedString", Namespace = "Golden",
+                Extensibility = CycloneDDS.Schema.DdsExtensibilityKind.Final,
                 Fields = new List<FieldInfo> {
                     new FieldInfo { Name = "id", TypeName = "int" },
                     new FieldInfo { Name = "message", TypeName = "string" }
@@ -63,6 +68,7 @@ namespace CycloneDDS.CodeGen.Tests
             // PrimitiveSequence
             var tPrimSeq = new TypeInfo {
                 Name = "PrimitiveSequence", Namespace = "Golden",
+                Extensibility = CycloneDDS.Schema.DdsExtensibilityKind.Final,
                 Fields = new List<FieldInfo> {
                     new FieldInfo { Name = "values", TypeName = "BoundedSeq<int>" }
                 }
@@ -78,6 +84,7 @@ namespace CycloneDDS.CodeGen.Tests
             // MixedStruct
             var tMixed = new TypeInfo {
                 Name = "MixedStruct", Namespace = "Golden",
+                Extensibility = CycloneDDS.Schema.DdsExtensibilityKind.Final,
                 Fields = new List<FieldInfo> {
                     new FieldInfo { Name = "b", TypeName = "byte" },
                     new FieldInfo { Name = "i", TypeName = "int" },
