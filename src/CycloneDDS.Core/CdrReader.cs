@@ -9,11 +9,15 @@ namespace CycloneDDS.Core
     {
         private ReadOnlySpan<byte> _data;
         private int _position;
+        private readonly bool _isXcdr2;
 
-        public CdrReader(ReadOnlySpan<byte> data)
+        public bool IsXcdr2 => _isXcdr2;
+
+        public CdrReader(ReadOnlySpan<byte> data, bool isXcdr2 = false)
         {
             _data = data;
             _position = 0;
+            _isXcdr2 = isXcdr2;
         }
 
         public int Position => _position;
@@ -120,27 +124,36 @@ namespace CycloneDDS.Core
             return value;
         }
 
-        public ReadOnlySpan<byte> ReadStringBytes()
+        public ReadOnlySpan<byte> ReadStringBytes(bool? isXcdr2 = null)
         {
             // Read length (4 bytes)
-            int length = ReadInt32(); // count including NUL
+            int length = ReadInt32(); // count including NUL in XCDR1, excluding NUL in XCDR2
             
             if (_position + length > _data.Length)
                 throw new IndexOutOfRangeException("Not enough data for string");
             
-            // The bytes are at _position.
-            // We want bytes excluding NUL terminator.
-            // length includes NUL.
-            int bytesToReturn = length > 0 ? length - 1 : 0;
+            bool useXcdr2 = isXcdr2 ?? _isXcdr2;
+            int bytesToReturn;
+            if (useXcdr2)
+            {
+                bytesToReturn = length;
+            }
+            else
+            {
+                // The bytes are at _position.
+                // We want bytes excluding NUL terminator.
+                // length includes NUL.
+                bytesToReturn = length > 0 ? length - 1 : 0;
+            }
             
             var span = _data.Slice(_position, bytesToReturn);
             _position += length;
             return span;
         }
 
-        public string ReadString()
+        public string ReadString(bool? isXcdr2 = null)
         {
-            var span = ReadStringBytes();
+            var span = ReadStringBytes(isXcdr2);
             return Encoding.UTF8.GetString(span);
         }
 

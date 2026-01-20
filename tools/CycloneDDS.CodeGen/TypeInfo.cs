@@ -1,7 +1,10 @@
+using CycloneDDS.Schema;
+
 namespace CycloneDDS.CodeGen
 {
     public class TypeInfo
     {
+        public DdsExtensibilityKind Extensibility { get; set; } = DdsExtensibilityKind.Appendable;
         public string Name { get; set; } = string.Empty;
         public string Namespace { get; set; } = string.Empty;
         public string FullName => string.IsNullOrEmpty(Namespace) ? Name : $"{Namespace}.{Name}";

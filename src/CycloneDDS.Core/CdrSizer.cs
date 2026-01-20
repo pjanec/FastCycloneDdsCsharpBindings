@@ -59,12 +59,16 @@ namespace CycloneDDS.Core
             _cursor += 8;
         }
         
-        public void WriteString(ReadOnlySpan<char> value)
+        public void WriteString(ReadOnlySpan<char> value, bool isXcdr2 = false)
         {
-            Align(4);
+            // Note: CdrWriter.WriteInt32 does NOT align internally.
+            // SerializerEmitter generates explicit Align(4) calls before writing strings.
             _cursor += 4; // Length (Int32)
             _cursor += Encoding.UTF8.GetByteCount(value);
-            _cursor += 1; // NUL terminator
+            if (!isXcdr2)
+            {
+                _cursor += 1; // NUL terminator
+            }
         }
         
         public void Skip(int bytes)

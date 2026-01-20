@@ -28,7 +28,7 @@ namespace CycloneDDS.Runtime
 
         // Delegates for high-performance invocation
         private delegate void SerializeDelegate(in T sample, ref CdrWriter writer);
-        private delegate int GetSerializedSizeDelegate(in T sample, int currentAlignment);
+        private delegate int GetSerializedSizeDelegate(in T sample, int currentAlignment, bool isXcdr2);
 
         private static readonly SerializeDelegate? _serializer;
         private static readonly GetSerializedSizeDelegate? _sizer;
@@ -98,7 +98,8 @@ namespace CycloneDDS.Runtime
 
             // 1. Get Size (no alloc)
             // Start at offset 4 because we will prepend 4-byte CDR header
-            int payloadSize = _sizer!(sample, 4); 
+            // 4 bytes header offset, isXcdr2=true
+            int payloadSize = _sizer!(sample, 4, true); 
             int totalSize = payloadSize + 4;
 
             // 2. Rent Buffer (no alloc - pooled)
@@ -108,26 +109,26 @@ namespace CycloneDDS.Runtime
             {
                 // 3. Serialize (ZERO ALLOC via new Span overload)
                 var span = buffer.AsSpan(0, totalSize);
-                var cdr = new CdrWriter(span); 
+                // Enable XCDR2 mode in CdrWriter explicitly
+                var cdr = new CdrWriter(span, isXcdr2: true); 
                 
-                // Write CDR Header (XCDR1 format)
-                // CDR Identifier: 0x0001 (LE) or 0x0000 (BE)
+                // Write CDR Header (XCDR2 format)
+                // DELIMITED_CDR2 Identifier: 0x0009 (LE) or 0x0008 (BE)
                 // Options: 0x0000
                 if (BitConverter.IsLittleEndian)
                 {
-                    // Little Endian (x64, ARM64, most platforms)
+                    // Little Endian
                     cdr.WriteByte(0x00);
-                    cdr.WriteByte(0x01);
+                    cdr.WriteByte(0x09);
                 }
                 else
                 {
-                    // Big Endian (rare: PowerPC, SPARC, older MIPS)
+                    // Big Endian
                     cdr.WriteByte(0x00);
-                    cdr.WriteByte(0x00);
+                    cdr.WriteByte(0x08);
                 }
-                // NOTE: CdrWriter/CdrReader endianness handling is platform-specific.
-                // XCDR1 requires encapsulation identifier to match data endianness.
-                // Most .NET platforms are Little Endian (LE).
+                
+                // Options (2 bytes)
                 cdr.WriteByte(0x00);
                 cdr.WriteByte(0x00);
                 
@@ -311,13 +312,13 @@ namespace CycloneDDS.Runtime
         // --- Delegate Generators ---
         private static GetSerializedSizeDelegate CreateSizerDelegate()
         {
-            var method = typeof(T).GetMethod("GetSerializedSize", new[] { typeof(int) });
-            if (method == null) throw new MissingMethodException(typeof(T).Name, "GetSerializedSize");
+            var method = typeof(T).GetMethod("GetSerializedSize", new[] { typeof(int), typeof(bool) });
+            if (method == null) throw new MissingMethodException(typeof(T).Name, "GetSerializedSize(int, bool)");
 
             var dm = new DynamicMethod(
                 "GetSerializedSizeThunk",
                 typeof(int),
-                new[] { typeof(T).MakeByRefType(), typeof(int) },
+                new[] { typeof(T).MakeByRefType(), typeof(int), typeof(bool) },
                 typeof(DdsWriter<T>).Module);
 
             var il = dm.GetILGenerator();
@@ -328,6 +329,7 @@ namespace CycloneDDS.Runtime
             }
             
             il.Emit(OpCodes.Ldarg_1); // offset
+            il.Emit(OpCodes.Ldarg_2); // isXcdr2
             il.Emit(OpCodes.Call, method); 
             il.Emit(OpCodes.Ret);
 

@@ -422,7 +422,18 @@ namespace CycloneDDS.Runtime
                             
                             // Deserialize
                             var span = new ReadOnlySpan<byte>(p, (int)size);
-                            var reader = new CdrReader(span);
+                            
+                            // Check XCDR2 (Byte 1 >= 6). 
+                            // Encapsulation Header: Byte 0, Byte 1 (ID), Byte 2, Byte 3 (Options)
+                            // ID 0x0006 - 0x000D are XCDR2. 
+                            // Byte 1 stores the specific ID value in standard encodings.
+                            bool isXcdr2 = false;
+                            if (size >= 2)
+                            {
+                                if (p[1] >= 6) isXcdr2 = true;
+                            }
+
+                            var reader = new CdrReader(span, isXcdr2);
                             
                             // Cyclone DDS provides the 4-byte encapsulation header in the serdata.
                             // We must skip it so that CdrReader is aligned to the start of the payload

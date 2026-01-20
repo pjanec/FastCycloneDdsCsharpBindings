@@ -5,6 +5,7 @@ using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using CycloneDDS.Schema;
 
 namespace CycloneDDS.CodeGen
 {
@@ -101,6 +102,22 @@ namespace CycloneDDS.CodeGen
                             IsEnum = isEnum,
                             Attributes = ExtractAttributes(typeSymbol)
                         };
+
+                        // Check for DdsExtensibility attribute
+                        var extAttr = typeSymbol.GetAttributes().FirstOrDefault(a => a.AttributeClass?.Name == "DdsExtensibilityAttribute" || a.AttributeClass?.Name == "DdsExtensibility");
+                        if (extAttr != null && extAttr.ConstructorArguments.Length > 0)
+                        {
+                            var val = extAttr.ConstructorArguments[0].Value;
+                            if (val is int intVal)
+                            {
+                                typeInfo.Extensibility = (DdsExtensibilityKind)intVal;
+                            }
+                        }
+                        else
+                        {
+                            // Default to Appendable
+                            typeInfo.Extensibility = DdsExtensibilityKind.Appendable;
+                        }
 
                         if (isEnum)
                         {
@@ -282,10 +299,14 @@ namespace CycloneDDS.CodeGen
                 typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces,
                 genericsOptions: SymbolDisplayGenericsOptions.IncludeTypeParameters);
 
+            // Normalize common types to C# aliases for consistency with SerializerEmitter
+            string typeName = type.ToDisplayString(format);
+            if (typeName == "System.String") typeName = "string";
+            
             return new FieldInfo
             {
                 Name = member.Name,
-                TypeName = type.ToDisplayString(format),
+                TypeName = typeName,
                 Attributes = ExtractAttributes(member)
             };
         }

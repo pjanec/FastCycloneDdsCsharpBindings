@@ -2,6 +2,7 @@ using System;
 using System.Text;
 using System.Linq;
 using System.Collections.Generic;
+using CycloneDDS.Schema;
 
 namespace CycloneDDS.CodeGen
 {
@@ -204,7 +205,19 @@ namespace CycloneDDS.CodeGen
             string indent = GetIndent(indentLevel);
             string fieldIndent = GetIndent(indentLevel + 1);
 
-            sb.AppendLine($"{indent}@appendable");
+            switch (type.Extensibility)
+            {
+                case DdsExtensibilityKind.Final:
+                    sb.AppendLine($"{indent}@final");
+                    break;
+                case DdsExtensibilityKind.Appendable:
+                    sb.AppendLine($"{indent}@appendable");
+                    break;
+                case DdsExtensibilityKind.Mutable:
+                    sb.AppendLine($"{indent}@mutable");
+                    break;
+            }
+
             sb.AppendLine($"{indent}struct {type.Name} {{");
             
             foreach (var field in type.Fields)
@@ -251,7 +264,19 @@ namespace CycloneDDS.CodeGen
 
             var (switchType, _) = MapType(discriminator);
 
-            sb.AppendLine($"{indent}@appendable");
+            switch (type.Extensibility)
+            {
+                case DdsExtensibilityKind.Final:
+                    sb.AppendLine($"{indent}@final");
+                    break;
+                case DdsExtensibilityKind.Appendable:
+                    sb.AppendLine($"{indent}@appendable");
+                    break;
+                case DdsExtensibilityKind.Mutable:
+                    sb.AppendLine($"{indent}@mutable");
+                    break;
+            }
+
             sb.AppendLine($"{indent}union {type.Name} switch ({switchType}) {{");
 
             foreach (var field in type.Fields)

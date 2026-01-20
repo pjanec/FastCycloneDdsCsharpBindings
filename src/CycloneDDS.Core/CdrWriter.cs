@@ -11,23 +11,28 @@ namespace CycloneDDS.Core
         private Span<byte> _span;
         private int _buffered;
         private int _totalWritten;
+        private readonly bool _isXcdr2;
+
+        public bool IsXcdr2 => _isXcdr2;
 
         // NEW: Zero-Alloc Constructor for Fixed Buffers
-        public CdrWriter(Span<byte> buffer)
+        public CdrWriter(Span<byte> buffer, bool isXcdr2 = false)
         {
             _output = null;  // Fixed buffer mode - no IBufferWriter
             _span = buffer;
             _buffered = 0;
             _totalWritten = 0;
+            _isXcdr2 = isXcdr2;
         }
 
         // EXISTING: Keep this for dynamic buffers
-        public CdrWriter(IBufferWriter<byte> output)
+        public CdrWriter(IBufferWriter<byte> output, bool isXcdr2 = false)
         {
             _output = output;
             _span = output.GetSpan();
             _buffered = 0;
             _totalWritten = 0;
+            _isXcdr2 = isXcdr2;
         }
 
         public int Position => _totalWritten + _buffered;
@@ -56,6 +61,33 @@ namespace CycloneDDS.Core
             EnsureSize(sizeof(int));
             BinaryPrimitives.WriteInt32LittleEndian(_span.Slice(_buffered), value);
             _buffered += sizeof(int);
+        }
+
+        public void WriteUInt32At(int offset, uint value)
+        {
+            // Only works if the offset refers to the current span
+            // DdsWriter usage guarantees a single contiguous span for the whole message
+            // or at least that we are patching something relatively recent.
+            if (_output == null)
+            {
+                // Fixed buffer mode
+                BinaryPrimitives.WriteUInt32LittleEndian(_span.Slice(offset), value);
+            }
+            else
+            {
+                // IBufferWriter mode - complicated. 
+                // However, for this specific binding optimization work, we are focusing on the Span-based path.
+                // If offset < _totalWritten, we can't patch.
+                int relative = offset - _totalWritten;
+                if (relative >= 0 && relative < _buffered)
+                {
+                    BinaryPrimitives.WriteUInt32LittleEndian(_span.Slice(relative), value);
+                }
+                else
+                {
+                    throw new NotSupportedException("Cannot patch memory that has been flushed or is out of range.");
+                }
+            }
         }
 
         public void WriteUInt32(uint value)
@@ -132,18 +164,25 @@ namespace CycloneDDS.Core
             _buffered += sizeof(byte);
         }
 
-        public void WriteString(ReadOnlySpan<char> value)
+        public void WriteString(ReadOnlySpan<char> value, bool? isXcdr2 = null)
         {
             int utf8Length = Encoding.UTF8.GetByteCount(value);
-            int totalLength = utf8Length + 1; // +1 for NUL
+            // XCDR2: Length = ByteCount
+            // XCDR1: Length = ByteCount + 1 (for NUL)
+            bool useXcdr2 = isXcdr2 ?? _isXcdr2;
+            int lengthToWrite = useXcdr2 ? utf8Length : utf8Length + 1;
             
-            WriteInt32(totalLength);
+            WriteInt32(lengthToWrite);
             
-            EnsureSize(totalLength);
+            EnsureSize(useXcdr2 ? utf8Length : utf8Length + 1);
             int written = Encoding.UTF8.GetBytes(value, _span.Slice(_buffered));
             _buffered += written;
-            _span[_buffered] = 0; // NUL terminator
-            _buffered += 1;
+            
+            if (!useXcdr2)
+            {
+                _span[_buffered] = 0; // NUL terminator
+                _buffered += 1;
+            }
         }
 
         public void WriteFixedString(ReadOnlySpan<byte> utf8Bytes, int fixedSize)

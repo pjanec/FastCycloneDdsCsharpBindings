@@ -3,9 +3,9 @@ using CycloneDDS.Runtime;
 
 namespace CycloneDDS.Runtime.Tests
 {
-    public partial struct TestMessage
+    public partial struct StringMessage
     {
-        private static readonly uint[] _ops = new uint[] {67108864, 16973856, 0, 16973856, 4, 0};
+        private static readonly uint[] _ops = new uint[] {67108864, 16973856, 0, 17104896, 8, 0};
 
         public static uint[] GetDescriptorOps() => _ops;
     }

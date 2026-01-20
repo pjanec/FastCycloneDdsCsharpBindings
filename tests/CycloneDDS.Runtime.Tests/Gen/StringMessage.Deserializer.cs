@@ -6,17 +6,17 @@ using System.Collections.Generic;
 
 namespace CycloneDDS.Runtime.Tests
 {
-    public partial struct TestMessage
+    public partial struct StringMessage
     {
-        public static TestMessage Deserialize(ref CdrReader reader)
+        public static StringMessage Deserialize(ref CdrReader reader)
         {
-            var view = new TestMessage();
+            var view = new StringMessage();
             int endPos = int.MaxValue;
                 view.Id = reader.ReadInt32();
-                view.Value = reader.ReadInt32();
+                reader.Align(4); view.Msg = reader.ReadString();
             return view;
         }
-        public TestMessage ToOwned()
+        public StringMessage ToOwned()
         {
             return this;
         }

@@ -47,12 +47,12 @@ namespace CycloneDDS.CodeGen
         
         private bool HasDdsManagedAttribute(TypeInfo type)
         {
-            return type.Attributes?.Any(a => a.Name == "DdsManaged") ?? false;
+            return type.Attributes?.Any(a => a.Name == "DdsManaged" || a.Name == "DdsManagedAttribute") ?? false;
         }
-        
+
         private bool HasDdsManagedAttribute(FieldInfo field)
         {
-            return field.Attributes?.Any(a => a.Name == "DdsManaged") ?? false;
+            return field.Attributes?.Any(a => a.Name == "DdsManaged" || a.Name == "DdsManagedAttribute") ?? false;
         }
     }
 

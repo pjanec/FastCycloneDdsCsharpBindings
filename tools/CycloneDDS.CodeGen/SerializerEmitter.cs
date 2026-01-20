@@ -2,6 +2,7 @@ using System;
 using System.Text;
 using System.Linq;
 using System.Collections.Generic;
+using CycloneDDS.Schema;
 
 namespace CycloneDDS.CodeGen
 {
@@ -51,18 +52,21 @@ namespace CycloneDDS.CodeGen
         
         private bool IsAppendable(TypeInfo type)
         {
-             if (type.Fields.Any(f => IsOptional(f))) return true;
-             return type.HasAttribute("DdsAppendable") || type.HasAttribute("DdsMutable") || type.HasAttribute("Appendable");
+             return type.Extensibility == DdsExtensibilityKind.Appendable || type.Extensibility == DdsExtensibilityKind.Mutable;
         }
 
         private void EmitGetSerializedSize(StringBuilder sb, TypeInfo type)
         {
-            sb.AppendLine("        public int GetSerializedSize(int currentOffset)");
+            sb.AppendLine("        public int GetSerializedSize(int currentOffset, bool isXcdr2 = false)");
             sb.AppendLine("        {");
             sb.AppendLine("            var sizer = new CdrSizer(currentOffset);");
             sb.AppendLine();
             
-            if (IsAppendable(type))
+            bool isAppendable = IsAppendable(type);
+            bool isXcdr2 = isAppendable; // Dummy for generator calls
+            // bool isXcdr2 parameter is used in generated code string
+
+            if (isAppendable)
             {
                 sb.AppendLine("            // DHEADER");
                 sb.AppendLine("            sizer.Align(4);");
@@ -72,7 +76,7 @@ namespace CycloneDDS.CodeGen
 
             if (type.HasAttribute("DdsUnion"))
             {
-                EmitUnionGetSerializedSizeBody(sb, type);
+                EmitUnionGetSerializedSizeBody(sb, type, isXcdr2);
             }
             else
             {
@@ -85,11 +89,11 @@ namespace CycloneDDS.CodeGen
                     var field = item.Field;
                     if (IsOptional(field))
                     {
-                        EmitOptionalSizer(sb, field);
+                        EmitOptionalSizer(sb, field, isXcdr2);
                     }
                     else
                     {
-                        string sizerCall = GetSizerCall(field);
+                        string sizerCall = GetSizerCall(field, isXcdr2);
                         sb.AppendLine($"            {sizerCall}; // {field.Name}");
                     }
                 }
@@ -101,13 +105,13 @@ namespace CycloneDDS.CodeGen
             sb.AppendLine();
         }
         
-        private void EmitUnionGetSerializedSizeBody(StringBuilder sb, TypeInfo type)
+        private void EmitUnionGetSerializedSizeBody(StringBuilder sb, TypeInfo type, bool isXcdr2)
         {
             var discriminator = type.Fields.FirstOrDefault(f => f.HasAttribute("DdsDiscriminator"));
             if (discriminator == null) throw new Exception($"Union {type.Name} missing [DdsDiscriminator] field");
 
             // Write Discriminator
-            string discSizer = GetSizerCall(discriminator);
+            string discSizer = GetSizerCall(discriminator, isXcdr2);
             sb.AppendLine($"            {discSizer}; // Discriminator {discriminator.Name}");
             
             sb.AppendLine($"            switch (({GetDiscriminatorCastType(discriminator.TypeName)})this.{ToPascalCase(discriminator.Name)})");
@@ -122,7 +126,7 @@ namespace CycloneDDS.CodeGen
                     {
                         sb.AppendLine($"                case {val}:");
                     }
-                    sb.AppendLine($"                    {GetSizerCall(field)};");
+                    sb.AppendLine($"                    {GetSizerCall(field, isXcdr2)};");
                     sb.AppendLine("                    break;");
                 }
             }
@@ -131,7 +135,7 @@ namespace CycloneDDS.CodeGen
             if (defaultField != null)
             {
                 sb.AppendLine("                default:");
-                sb.AppendLine($"                    {GetSizerCall(defaultField)};");
+                sb.AppendLine($"                    {GetSizerCall(defaultField, isXcdr2)};");
                 sb.AppendLine("                    break;");
             }
             else
@@ -157,21 +161,22 @@ namespace CycloneDDS.CodeGen
         {
             sb.AppendLine("        public void Serialize(ref CdrWriter writer)");
             sb.AppendLine("        {");
-            if (IsAppendable(type))
+            
+            bool isAppendable = IsAppendable(type);
+            bool isXcdr2 = isAppendable;
+
+            if (isAppendable)
             {
                 sb.AppendLine("            // DHEADER");
                 sb.AppendLine("            writer.Align(4);");
-                sb.AppendLine("            // Calculate size upfront using the Sizer pass");
-                sb.AppendLine("            // GetSerializedSize returns Header(4) + Body.");
-                sb.AppendLine("            // DHEADER requires Body size, so we subtract 4.");
-                sb.AppendLine("            int totalSize = GetSerializedSize(writer.Position);");
-                sb.AppendLine("            writer.WriteUInt32((uint)totalSize - 4);");
-                sb.AppendLine();
+                sb.AppendLine("            int dheaderPos = writer.Position;");
+                sb.AppendLine("            writer.WriteUInt32(0);");
+                sb.AppendLine("            int bodyStart = writer.Position;");
             }
 
             if (type.HasAttribute("DdsUnion"))
             {
-                EmitUnionSerializeBody(sb, type);
+                EmitUnionSerializeBody(sb, type, isXcdr2);
             }
             else
             {
@@ -186,27 +191,43 @@ namespace CycloneDDS.CodeGen
 
                     if (IsOptional(field))
                     {
-                        EmitOptionalSerializer(sb, field, fieldId);
+                        EmitOptionalSerializer(sb, field, fieldId, isXcdr2);
                     }
                     else
                     {
-                        string writerCall = GetWriterCall(field);
+                        string writerCall = GetWriterCall(field, isXcdr2);
                         sb.AppendLine($"            {writerCall}; // {field.Name}");
                     }
                 }
             }
-            
+ 
+            if (isAppendable)
+            {
+                sb.AppendLine("            int bodyLen = writer.Position - bodyStart;");
+                // TODO: PatchUInt32 is not yet implemented in CdrWriter?
+                // The plan says "sb.AppendLine("            writer.PatchUInt32(dheaderPos, (uint)bodyLen);");"
+                // But previously CdrWriter didn't have PatchUInt32. 
+                // Wait, I didn't see PatchUInt32 in CdrWriter source I read earlier!
+                // I need to add PatchUInt32 to CdrWriter as well, or implement it using slice.
+                // BinaryPrimitives.WriteUInt32LittleEndian(_span.Slice(dheaderPos), (uint)bodyLen);
+                // But CdrWriter _span is private. I need a public method.
+                // Assuming I will add it or inline the logic if possible.
+                // Since CdrWriter is a ref struct, I can't easily inline logic accessing private fields without Unsafe or Ref.
+                // However, CdrWriter seems to expose `_span` indirectly via methods.
+                // I'll add `WriteUInt32At(int offset, uint value)` to CdrWriter.
+                sb.AppendLine("            writer.WriteUInt32At(dheaderPos, (uint)bodyLen);");
+            }
 
             sb.AppendLine("        }");
         }
 
-        private void EmitUnionSerializeBody(StringBuilder sb, TypeInfo type)
+        private void EmitUnionSerializeBody(StringBuilder sb, TypeInfo type, bool isXcdr2)
         {
             var discriminator = type.Fields.FirstOrDefault(f => f.HasAttribute("DdsDiscriminator"));
             if (discriminator == null) throw new Exception($"Union {type.Name} missing [DdsDiscriminator] field");
 
             // Write Discriminator
-            string discWriter = GetWriterCall(discriminator);
+            string discWriter = GetWriterCall(discriminator, isXcdr2);
             sb.AppendLine($"            {discWriter}; // Discriminator {discriminator.Name}");
             
             sb.AppendLine($"            switch (({GetDiscriminatorCastType(discriminator.TypeName)})this.{ToPascalCase(discriminator.Name)})");
@@ -221,7 +242,7 @@ namespace CycloneDDS.CodeGen
                     {
                         sb.AppendLine($"                case {val}:");
                     }
-                    sb.AppendLine($"                    {GetWriterCall(field)};");
+                    sb.AppendLine($"                    {GetWriterCall(field, isXcdr2)};");
                     sb.AppendLine("                    break;");
                 }
             }
@@ -230,7 +251,7 @@ namespace CycloneDDS.CodeGen
             if (defaultField != null)
             {
                 sb.AppendLine("                default:");
-                sb.AppendLine($"                    {GetWriterCall(defaultField)};");
+                sb.AppendLine($"                    {GetWriterCall(defaultField, isXcdr2)};");
                 sb.AppendLine("                    break;");
             }
             else
@@ -242,7 +263,7 @@ namespace CycloneDDS.CodeGen
             sb.AppendLine("            }");
         }
         
-        private void EmitOptionalSizer(StringBuilder sb, FieldInfo field)
+        private void EmitOptionalSizer(StringBuilder sb, FieldInfo field, bool isXcdr2)
         {
             string access = $"this.{ToPascalCase(field.Name)}";
             string check = field.TypeName == "string?" ? $"{access} != null" : $"{access}.HasValue";
@@ -278,7 +299,7 @@ namespace CycloneDDS.CodeGen
                  // We want: `sizer.Method(this.FieldName.Value)`
                  
                  // Let's manually constructing the sizer call here for optionals might be cleaner
-                 string sizerCall = GetSizerCall(nonOptionalField);
+                 string sizerCall = GetSizerCall(nonOptionalField, isXcdr2);
                  // Replace `this.Name` with `this.Name.Value` if needed
                  if (!sizerCall.Contains(".Value") && !sizerCall.Contains(".ToString")) 
                     sizerCall = sizerCall.Replace($"this.{ToPascalCase(field.Name)}", $"this.{ToPascalCase(field.Name)}.Value");
@@ -288,14 +309,14 @@ namespace CycloneDDS.CodeGen
             else
             {
                  // Reference type (string?), just use name
-                 string sizerCall = GetSizerCall(nonOptionalField);
+                 string sizerCall = GetSizerCall(nonOptionalField, isXcdr2);
                  sb.AppendLine($"                {sizerCall};");
             }
 
             sb.AppendLine("            }");
         }
 
-        private void EmitOptionalSerializer(StringBuilder sb, FieldInfo field, int fieldId)
+        private void EmitOptionalSerializer(StringBuilder sb, FieldInfo field, int fieldId, bool isXcdr2)
         {
             string access = $"this.{ToPascalCase(field.Name)}";
             string check = field.TypeName == "string?" ? $"{access} != null" : $"{access}.HasValue";
@@ -316,7 +337,7 @@ namespace CycloneDDS.CodeGen
                 Type = field.Type 
             };
             
-            string writerCall = GetWriterCall(nonOptionalField);
+            string writerCall = GetWriterCall(nonOptionalField, isXcdr2);
             if (baseType != "string" && !IsReferenceType(baseType))
             {
                  writerCall = writerCall.Replace($"this.{ToPascalCase(field.Name)}", $"this.{ToPascalCase(field.Name)}.Value");
@@ -371,29 +392,29 @@ namespace CycloneDDS.CodeGen
             };
         }
 
-        private string GetSizerCall(FieldInfo field)
+        private string GetSizerCall(FieldInfo field, bool isXcdr2)
         {
             // 1. Strings (Variable)
             if (field.TypeName == "string")
             {
-                 return $"sizer.Align(4); sizer.WriteString(this.{ToPascalCase(field.Name)})";
+                 return $"sizer.Align(4); sizer.WriteString(this.{ToPascalCase(field.Name)}, isXcdr2)";
             }
 
             // Handle List<T>
             if (field.TypeName.StartsWith("List<") || field.TypeName.StartsWith("System.Collections.Generic.List<"))
             {
-                 return EmitListSizer(field);
+                 return EmitListSizer(field, isXcdr2);
             }
 
             // 2. Sequences
             if (field.TypeName.StartsWith("BoundedSeq") || field.TypeName.Contains("BoundedSeq<"))
             {
-                 return EmitSequenceSizer(field);
+                 return EmitSequenceSizer(field, isXcdr2);
             }
 
             if (field.TypeName.EndsWith("[]"))
             {
-                 return EmitArraySizer(field);
+                 return EmitArraySizer(field, isXcdr2);
             }
 
             // 3. Fixed Strings
@@ -416,35 +437,35 @@ namespace CycloneDDS.CodeGen
             {
                 // Nested struct
                 // Use actual instance for variable sizing logic
-                return $"sizer.Skip(this.{ToPascalCase(field.Name)}.GetSerializedSize(sizer.Position))";
+                return $"sizer.Skip(this.{ToPascalCase(field.Name)}.GetSerializedSize(sizer.Position, isXcdr2))";
             }
         }
         
-        private string GetWriterCall(FieldInfo field)
+        private string GetWriterCall(FieldInfo field, bool isXcdr2)
         {
             string fieldAccess = $"this.{ToPascalCase(field.Name)}";
             
             // 1. Strings (Variable)
             if (field.TypeName == "string")
             {
-                 return $"writer.Align(4); writer.WriteString({fieldAccess})";
+                 return $"writer.Align(4); writer.WriteString({fieldAccess}, writer.IsXcdr2)";
             }
 
             // Handle List<T>
             if (field.TypeName.StartsWith("List<") || field.TypeName.StartsWith("System.Collections.Generic.List<"))
             {
-                 return EmitListWriter(field);
+                 return EmitListWriter(field, isXcdr2);
             }
 
             // 2. Sequences
             if (field.TypeName.StartsWith("BoundedSeq") || field.TypeName.Contains("BoundedSeq<"))
             {
-                 return EmitSequenceWriter(field);
+                 return EmitSequenceWriter(field, isXcdr2);
             }
 
             if (field.TypeName.EndsWith("[]"))
             {
-                 return EmitArrayWriter(field);
+                 return EmitArrayWriter(field, isXcdr2);
             }
 
             if (field.TypeName.Contains("FixedString"))
@@ -466,7 +487,7 @@ namespace CycloneDDS.CodeGen
             }
         }
 
-        private string EmitArraySizer(FieldInfo field)
+        private string EmitArraySizer(FieldInfo field, bool isXcdr2)
         {
             string fieldAccess = $"this.{ToPascalCase(field.Name)}";
             string elementType = field.TypeName.Substring(0, field.TypeName.Length - 2);
@@ -503,7 +524,7 @@ namespace CycloneDDS.CodeGen
                 return $@"sizer.Align(4); sizer.WriteUInt32(0);
             for (int i = 0; i < {fieldAccess}.Length; i++)
             {{
-                sizer.Align(4); sizer.WriteString({fieldAccess}[i]);
+                sizer.Align(4); sizer.WriteString({fieldAccess}[i], isXcdr2);
             }}";
             }
              
@@ -511,11 +532,11 @@ namespace CycloneDDS.CodeGen
             return $@"sizer.Align(4); sizer.WriteUInt32(0);
             for (int i = 0; i < {fieldAccess}.Length; i++)
             {{
-                sizer.Skip({fieldAccess}[i].GetSerializedSize(sizer.Position));
+                sizer.Skip({fieldAccess}[i].GetSerializedSize(sizer.Position, isXcdr2));
             }}";
         }
         
-        private string EmitArrayWriter(FieldInfo field)
+        private string EmitArrayWriter(FieldInfo field, bool isXcdr2)
         {
             string fieldAccess = $"this.{ToPascalCase(field.Name)}";
             string elementType = field.TypeName.Substring(0, field.TypeName.Length - 2);
@@ -538,10 +559,11 @@ namespace CycloneDDS.CodeGen
             string? writerMethod = TypeMapper.GetWriterMethod(elementType);
             int alignEl = GetAlignment(elementType);
             string loopBody;
+
             if (writerMethod != null)
                 loopBody = $"writer.Align({alignEl}); writer.{writerMethod}({fieldAccess}[i]);";
             else if (elementType == "string")
-                loopBody = $"writer.Align(4); writer.WriteString({fieldAccess}[i]);";
+                loopBody = $"writer.Align(4); writer.WriteString({fieldAccess}[i], writer.IsXcdr2);";
             else
                 loopBody = $"var item = {fieldAccess}[i]; item.Serialize(ref writer);";
 
@@ -553,7 +575,7 @@ namespace CycloneDDS.CodeGen
             }}";
         }
 
-        private string EmitSequenceSizer(FieldInfo field)
+        private string EmitSequenceSizer(FieldInfo field, bool isXcdr2)
         {
             string fieldAccess = $"this.{ToPascalCase(field.Name)}";
             string elementType = ExtractSequenceElementType(field.TypeName);
@@ -582,7 +604,7 @@ namespace CycloneDDS.CodeGen
                 return $@"sizer.Align(4); sizer.WriteUInt32(0); // Sequence Length
             for (int i = 0; i < {fieldAccess}.Count; i++)
             {{
-                sizer.Align(4); sizer.WriteString({fieldAccess}[i]);
+                sizer.Align(4); sizer.WriteString({fieldAccess}[i], isXcdr2);
             }}";
             }
              
@@ -590,11 +612,11 @@ namespace CycloneDDS.CodeGen
             return $@"sizer.Align(4); sizer.WriteUInt32(0); // Sequence Length
             for (int i = 0; i < {fieldAccess}.Count; i++)
             {{
-                sizer.Skip({fieldAccess}[i].GetSerializedSize(sizer.Position));
+                sizer.Skip({fieldAccess}[i].GetSerializedSize(sizer.Position, isXcdr2));
             }}";
         }
 
-        private string EmitSequenceWriter(FieldInfo field)
+        private string EmitSequenceWriter(FieldInfo field, bool isXcdr2)
         {
             string fieldAccess = $"this.{ToPascalCase(field.Name)}";
             string elementType = ExtractSequenceElementType(field.TypeName);
@@ -618,13 +640,14 @@ namespace CycloneDDS.CodeGen
             int align = GetAlignment(elementType);
             
             string loopBody;
+
             if (writerMethod != null)
             {
                 loopBody = $"writer.Align({align}); writer.{writerMethod}({fieldAccess}[i]);";
             }
             else if (elementType == "string")
             {
-                loopBody = $"writer.Align(4); writer.WriteString({fieldAccess}[i]);";
+                loopBody = $"writer.Align(4); writer.WriteString({fieldAccess}[i], writer.IsXcdr2);";
             }
             else
             {
@@ -744,7 +767,7 @@ namespace CycloneDDS.CodeGen
             return typeName.Substring(start, end - start).Trim();
         }
 
-        private string EmitListWriter(FieldInfo field)
+        private string EmitListWriter(FieldInfo field, bool isXcdr2)
         {
              string fieldAccess = $"this.{ToPascalCase(field.Name)}";
              string elementType = ExtractGenericType(field.TypeName);
@@ -773,7 +796,7 @@ namespace CycloneDDS.CodeGen
              }
              else if (elementType == "string")
              {
-                 loopBody = "writer.Align(4); writer.WriteString(item);";
+                 loopBody = $"writer.Align(4); writer.WriteString(item, writer.IsXcdr2);";
              }
              else
              {
@@ -787,7 +810,7 @@ namespace CycloneDDS.CodeGen
             }}";
         }
 
-        private string EmitListSizer(FieldInfo field)
+        private string EmitListSizer(FieldInfo field, bool isXcdr2)
         {
             string fieldAccess = $"this.{ToPascalCase(field.Name)}";
             string elementType = ExtractGenericType(field.TypeName);
@@ -812,14 +835,14 @@ namespace CycloneDDS.CodeGen
                 return $@"sizer.Align(4); sizer.WriteUInt32(0); // Sequence Length
             foreach (var item in {fieldAccess})
             {{
-                sizer.Align(4); sizer.WriteString(item);
+                sizer.Align(4); sizer.WriteString(item, isXcdr2);
             }}";
             }
             
             return $@"sizer.Align(4); sizer.WriteUInt32(0); // Sequence Length
             foreach (var item in {fieldAccess})
             {{
-                sizer.Skip(item.GetSerializedSize(sizer.Position));
+                sizer.Skip(item.GetSerializedSize(sizer.Position, isXcdr2));
             }}";
         }
 
