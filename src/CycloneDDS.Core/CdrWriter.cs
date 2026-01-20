@@ -167,22 +167,18 @@ namespace CycloneDDS.Core
         public void WriteString(ReadOnlySpan<char> value, bool? isXcdr2 = null)
         {
             int utf8Length = Encoding.UTF8.GetByteCount(value);
-            // XCDR2: Length = ByteCount
-            // XCDR1: Length = ByteCount + 1 (for NUL)
+            // Always include NUL terminator for now to match CycloneDDS expectation
             bool useXcdr2 = isXcdr2 ?? _isXcdr2;
-            int lengthToWrite = useXcdr2 ? utf8Length : utf8Length + 1;
+            int lengthToWrite = utf8Length + 1;
             
             WriteInt32(lengthToWrite);
             
-            EnsureSize(useXcdr2 ? utf8Length : utf8Length + 1);
+            EnsureSize(utf8Length + 1);
             int written = Encoding.UTF8.GetBytes(value, _span.Slice(_buffered));
             _buffered += written;
             
-            if (!useXcdr2)
-            {
-                _span[_buffered] = 0; // NUL terminator
-                _buffered += 1;
-            }
+            _span[_buffered] = 0; // NUL terminator
+            _buffered += 1;
         }
 
         public void WriteFixedString(ReadOnlySpan<byte> utf8Bytes, int fixedSize)

@@ -65,10 +65,8 @@ namespace CycloneDDS.Core
             // SerializerEmitter generates explicit Align(4) calls before writing strings.
             _cursor += 4; // Length (Int32)
             _cursor += Encoding.UTF8.GetByteCount(value);
-            if (!isXcdr2)
-            {
-                _cursor += 1; // NUL terminator
-            }
+            // Always include NUL terminator to match CdrWriter
+            _cursor += 1; 
         }
         
         public void Skip(int bytes)

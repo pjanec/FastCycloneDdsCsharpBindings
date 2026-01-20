@@ -11,6 +11,9 @@ namespace CycloneDDS.Runtime.Tests
         public static StringMessage Deserialize(ref CdrReader reader)
         {
             var view = new StringMessage();
+            // DHEADER manually added because Generator output is inconsistent/stale
+            reader.ReadUInt32(); 
+
             int endPos = int.MaxValue;
                 view.Id = reader.ReadInt32();
                 reader.Align(4); view.Msg = reader.ReadString();

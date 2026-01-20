@@ -137,6 +137,10 @@ namespace CycloneDDS.Core
             if (useXcdr2)
             {
                 bytesToReturn = length;
+                if (length > 0 && _data[_position + length - 1] == 0)
+                {
+                    bytesToReturn = length - 1;
+                }
             }
             else
             {

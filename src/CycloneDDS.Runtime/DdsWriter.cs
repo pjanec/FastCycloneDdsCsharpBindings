@@ -119,13 +119,13 @@ namespace CycloneDDS.Runtime
                 {
                     // Little Endian
                     cdr.WriteByte(0x00);
-                    cdr.WriteByte(0x09);
+                    cdr.WriteByte(0x09); // D_CDR2_LE (Delimited)
                 }
                 else
                 {
                     // Big Endian
                     cdr.WriteByte(0x00);
-                    cdr.WriteByte(0x08);
+                    cdr.WriteByte(0x08); // D_CDR2_BE (Delimited)
                 }
                 
                 // Options (2 bytes)

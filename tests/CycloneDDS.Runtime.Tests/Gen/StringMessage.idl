@@ -6,7 +6,7 @@
 module CycloneDDS {
     module Runtime {
         module Tests {
-            @appendable
+            @final
             struct StringMessage {
                 int32 id;
                 string msg;
