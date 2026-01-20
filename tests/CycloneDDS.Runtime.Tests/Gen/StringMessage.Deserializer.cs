@@ -11,12 +11,23 @@ namespace CycloneDDS.Runtime.Tests
         public static StringMessage Deserialize(ref CdrReader reader)
         {
             var view = new StringMessage();
-            // DHEADER manually added because Generator output is inconsistent/stale
-            reader.ReadUInt32(); 
-
-            int endPos = int.MaxValue;
+            // DHEADER
+            reader.Align(4);
+            uint dheader = reader.ReadUInt32();
+            int endPos = reader.Position + (int)dheader;
+            if (reader.Position < endPos)
+            {
                 view.Id = reader.ReadInt32();
+            }
+            if (reader.Position < endPos)
+            {
                 reader.Align(4); view.Msg = reader.ReadString();
+            }
+
+            if (reader.Position < endPos)
+            {
+                reader.Seek(endPos);
+            }
             return view;
         }
         public StringMessage ToOwned()

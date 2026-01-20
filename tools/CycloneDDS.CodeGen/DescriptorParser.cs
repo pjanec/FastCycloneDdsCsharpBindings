@@ -37,10 +37,12 @@ namespace CycloneDDS.CodeGen
 
              // Flags
             { "DDS_OP_FLAG_KEY", 0x01u },
-            { "DDS_OP_FLAG_OPT", 0x02u },
-            { "DDS_OP_FLAG_MU",  0x04u },
-            { "DDS_OP_FLAG_SGN", 0x20u }, 
-            { "DDS_OP_FLAG_FP",  0x40u },
+            { "DDS_OP_FLAG_DEF", 0x02u },
+            { "DDS_OP_FLAG_SGN", 0x04u },
+            { "DDS_OP_FLAG_FP",  0x08u },
+            { "DDS_OP_FLAG_EXT", 0x10u },
+            { "DDS_OP_FLAG_OPT", 0x20u },
+            { "DDS_OP_FLAG_MU",  0x40u },
             
             // Type Codes (unshifted) for manual composition if needed
             { "DDS_OP_VAL_1BY", 0x01u },

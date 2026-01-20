@@ -11,9 +11,23 @@ namespace CycloneDDS.Runtime.Tests
         public static TestMessage Deserialize(ref CdrReader reader)
         {
             var view = new TestMessage();
-            int endPos = int.MaxValue;
+            // DHEADER
+            reader.Align(4);
+            uint dheader = reader.ReadUInt32();
+            int endPos = reader.Position + (int)dheader;
+            if (reader.Position < endPos)
+            {
                 view.Id = reader.ReadInt32();
+            }
+            if (reader.Position < endPos)
+            {
                 view.Value = reader.ReadInt32();
+            }
+
+            if (reader.Position < endPos)
+            {
+                reader.Seek(endPos);
+            }
             return view;
         }
         public TestMessage ToOwned()

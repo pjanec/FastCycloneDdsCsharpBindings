@@ -292,7 +292,7 @@ namespace CycloneDDS.CodeGen
                 }
             }
             return typeName.TrimEnd('?');
-}
+        }
 
     }
 }

@@ -2,6 +2,7 @@ using System;
 using System.Text;
 using System.Linq;
 using System.Collections.Generic;
+using CycloneDDS.Schema;
 
 namespace CycloneDDS.CodeGen
 {
@@ -42,8 +43,7 @@ namespace CycloneDDS.CodeGen
         
         private bool IsAppendable(TypeInfo type)
         {
-            if (type.Fields.Any(f => IsOptional(f))) return true;
-            return type.HasAttribute("DdsAppendable") || type.HasAttribute("DdsMutable") || type.HasAttribute("Appendable");
+             return type.Extensibility == DdsExtensibilityKind.Appendable || type.Extensibility == DdsExtensibilityKind.Mutable;
         }
 
         private void EmitPartialStruct(StringBuilder sb, TypeInfo type)
