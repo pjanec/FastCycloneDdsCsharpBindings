@@ -17,15 +17,15 @@ namespace CycloneDDS.Runtime.Tests.KeyedMessages
             int endPos = reader.Position + (int)dheader;
             if (reader.Position < endPos)
             {
-                view.SensorId = reader.ReadInt32();
+                reader.Align(4); view.SensorId = reader.ReadInt32();
             }
             if (reader.Position < endPos)
             {
-                view.LocationId = reader.ReadInt32();
+                reader.Align(4); view.LocationId = reader.ReadInt32();
             }
             if (reader.Position < endPos)
             {
-                view.Temperature = reader.ReadDouble();
+                reader.Align(8); view.Temperature = reader.ReadDouble();
             }
 
             if (reader.Position < endPos)

@@ -20,9 +20,9 @@ namespace CycloneDDS.Runtime.Tests.KeyedMessages
             sizer.WriteUInt32(0);
 
             // Struct body
-            sizer.Align(1); sizer.WriteInt32(0); // DeviceId
-            sizer.Align(1); sizer.WriteInt32(0); // Value
-            sizer.Align(1); sizer.WriteInt64(0); // Timestamp
+            sizer.Align(4); sizer.WriteInt32(0); // DeviceId
+            sizer.Align(4); sizer.WriteInt32(0); // Value
+            sizer.Align(8); sizer.WriteInt64(0); // Timestamp
 
             return sizer.GetSizeDelta(currentOffset);
         }
@@ -35,9 +35,9 @@ namespace CycloneDDS.Runtime.Tests.KeyedMessages
             writer.WriteUInt32(0);
             int bodyStart = writer.Position;
             // Struct body
-            writer.Align(1); writer.WriteInt32(this.DeviceId); // DeviceId
-            writer.Align(1); writer.WriteInt32(this.Value); // Value
-            writer.Align(1); writer.WriteInt64(this.Timestamp); // Timestamp
+            writer.Align(4); writer.WriteInt32(this.DeviceId); // DeviceId
+            writer.Align(4); writer.WriteInt32(this.Value); // Value
+            writer.Align(8); writer.WriteInt64(this.Timestamp); // Timestamp
             int bodyLen = writer.Position - bodyStart;
             writer.WriteUInt32At(dheaderPos, (uint)bodyLen);
         }

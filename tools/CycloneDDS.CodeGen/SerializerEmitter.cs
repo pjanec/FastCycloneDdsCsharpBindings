@@ -687,15 +687,19 @@ namespace CycloneDDS.CodeGen
             
             return typeName.ToLower() switch
             {
-                "byte" or "uint8" or "sbyte" or "int8" or "bool" or "boolean" => 1,
-                "short" or "int16" or "ushort" or "uint16" => 2,
-                "int" or "int32" or "uint" or "uint32" or "float" or
+                "byte" or "uint8" or "sbyte" or "int8" or "bool" or "boolean" or
+                "system.byte" or "system.sbyte" or "system.boolean" => 1,
+                "short" or "int16" or "ushort" or "uint16" or
+                "system.int16" or "system.uint16" => 2,
+                "int" or "int32" or "uint" or "uint32" or "float" or "single" or
+                "system.int32" or "system.uint32" or "system.single" or
                 "system.numerics.vector2" or
                 "system.numerics.vector3" or
                 "system.numerics.vector4" or
                 "system.numerics.quaternion" or
                 "system.numerics.matrix4x4" => 4,
                 "long" or "int64" or "ulong" or "uint64" or "double" or
+                "system.int64" or "system.uint64" or "system.double" or
                 "system.datetime" or "system.timespan" or
                 "system.datetimeoffset" => 8,
                 "system.guid" => 1,

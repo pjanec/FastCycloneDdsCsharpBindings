@@ -1,0 +1,24 @@
+// Auto-generated IDL for NestedStructKeyMessage by CycloneDDS C# Bindings
+// Generated on: 2026-01-21 08:03:04 UTC
+#ifndef _CYCLONEDDS_GENERATED_NESTEDSTRUCTKEYMESSAGE_IDL_
+#define _CYCLONEDDS_GENERATED_NESTEDSTRUCTKEYMESSAGE_IDL_
+
+#include "ProcessAddress.idl"
+
+module CycloneDDS {
+    module Runtime {
+        module Tests {
+            module KeyedMessages {
+                @appendable
+                struct NestedStructKeyMessage {
+                    @key uint32 frameId;
+                    ProcessAddress processAddr;
+                    double timeStamp;
+                };
+
+            };
+        };
+    };
+};
+
+#endif // _CYCLONEDDS_GENERATED_NESTEDSTRUCTKEYMESSAGE_IDL_

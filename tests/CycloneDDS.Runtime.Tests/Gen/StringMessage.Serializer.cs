@@ -20,7 +20,7 @@ namespace CycloneDDS.Runtime.Tests
             sizer.WriteUInt32(0);
 
             // Struct body
-            sizer.Align(1); sizer.WriteInt32(0); // Id
+            sizer.Align(4); sizer.WriteInt32(0); // Id
             sizer.Align(4); sizer.WriteString(this.Msg, isXcdr2); // Msg
 
             return sizer.GetSizeDelta(currentOffset);
@@ -34,7 +34,7 @@ namespace CycloneDDS.Runtime.Tests
             writer.WriteUInt32(0);
             int bodyStart = writer.Position;
             // Struct body
-            writer.Align(1); writer.WriteInt32(this.Id); // Id
+            writer.Align(4); writer.WriteInt32(this.Id); // Id
             writer.Align(4); writer.WriteString(this.Msg, writer.IsXcdr2); // Msg
             int bodyLen = writer.Position - bodyStart;
             writer.WriteUInt32At(dheaderPos, (uint)bodyLen);

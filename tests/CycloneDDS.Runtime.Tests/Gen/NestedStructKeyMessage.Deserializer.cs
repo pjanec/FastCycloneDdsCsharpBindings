@@ -6,22 +6,26 @@ using System.Collections.Generic;
 
 namespace CycloneDDS.Runtime.Tests.KeyedMessages
 {
-    public partial struct NestedKeyMessage
+    public partial struct NestedStructKeyMessage
     {
-        public static NestedKeyMessage Deserialize(ref CdrReader reader)
+        public static NestedStructKeyMessage Deserialize(ref CdrReader reader)
         {
-            var view = new NestedKeyMessage();
+            var view = new NestedStructKeyMessage();
             // DHEADER
             reader.Align(4);
             uint dheader = reader.ReadUInt32();
             int endPos = reader.Position + (int)dheader;
             if (reader.Position < endPos)
             {
-                reader.Align(4); view.InnerId = reader.ReadInt32();
+                reader.Align(4); view.FrameId = reader.ReadUInt32();
             }
             if (reader.Position < endPos)
             {
-                reader.Align(4); view.Data = reader.ReadString();
+                view.ProcessAddr = CycloneDDS.Runtime.Tests.KeyedMessages.ProcessAddress.Deserialize(ref reader);
+            }
+            if (reader.Position < endPos)
+            {
+                reader.Align(8); view.TimeStamp = reader.ReadDouble();
             }
 
             if (reader.Position < endPos)
@@ -30,7 +34,7 @@ namespace CycloneDDS.Runtime.Tests.KeyedMessages
             }
             return view;
         }
-        public NestedKeyMessage ToOwned()
+        public NestedStructKeyMessage ToOwned()
         {
             return this;
         }

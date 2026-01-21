@@ -17,15 +17,15 @@ namespace CycloneDDS.Runtime.Tests.KeyedMessages
             int endPos = reader.Position + (int)dheader;
             if (reader.Position < endPos)
             {
-                view.DeviceId = reader.ReadInt32();
+                reader.Align(4); view.DeviceId = reader.ReadInt32();
             }
             if (reader.Position < endPos)
             {
-                view.Value = reader.ReadInt32();
+                reader.Align(4); view.Value = reader.ReadInt32();
             }
             if (reader.Position < endPos)
             {
-                view.Timestamp = reader.ReadInt64();
+                reader.Align(8); view.Timestamp = reader.ReadInt64();
             }
 
             if (reader.Position < endPos)

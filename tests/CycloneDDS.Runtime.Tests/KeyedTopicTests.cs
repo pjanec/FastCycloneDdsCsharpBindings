@@ -386,5 +386,62 @@ Assert.Equal("Updated", scope[0].Data);
             Assert.Equal(999, received.Id);
             Assert.Equal("SomeData", received.Data);
         }
+
+        [Fact]
+        public void NestedStructKey_RoundTrip()
+        {
+            using var participant = new DdsParticipant(domainId: 0);
+            string topicName = $"NestedStructKeyTopic_{Guid.NewGuid()}";
+
+            using var writer = new DdsWriter<NestedStructKeyMessage>(participant, topicName);
+            using var reader = new DdsReader<NestedStructKeyMessage, NestedStructKeyMessage>(participant, topicName);
+
+            // 1. Write Sample A
+            var sampleA = new NestedStructKeyMessage
+            {
+                FrameId = 1,
+                ProcessAddr = new ProcessAddress { StationId = "StationA", ProcessId = "Proc1", SomeOtherId = "Ignored" },
+                TimeStamp = 100.0
+            };
+            writer.Write(sampleA);
+
+            // 2. Write Sample B (Same FrameId, Different StationId) => New Instance
+            var sampleB = new NestedStructKeyMessage
+            {
+                FrameId = 1,
+                ProcessAddr = new ProcessAddress { StationId = "StationB", ProcessId = "Proc1", SomeOtherId = "Ignored" },
+                TimeStamp = 200.0
+            };
+            writer.Write(sampleB);
+
+            // 3. Write Sample C (Same Keys as A) => Update Instance A
+            var sampleC = new NestedStructKeyMessage
+            {
+                FrameId = 1,
+                ProcessAddr = new ProcessAddress { StationId = "StationA", ProcessId = "Proc1", SomeOtherId = "Changed" },
+                TimeStamp = 300.0
+            };
+            writer.Write(sampleC);
+
+            Thread.Sleep(200);
+
+            using var scope = reader.Take();
+            // Expect 2 instances (A and B). A should have latest data (C).
+            Assert.Equal(2, scope.Count);
+
+            var instances = new System.Collections.Generic.List<NestedStructKeyMessage>();
+            foreach (var s in scope) instances.Add(s);
+
+            // Check for Instance B
+            var instB = instances.FirstOrDefault(s => s.ProcessAddr.StationId == "StationB");
+            Assert.NotNull(instB);
+            Assert.Equal(200.0, instB.TimeStamp);
+
+            // Check for Instance A (should imply data C)
+            var instA = instances.FirstOrDefault(s => s.ProcessAddr.StationId == "StationA");
+            Assert.NotNull(instA);
+            Assert.Equal(300.0, instA.TimeStamp);
+            Assert.Equal("Changed", instA.ProcessAddr.SomeOtherId);
+        }
     }
 }

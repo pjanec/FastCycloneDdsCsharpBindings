@@ -20,7 +20,7 @@ namespace CycloneDDS.Runtime.Tests.KeyedMessages
             sizer.WriteUInt32(0);
 
             // Struct body
-            sizer.Align(1); sizer.WriteInt32(0); // Id
+            sizer.Align(4); sizer.WriteInt32(0); // Id
             sizer.Align(4); sizer.WriteString(this.Name, isXcdr2); // Name
             sizer.Align(4); sizer.WriteString(this.Data, isXcdr2); // Data
 
@@ -35,7 +35,7 @@ namespace CycloneDDS.Runtime.Tests.KeyedMessages
             writer.WriteUInt32(0);
             int bodyStart = writer.Position;
             // Struct body
-            writer.Align(1); writer.WriteInt32(this.Id); // Id
+            writer.Align(4); writer.WriteInt32(this.Id); // Id
             writer.Align(4); writer.WriteString(this.Name, writer.IsXcdr2); // Name
             writer.Align(4); writer.WriteString(this.Data, writer.IsXcdr2); // Data
             int bodyLen = writer.Position - bodyStart;

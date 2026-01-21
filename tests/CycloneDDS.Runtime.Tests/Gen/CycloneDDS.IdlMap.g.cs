@@ -8,5 +8,7 @@ using System.Reflection;
 [assembly: DdsIdlMapping("CycloneDDS.Runtime.Tests.KeyedMessages.KeyLastMessage", "KeyLastMessage", "CycloneDDS::Runtime::Tests::KeyedMessages")]
 [assembly: DdsIdlMapping("CycloneDDS.Runtime.Tests.KeyedMessages.MixedKeyMessage", "MixedKeyMessage", "CycloneDDS::Runtime::Tests::KeyedMessages")]
 [assembly: DdsIdlMapping("CycloneDDS.Runtime.Tests.KeyedMessages.NestedKeyMessage", "NestedKeyMessage", "CycloneDDS::Runtime::Tests::KeyedMessages")]
+[assembly: DdsIdlMapping("CycloneDDS.Runtime.Tests.KeyedMessages.NestedStructKeyMessage", "NestedKeys", "CycloneDDS::Runtime::Tests::KeyedMessages")]
+[assembly: DdsIdlMapping("CycloneDDS.Runtime.Tests.KeyedMessages.ProcessAddress", "NestedKeys", "CycloneDDS::Runtime::Tests::KeyedMessages")]
 [assembly: DdsIdlMapping("CycloneDDS.Runtime.Tests.KeyedMessages.SingleKeyMessage", "SingleKeyMessage", "CycloneDDS::Runtime::Tests::KeyedMessages")]
 [assembly: DdsIdlMapping("CycloneDDS.Runtime.Tests.KeyedMessages.StringKeyMessage", "StringKeyMessage", "CycloneDDS::Runtime::Tests::KeyedMessages")]

@@ -212,25 +212,29 @@ namespace CycloneDDS.CodeGen
                  var info = new KeyDescriptorInfo();
                  info.Name = itemMatch.Groups[1].Value;
                  
-                 string offsetStr = itemMatch.Groups[2].Value.Trim();
-                 bool offsetParsed = false;
-                 if (uint.TryParse(offsetStr, out uint pOffset))
-                 {
-                     info.Offset = pOffset;
-                     offsetParsed = true;
-                 }
+                 // In modern Cyclone DDS (0.11+), the second parameter in the key descriptor 
+                 // is the Index into the Ops array (pointing to KOF), not the byte offset.
+                 // The third parameter is the Key Index/Order.
+                 // We populate 'Offset' with the Ops Index so that DdsParticipant passes it to 'm_offset' field.
+                 
+                 if (uint.TryParse(itemMatch.Groups[2].Value, out uint opsIdx))
+                     info.Offset = opsIdx;
                  else
-                 {
                      info.Offset = 0;
-                 }
 
-                 if (uint.TryParse(itemMatch.Groups[3].Value, out uint idx))
-                    info.Index = idx;
+                 if (uint.TryParse(itemMatch.Groups[3].Value, out uint keyIdx))
+                    info.Index = keyIdx;
                  else 
                     info.Index = 0;
                 
+                 // Do NOT force Offset to 0. Trust the C generator values which are Ops Indices.
+                 // This ensures we point to KOF instructions correctly.
+
+                
                  // Try resolve offset from compilation if not parsed or if we suspect we need struct layout
                  // But trusting IDL generated offset seems safer if it is a literal.
+                 // We force usage of C# runtime offset calculation by keeping Offset=0.
+                 /*
                  if (!offsetParsed && compilation != null)
                  {
                      string targetStruct = typeName;
@@ -253,6 +257,7 @@ namespace CycloneDDS.CodeGen
                          }
                      }
                  }
+                 */
 
                  list.Add(info);
             }
@@ -313,10 +318,6 @@ namespace CycloneDDS.CodeGen
 
         private uint[] ResolveOffsets(List<uint?> rawValues)
         {
-            // Debug dump
-            // Console.Error.WriteLine($"ResolveOffsets input count: {rawValues.Count}");
-            // for(int k=0; k<rawValues.Count; k++) Console.Error.WriteLine($"  raw[{k}]: {(rawValues[k].HasValue ? rawValues[k].Value.ToString() : "null")}");
-
             uint currentOffset = 0;
             var result = new uint[rawValues.Count];
             
@@ -342,6 +343,47 @@ namespace CycloneDDS.CodeGen
                 {
                     uint type = (prevOp & DDS_OP_TYPE_MASK) >> 16;
                     var (size, align) = GetTypeSizeAndAlign(type);
+
+                    // Special handling for EXT (recursion / inline struct)
+                    if (type == 0x0Du) // DDS_OP_TYPE_EXT
+                    {
+                        // Look ahead for jump argument
+                        if (i + 1 < rawValues.Count && rawValues[i + 1].HasValue)
+                        {
+                            uint jumpArg = rawValues[i + 1].Value;
+                            int offsetVal = (int)(jumpArg & 0xFFFF);
+                            // Target is relative to the instruction start (i - 1)
+                            // But usually offset is relative to 'current pc'.
+                            // If Op is at X. Args at X+1, X+2.
+                            // The generated code (3<<16) + 6.
+                            // If it points to Ops[9]. Ops[3] was the Op.
+                            // 3 + 6 = 9. So it is relative to Op index.
+                            int targetIdx = (i - 1) + offsetVal;
+                            
+                            // Calculate size of that struct
+                            // Assuming inline struct
+                            uint extSize = CalculateStructSize(rawValues, targetIdx);
+                            if (extSize > 0)
+                            {
+                                size = extSize;
+                                // Align of struct is max align of members. 
+                                // Simplified: if size >= 8, align 8. Else size.
+                                // Or assume 8 for now.
+                                align = 8;
+                            }
+                        }
+                    }
+                    else if (type == 0x0Au) // DDS_OP_TYPE_STU
+                    {
+                        // [ADR, STU, f] [offset] [elem-size] ...
+                        // i points to [offset]. i+1 is [elem-size].
+                        if (i + 1 < rawValues.Count && rawValues[i + 1].HasValue)
+                        {
+                             size = rawValues[i + 1].Value;
+                             // Alignment? Assume 8 for structs containing pointers/doubles.
+                             align = 8; 
+                        }
+                    }
                     
                     uint padding = (align - (currentOffset % align)) % align;
                     currentOffset += padding;
@@ -360,16 +402,111 @@ namespace CycloneDDS.CodeGen
                 else
                 {
                     result[i] = rawValues[i] ?? 0;
+
+                    // If this is RTS (Return To Subroutine), it marks the end of a struct definition.
+                    // The next instruction will be the start of a new struct definition (if any),
+                    // so we must reset the offset counter.
+                    if (result[i] == 0) 
+                    {
+                        currentOffset = 0;
+                    }
                 }
             }
             
             return result;
         }
 
+        private uint CalculateStructSize(List<uint?> rawValues, int startIdx)
+        {
+            if (startIdx < 0 || startIdx >= rawValues.Count) return 0;
+            
+            uint size = 0;
+            uint maxAlign = 1;
+            int idx = startIdx;
+            
+            // Limit loop to prevent infinite recursion or long hangs
+            int safety = 0;
+            while(idx < rawValues.Count && safety++ < 1000)
+            {
+                if (!rawValues[idx].HasValue) { idx++; continue; }
+                uint op = rawValues[idx].Value;
+                uint opCode = op & DDS_OP_MASK;
+                
+                if (opCode == (0x00u << 24)) // RTS
+                    break;
+                    
+                if (opCode == (0x01u << 24)) // ADR
+                {
+                    uint type = (op & DDS_OP_TYPE_MASK) >> 16;
+                    var (s, a) = GetTypeSizeAndAlign(type);
+                    
+                    // If we encounter nested EXT here, we should recurse ideally,
+                    // but for now let's stick to base pointer size to avoid overflow,
+                    // OR simple recursion if we trust depth.
+                    // ProcessAddress uses STR, so no EXT.
+                    
+                    if (a > maxAlign) maxAlign = a;
+                    
+                    uint padding = (a - (size % a)) % a;
+                    size += padding;
+                    size += s;
+                    
+                    // Advance past Op and Offset
+                    idx += 2; 
+                    
+                    // Skip extra args
+                    if (type == 0x0Du) idx++; // EXT jump
+                    if (type == 0x0Au) idx += 2; // STU: [offset] [elem-size] [next-insn, elem-insn] ? Wait, check standard
+                    // STU op structure: [ADR | STU | f] [offset] [elem-size] [next-insn, elem-insn]
+                    // My parser advances +2 (Op, Offset).
+                    // So remaining args are [elem-size] [next-insn, elem-insn]. i.e. 2 extra uints is wrong?
+                    // Standard DDS_OP_ADR consumes 2 uints if 1-word op.
+                    // But STU is multi-word op?
+                    // dds_opcodes.h says:
+                    // [ADR, STU, f] [offset] [elem-size] [next-insn, elem-insn]
+                    // This is 4 words total.
+                    // I advanced 2 (Op, Offset). So need to skip 2 more.
+                    if (type == 0x0Au) idx += 2; 
+
+                    continue;
+                }
+                
+                idx++;
+            }
+            // Align the total struct size to maxAlign
+            if (maxAlign > 0)
+            {
+                uint endPadding = (maxAlign - (size % maxAlign)) % maxAlign;
+                size += endPadding;
+            }
+            return size;
+        }
+
         private uint? EvaluateExpression(CppExpression expression)
         {
             // Debug logging
-            // Console.Error.WriteLine($"Evaluating: {expression} ({expression.GetType().Name}) Kind={expression.Kind}");
+            // Console.WriteLine($"Evaluating: {expression} ({expression.GetType().Name}) Kind={expression.Kind}");
+
+            if (expression.GetType().Name == "CppParenExpression")
+            {
+                var props = expression.GetType().GetProperties();
+                foreach (var p in props)
+                {
+                    if (p.Name == "Arguments" && typeof(System.Collections.IEnumerable).IsAssignableFrom(p.PropertyType))
+                    {
+                         var val = p.GetValue(expression) as System.Collections.IEnumerable;
+                         if (val != null)
+                         {
+                             foreach(var item in val)
+                             {
+                                 if (item is CppAst.CppExpression inner)
+                                    return EvaluateExpression(inner);
+                             }
+                         }
+                    }
+                }
+                return null;
+            }
 
             if (expression is CppLiteralExpression lit)
             {

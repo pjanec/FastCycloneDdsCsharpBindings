@@ -17,11 +17,11 @@ namespace CycloneDDS.Runtime.Tests
             int endPos = reader.Position + (int)dheader;
             if (reader.Position < endPos)
             {
-                view.Id = reader.ReadInt32();
+                reader.Align(4); view.Id = reader.ReadInt32();
             }
             if (reader.Position < endPos)
             {
-                view.Value = reader.ReadInt32();
+                reader.Align(4); view.Value = reader.ReadInt32();
             }
 
             if (reader.Position < endPos)

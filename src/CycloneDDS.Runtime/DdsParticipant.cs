@@ -215,6 +215,54 @@ namespace CycloneDDS.Runtime
             public uint Index;
         }
 
+        private static int GetRecursiveOffset(Type type, string keyPath)
+        {
+            try
+            {
+                string[] parts = keyPath.Split('.');
+                int totalOffset = 0;
+                Type currentType = type;
+
+                foreach (var part in parts)
+                {
+                    // Find the field in the current type
+                    var field = currentType.GetField(part, 
+                        System.Reflection.BindingFlags.Instance | 
+                        System.Reflection.BindingFlags.Public | 
+                        System.Reflection.BindingFlags.NonPublic | 
+                        System.Reflection.BindingFlags.IgnoreCase);
+
+                    if (field == null)
+                    {
+                         // Try backing field for property? <Name>k__BackingField
+                         field = currentType.GetField($"<{part}>k__BackingField", 
+                            System.Reflection.BindingFlags.Instance | 
+                            System.Reflection.BindingFlags.NonPublic |
+                            System.Reflection.BindingFlags.IgnoreCase);
+                    }
+
+                    if (field == null)
+                    {
+                        throw new InvalidOperationException($"Could not find field '{part}' in type '{currentType.Name}' while resolving key '{keyPath}'");
+                    }
+
+                    // Add the offset of this field within its parent
+                    // Note: Marshal.OffsetOf requires exact case match of the field definition
+                    totalOffset += Marshal.OffsetOf(currentType, field.Name).ToInt32();
+                    
+                    // Drill down
+                    currentType = field.FieldType;
+                }
+
+                return totalOffset;
+            }
+            catch(Exception ex)
+            {
+                Console.WriteLine($"Error calculating recursive offset for {keyPath} in {type.Name}: {ex}");
+                throw;
+            }
+        }
+
         private IntPtr MarshalDescriptor<T>(uint[] ops, DdsKeyDescriptor[] keys, string typeName)
         {
             // Marshal type name
@@ -245,8 +293,8 @@ namespace CycloneDDS.Runtime
 
                      if (keys[i].Offset == 0)
                      {
-                         var offset = Marshal.OffsetOf<T>(keys[i].Name).ToInt32();
-                         nativeKey.Offset = (uint)offset;
+                         // Use recursive/smart offset calculation for all keys (handles dot notation and case mismatch)
+                         nativeKey.Offset = (uint)GetRecursiveOffset(typeof(T), keys[i].Name);
                      }
                      else
                      {
