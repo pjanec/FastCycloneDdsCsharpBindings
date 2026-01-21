@@ -8,11 +8,21 @@ using System.Threading.Tasks;
 using CycloneDDS.Core;
 using CycloneDDS.Runtime.Interop;
 using CycloneDDS.Runtime.Memory;
+using CycloneDDS.Schema;
 
 namespace CycloneDDS.Runtime
 {
     public sealed class DdsWriter<T> : IDisposable
     {
+        private static readonly byte _encodingKindLE;
+        private static readonly byte _encodingKindBE;
+
+        // Cached delegates to prevent allocation per call
+        private static readonly Func<DdsApi.DdsEntity, IntPtr, int> _writeOperation = DdsApi.dds_writecdr;
+        private static readonly Func<DdsApi.DdsEntity, IntPtr, int> _disposeOperation = DdsApi.dds_dispose_serdata;
+        private static readonly Func<DdsApi.DdsEntity, IntPtr, int> _unregisterOperation = DdsApi.dds_unregister_serdata;
+
+
         private DdsEntityHandle? _writerHandle;
         private DdsApi.DdsEntity _topicHandle;
         private DdsParticipant? _participant;
@@ -31,14 +41,36 @@ namespace CycloneDDS.Runtime
         private delegate int GetSerializedSizeDelegate(in T sample, int currentAlignment, bool isXcdr2);
 
         private static readonly SerializeDelegate? _serializer;
+        private static readonly SerializeDelegate? _keySerializer;
         private static readonly GetSerializedSizeDelegate? _sizer;
 
         static DdsWriter()
         {
+            var attr = typeof(T).GetCustomAttribute<DdsExtensibilityAttribute>();
+            var kind = attr?.Kind ?? DdsExtensibilityKind.Appendable;
+
+            switch (kind)
+            {
+                case DdsExtensibilityKind.Final:
+                    _encodingKindLE = 0x07; // CDR2_LE
+                    _encodingKindBE = 0x06; // CDR2_BE
+                    break;
+                case DdsExtensibilityKind.Mutable:
+                    _encodingKindLE = 0x0B; // PL_CDR2_LE
+                    _encodingKindBE = 0x0A; // PL_CDR2_BE
+                    break;
+                case DdsExtensibilityKind.Appendable:
+                default:
+                    _encodingKindLE = 0x09; // D_CDR2_LE
+                    _encodingKindBE = 0x08; // D_CDR2_BE
+                    break;
+            }
+
             try
             {
                 _sizer = CreateSizerDelegate();
                 _serializer = CreateSerializerDelegate();
+                _keySerializer = CreateKeySerializerDelegate();
             }
             catch (Exception ex)
             {
@@ -91,7 +123,7 @@ namespace CycloneDDS.Runtime
              #pragma warning restore CS8500
         }
 
-        private void PerformOperation(in T sample, Func<DdsApi.DdsEntity, IntPtr, int> operation)
+        private void PerformOperation(in T sample, Func<DdsApi.DdsEntity, IntPtr, int> operation, int serdataKind = 2)
         {
             if (_writerHandle == null) throw new ObjectDisposedException(nameof(DdsWriter<T>));
             if (!_topicHandle.IsValid) throw new ObjectDisposedException(nameof(DdsWriter<T>));
@@ -113,28 +145,35 @@ namespace CycloneDDS.Runtime
                 var cdr = new CdrWriter(span, isXcdr2: true); 
                 
                 // Write CDR Header (XCDR2 format)
-                // DELIMITED_CDR2 Identifier: 0x0009 (LE) or 0x0008 (BE)
-                // Options: 0x0000
                 if (BitConverter.IsLittleEndian)
                 {
                     // Little Endian
                     cdr.WriteByte(0x00);
-                    cdr.WriteByte(0x09); // D_CDR2_LE (Delimited)
+                    cdr.WriteByte(_encodingKindLE);
                 }
                 else
                 {
                     // Big Endian
                     cdr.WriteByte(0x00);
-                    cdr.WriteByte(0x08); // D_CDR2_BE (Delimited)
+                    cdr.WriteByte(_encodingKindBE);
                 }
                 
                 // Options (2 bytes)
                 cdr.WriteByte(0x00);
                 cdr.WriteByte(0x00);
                 
-                _serializer!(sample, ref cdr);
+                if (serdataKind == 1 && _keySerializer != null)
+                {
+                    _keySerializer(sample, ref cdr);
+                }
+                else
+                {
+                    _serializer!(sample, ref cdr);
+                }
                 cdr.Complete();
                 
+                int actualSize = cdr.Position;
+
                 // 4. Write to DDS via Serdata
                 unsafe
                 {
@@ -145,7 +184,8 @@ namespace CycloneDDS.Runtime
                         IntPtr serdata = DdsApi.dds_create_serdata_from_cdr(
                             _topicHandle,
                             dataPtr,
-                            (uint)totalSize);
+                            (uint)actualSize,
+                            serdataKind);
 
                         if (serdata == IntPtr.Zero)
                         {
@@ -169,7 +209,7 @@ namespace CycloneDDS.Runtime
 
         public void Write(in T sample)
         {
-            PerformOperation(sample, DdsApi.dds_writecdr);
+            PerformOperation(sample, _writeOperation);
         }
 
         /// <summary>
@@ -184,7 +224,7 @@ namespace CycloneDDS.Runtime
         /// </remarks>
         public void DisposeInstance(in T sample)
         {
-            PerformOperation(sample, DdsApi.dds_dispose_serdata);
+            PerformOperation(sample, _disposeOperation, 1); // SDK_KEY
         }
 
         /// <summary>
@@ -201,7 +241,7 @@ namespace CycloneDDS.Runtime
         /// </remarks>
         public void UnregisterInstance(in T sample)
         {
-            PerformOperation(sample, DdsApi.dds_unregister_serdata);
+            PerformOperation(sample, _unregisterOperation, 1); // SDK_KEY
         }
         
         public event EventHandler<DdsApi.DdsPublicationMatchedStatus>? PublicationMatched
@@ -294,8 +334,58 @@ namespace CycloneDDS.Runtime
              catch { }
         }
 
+        public DdsInstanceHandle LookupInstance(in T keySample)
+        {
+            if (_writerHandle == null) throw new ObjectDisposedException(nameof(DdsWriter<T>));
+
+            // Use _sizer to calculate size. Start at offset 4 for header
+            int size = _sizer!(keySample, 4, true);
+            byte[] buffer = Arena.Rent(size + 4);
+
+            try
+            {
+                var span = buffer.AsSpan(0, size + 4);
+                var cdr = new CdrWriter(span, isXcdr2: true);
+                
+                // Write Header
+                if (BitConverter.IsLittleEndian) { cdr.WriteByte(0x00); cdr.WriteByte(_encodingKindLE); }
+                else { cdr.WriteByte(0x00); cdr.WriteByte(_encodingKindBE); }
+                cdr.WriteByte(0x00); cdr.WriteByte(0x00);
+
+                _serializer!(keySample, ref cdr);
+                
+                unsafe
+                {
+                    fixed (byte* p = buffer)
+                    {
+                        // 2. Create Serdata (Kind=1 for SDK_KEY)
+                        IntPtr serdata = DdsApi.dds_create_serdata_from_cdr(
+                            _topicHandle, (IntPtr)p, (uint)(size + 4), 1);
+                            
+                        if (serdata == IntPtr.Zero) return DdsInstanceHandle.Nil;
+
+                        try
+                        {
+                            long handle = DdsApi.dds_lookup_instance_serdata(_writerHandle.NativeHandle.Handle, serdata);
+                            return new DdsInstanceHandle(handle);
+                        }
+                        finally
+                        {
+                            DdsApi.ddsi_serdata_unref(serdata);
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                Arena.Return(buffer);
+            }
+        }
+
         public void Dispose()
         {
+            if (_writerHandle == null) return;
+            
             if (_listener != IntPtr.Zero)
             {
                 DdsApi.dds_delete_listener(_listener);
@@ -343,6 +433,31 @@ namespace CycloneDDS.Runtime
 
             var dm = new DynamicMethod(
                 "SerializeThunk",
+                typeof(void),
+                new[] { typeof(T).MakeByRefType(), typeof(CdrWriter).MakeByRefType() },
+                typeof(DdsWriter<T>).Module);
+
+            var il = dm.GetILGenerator();
+            il.Emit(OpCodes.Ldarg_0); // sample (ref)
+            if (!typeof(T).IsValueType)
+            {
+                il.Emit(OpCodes.Ldind_Ref);
+            }
+            il.Emit(OpCodes.Ldarg_1); // writer (ref)
+            il.Emit(OpCodes.Call, method);
+            il.Emit(OpCodes.Ret);
+
+            return (SerializeDelegate)dm.CreateDelegate(typeof(SerializeDelegate));
+        }
+
+        private static SerializeDelegate? CreateKeySerializerDelegate()
+        {
+            var method = typeof(T).GetMethod("SerializeKey", new[] { typeof(CdrWriter).MakeByRefType() });
+            Console.WriteLine($"[DEBUG] Type {typeof(T).Name} SerializeKey found: {method != null}");
+            if (method == null) return null;
+
+            var dm = new DynamicMethod(
+                "SerializeKeyThunk",
                 typeof(void),
                 new[] { typeof(T).MakeByRefType(), typeof(CdrWriter).MakeByRefType() },
                 typeof(DdsWriter<T>).Module);

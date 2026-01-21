@@ -10,6 +10,7 @@ using System.Runtime.CompilerServices;
 using CycloneDDS.Core;
 using CycloneDDS.Runtime.Interop;
 using CycloneDDS.Runtime.Memory;
+using CycloneDDS.Schema;
 
 namespace CycloneDDS.Runtime
 {
@@ -18,6 +19,9 @@ namespace CycloneDDS.Runtime
     public sealed class DdsReader<T, TView> : IDisposable 
         where TView : struct
     {
+        private static readonly byte _encodingKindLE;
+        private static readonly byte _encodingKindBE;
+
         private DdsEntityHandle? _readerHandle;
         private DdsApi.DdsEntity _topicHandle;
         private DdsParticipant? _participant;
@@ -62,12 +66,39 @@ namespace CycloneDDS.Runtime
             }
         }
 
+        private delegate void SerializeDelegate(in T sample, ref CdrWriter writer);
+        private delegate int GetSerializedSizeDelegate(in T sample, int currentAlignment, bool isXcdr2);
+
         private static readonly DeserializeDelegate<TView>? _deserializer;
+        private static readonly SerializeDelegate? _serializer;
+        private static readonly GetSerializedSizeDelegate? _sizer;
         
         static DdsReader()
         {
+            var attr = typeof(T).GetCustomAttribute<DdsExtensibilityAttribute>();
+            var kind = attr?.Kind ?? DdsExtensibilityKind.Appendable;
+
+            switch (kind)
+            {
+                case DdsExtensibilityKind.Final:
+                    _encodingKindLE = 0x07; // CDR2_LE
+                    _encodingKindBE = 0x06; // CDR2_BE
+                    break;
+                case DdsExtensibilityKind.Mutable:
+                    _encodingKindLE = 0x0B; // PL_CDR2_LE
+                    _encodingKindBE = 0x0A; // PL_CDR2_BE
+                    break;
+                case DdsExtensibilityKind.Appendable:
+                default:
+                    _encodingKindLE = 0x09; // D_CDR2_LE
+                    _encodingKindBE = 0x08; // D_CDR2_BE
+                    break;
+            }
+
             try { 
                 _deserializer = CreateDeserializerDelegate(); 
+                _sizer = CreateSizerDelegate();
+                _serializer = CreateSerializerDelegate(); 
                 
                 // Verify Struct Size
                 uint nativeSize = DdsApi.dds_sample_info_size();
@@ -316,6 +347,165 @@ namespace CycloneDDS.Runtime
             _participant = null;
         }
         
+        public DdsInstanceHandle LookupInstance(in T keySample)
+        {
+            if (_readerHandle == null) throw new ObjectDisposedException(nameof(DdsReader<T, TView>));
+
+            // Use _sizer to calculate size. Start at offset 4 for header
+            int size = _sizer!(keySample, 4, true);
+            byte[] buffer = Arena.Rent(size + 4);
+
+            try
+            {
+                var span = buffer.AsSpan(0, size + 4);
+                var cdr = new CdrWriter(span, isXcdr2: true);
+                
+                // Write Header
+                if (BitConverter.IsLittleEndian) { cdr.WriteByte(0x00); cdr.WriteByte(_encodingKindLE); }
+                else { cdr.WriteByte(0x00); cdr.WriteByte(_encodingKindBE); }
+                cdr.WriteByte(0x00); cdr.WriteByte(0x00);
+
+                _serializer!(keySample, ref cdr);
+                
+                unsafe
+                {
+                    fixed (byte* p = buffer)
+                    {
+                        // 2. Create Serdata (Kind=1 for SDK_KEY) 
+                        IntPtr serdata = DdsApi.dds_create_serdata_from_cdr(
+                            _topicHandle, (IntPtr)p, (uint)(size + 4), 1);
+                            
+                        if (serdata == IntPtr.Zero) return DdsInstanceHandle.Nil;
+
+                        try
+                        {
+                            long handle = DdsApi.dds_lookup_instance_serdata(_readerHandle.NativeHandle.Handle, serdata);
+                            return new DdsInstanceHandle(handle);
+                        }
+                        finally
+                        {
+                            DdsApi.ddsi_serdata_unref(serdata);
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                Arena.Return(buffer);
+            }
+        }
+
+        public ViewScope<TView> TakeInstance(DdsInstanceHandle handle, int maxSamples = 1)
+        {
+            return ReadOrTakeInstance(handle, maxSamples, 0xFFFFFFFF, true);
+        }
+
+        public ViewScope<TView> ReadInstance(DdsInstanceHandle handle, int maxSamples = 1)
+        {
+            return ReadOrTakeInstance(handle, maxSamples, 0xFFFFFFFF, false);
+        }
+
+        private ViewScope<TView> ReadOrTakeInstance(DdsInstanceHandle handle, int maxSamples, uint mask, bool isTake)
+        {
+             if (_readerHandle == null) throw new ObjectDisposedException(nameof(DdsReader<T, TView>));
+             
+             var samples = ArrayPool<IntPtr>.Shared.Rent(maxSamples);
+             var infos = ArrayPool<DdsApi.DdsSampleInfo>.Shared.Rent(maxSamples);
+             
+             Array.Clear(samples, 0, maxSamples);
+             Array.Clear(infos, 0, maxSamples); 
+             
+             int count;
+             if (isTake)
+             {
+                 count = DdsApi.dds_takecdr_instance(
+                     _readerHandle.NativeHandle.Handle,
+                     samples,
+                     (uint)maxSamples,
+                     infos,
+                     handle.Value,
+                     mask);
+             }
+             else
+             {
+                 count = DdsApi.dds_readcdr_instance(
+                     _readerHandle.NativeHandle.Handle,
+                     samples,
+                     (uint)maxSamples,
+                     infos,
+                     handle.Value,
+                     mask);
+             }
+
+             if (count < 0)
+             {
+                 ArrayPool<IntPtr>.Shared.Return(samples);
+                 ArrayPool<DdsApi.DdsSampleInfo>.Shared.Return(infos);
+                 
+                 if (count == (int)DdsApi.DdsReturnCode.BadParameter)
+                     throw new ArgumentException("Invalid instance handle");
+                 
+                 // Handle NoData or other errors by returning empty view
+                 // If it's pure error we might want to throw, but standard Read returns empty on NoData
+                 if (count == (int)DdsApi.DdsReturnCode.NoData)
+                     return new ViewScope<TView>(_readerHandle.NativeHandle, null, null, 0, null, _filter);
+
+                 throw new DdsException((DdsApi.DdsReturnCode)count, $"dds_{(isTake ? "take" : "read")}cdr_instance failed: {count}");
+             }
+             
+             return new ViewScope<TView>(_readerHandle.NativeHandle, samples, infos, count, _deserializer, _filter);
+        }
+
+        private static GetSerializedSizeDelegate CreateSizerDelegate()
+        {
+            var method = typeof(T).GetMethod("GetSerializedSize", new[] { typeof(int), typeof(bool) });
+            if (method == null) throw new MissingMethodException(typeof(T).Name, "GetSerializedSize(int, bool)");
+
+            var dm = new DynamicMethod(
+                "GetSerializedSizeThunk",
+                typeof(int),
+                new[] { typeof(T).MakeByRefType(), typeof(int), typeof(bool) },
+                typeof(DdsReader<T, TView>).Module);
+
+            var il = dm.GetILGenerator();
+            il.Emit(OpCodes.Ldarg_0); // sample (ref)
+            if (!typeof(T).IsValueType)
+            {
+                 il.Emit(OpCodes.Ldind_Ref); 
+            }
+            
+            il.Emit(OpCodes.Ldarg_1); // offset
+            il.Emit(OpCodes.Ldarg_2); // isXcdr2
+            il.Emit(OpCodes.Call, method); 
+            il.Emit(OpCodes.Ret);
+
+            return (GetSerializedSizeDelegate)dm.CreateDelegate(typeof(GetSerializedSizeDelegate));
+        }
+
+         private static SerializeDelegate CreateSerializerDelegate()
+        {
+            var method = typeof(T).GetMethod("Serialize", new[] { typeof(CdrWriter).MakeByRefType() });
+            if (method == null) throw new MissingMethodException(typeof(T).Name, "Serialize");
+
+            var dm = new DynamicMethod(
+                "SerializeThunk",
+                typeof(void),
+                new[] { typeof(T).MakeByRefType(), typeof(CdrWriter).MakeByRefType() },
+                typeof(DdsReader<T, TView>).Module);
+
+            var il = dm.GetILGenerator();
+            il.Emit(OpCodes.Ldarg_0); // sample (ref)
+            if (!typeof(T).IsValueType)
+            {
+                il.Emit(OpCodes.Ldind_Ref);
+            }
+            il.Emit(OpCodes.Ldarg_1); // writer (ref)
+            il.Emit(OpCodes.Call, method);
+            il.Emit(OpCodes.Ret);
+
+            return (SerializeDelegate)dm.CreateDelegate(typeof(SerializeDelegate));
+        }
+
         private static DeserializeDelegate<TView> CreateDeserializerDelegate()
         {
              var method = typeof(T).GetMethod("Deserialize", new[] { typeof(CdrReader).MakeByRefType() });

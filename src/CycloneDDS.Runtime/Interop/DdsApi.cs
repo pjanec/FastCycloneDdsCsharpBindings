@@ -142,6 +142,7 @@ namespace CycloneDDS.Runtime.Interop
             DdsEntity writer,
             IntPtr serdata);
 
+
         [DllImport(DLL_NAME)]
         public static extern int dds_readcdr(
             int reader, // Changed from DdsEntity to int
@@ -156,6 +157,27 @@ namespace CycloneDDS.Runtime.Interop
             [In, Out] IntPtr[] samples, 
             uint maxs,
             [In, Out] DdsSampleInfo[] infos, 
+            uint mask);
+
+        [DllImport(DLL_NAME)]
+        public static extern long dds_lookup_instance_serdata(int entity, IntPtr serdata);
+
+        [DllImport(DLL_NAME)]
+        public static extern int dds_takecdr_instance(
+            int reader,
+            [In, Out] IntPtr[] samples, 
+            uint maxs,
+            [In, Out] DdsSampleInfo[] infos, 
+            long handle,
+            uint mask);
+
+        [DllImport(DLL_NAME)]
+        public static extern int dds_readcdr_instance(
+            int reader,
+            [In, Out] IntPtr[] samples, 
+            uint maxs,
+            [In, Out] DdsSampleInfo[] infos, 
+            long handle,
             uint mask);
 
         [DllImport(DLL_NAME, EntryPoint = "dds_takecdr")]
@@ -211,6 +233,11 @@ namespace CycloneDDS.Runtime.Interop
         // Helper to match user expectation
         public static IntPtr dds_create_serdata_from_cdr(DdsEntity topic, IntPtr data, uint size)
         {
+            return dds_create_serdata_from_cdr(topic, data, size, 2); // Default to SDK_DATA
+        }
+
+        public static IntPtr dds_create_serdata_from_cdr(DdsEntity topic, IntPtr data, uint size, int kind)
+        {
             IntPtr sertype = dds_get_topic_sertype(topic);
             if (sertype == IntPtr.Zero) return IntPtr.Zero;
 
@@ -220,7 +247,7 @@ namespace CycloneDDS.Runtime.Interop
                 iov_len = (UIntPtr)size
             };
             
-            return ddsi_serdata_from_ser_iov(sertype, 2, 1, new[] { iov }, (UIntPtr)size);
+            return ddsi_serdata_from_ser_iov(sertype, kind, 1, new[] { iov }, (UIntPtr)size);
         }
 
         [DllImport(DLL_NAME)]

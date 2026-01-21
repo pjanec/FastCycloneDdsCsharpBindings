@@ -214,3 +214,31 @@ The CycloneDDS.Runtime.Tests suite is fully green.
 **Note**: To permanently fix the alignment issue found in Phase 6, the CycloneDDS.CodeGen tool's SerializerEmitter.cs \(specifically GetAlignment\) needs to be updated to handle full type names \(e.g., System.Int32\) or more complex layout logic. For now, the patched test artifacts ensure the tests verify the runtime behavior correctly.
 
 ---
+SHA-1: 57438d1e34a0a18dfd1f12b3b7d2a70ce371ce4e
+
+* feat: nested keyed topics
+
+By applying a series of critical fixes to the Code Generator logic, the NestedStructKey\_RoundTrip test now passes successfully. The native crash was caused by malformed \_ops arrays and incorrect key indices/offsets in the generated descriptors, while the assertion failure was due to missing alignment calls in the generated deserializer.
+
+### Summary of Fixes
+
+1. **Descriptor Parser \(Structure Size\)**:
+
+    - Updated CalculateStructSize in DescriptorParser.cs to correctly skip arguments for DDS\_OP\_TYPE\_STU \(structs\) inside `ADR` ops. This ensures the parser traverses the instruction stream correctly.
+2. **Descriptor Parser \(Offset Reset Bug\)**:
+
+    - Fixed a critical bug in ResolveOffsets where the field offset counter was not reset upon encountering DDS\_OP\_RTS \(Return To Subroutine\). This caused offsets for nested struct fields \(like ProcessAddress\) to be calculated cumulatively from the previous struct, resulting in wildly incorrect access \(e.g., offset 32 instead of 0\) and crashing the native runtime.
+3. **Descriptor Parser \(Key Index/Offset Parsing\)**:
+
+    - In DescriptorParser.cs, updated the regex logic for methods parsing dds\_key\_descriptor\_t initializers.
+    - The second element \(previously treated as a byte offset and ignored\) is actually the **Ops Index** \(referenced by `m_offset` in the native struct for `KOF` operations\).
+    - The third element is the Key Order \(not the index\).
+    - Disabled the logic that forced Offset = 0. The parser now populates Offset with the correct Ops Index \(e.g., 16, 18, 21\), which allows the native runtime to locate the key definitions correctly.
+4. **Deserializer Emitter \(Alignment Bug\)**:
+
+    - Fixed GetAlignment in DeserializerEmitter.cs to handle fully qualified primitive names \(e.g., `system.double`\). Previously, it defaulted to 1 for these types, causing reader.Align\(8\) calls to be omitted. This led to TimeStamp \(double\) being read from an unaligned position, resulting in incorrect values \(0\).
+
+### Verification
+
+The NestedStructKey\_RoundTrip test passed.
+

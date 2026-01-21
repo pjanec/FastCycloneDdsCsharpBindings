@@ -14,9 +14,7 @@
 
   <Target Name="CycloneDDSCodeGen" BeforeTargets="CoreCompile">
     <PropertyGroup>
-      <CodeGenToolPath>$(MSBuildThisFileDirectory)..\tools\net8.0\CycloneDDS.CodeGen.exe</CodeGenToolPath>
-      <!-- Use explicit path to tool if not packed yet. Adjust as needed for dev env vs nuget package. -->
-      <!-- In dev workspace, we might rely on the build output directly. -->
+        <CodeGenToolPath>$(MSBuildThisFileDirectory)bin\Debug\net8.0\CycloneDDS.CodeGen.exe</CodeGenToolPath>
       
       <SourcePath>$(MSBuildProjectDirectory)</SourcePath>
       <OutputPath>$(MSBuildProjectDirectory)\obj\Generated</OutputPath>
@@ -45,4 +43,3 @@
   </Target>
 
 </Project>
-
