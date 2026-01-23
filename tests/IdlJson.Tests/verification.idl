@@ -1,0 +1,156 @@
+module Verification {
+    // ========== ENUMS ==========
+    enum Color { RED, GREEN, BLUE, YELLOW };
+    enum Status { PENDING, ACTIVE, SUSPENDED, TERMINATED };
+    enum Priority { LOW, MEDIUM, HIGH, CRITICAL };
+    
+    // ========== BASIC STRUCTS ==========
+    struct Point2D {
+        double x;
+        double y;
+    };
+
+    struct Point3D {
+        double x;
+        double y;
+        double z;
+    };
+
+    struct NestedStruct {
+        char c;
+        long l;
+        short s;
+    };
+
+    // ========== UNIONS ==========
+    union Shape switch(long) {
+        case 1: Point2D p2d;
+        case 2: Point3D p3d;
+        case 3: long radius;
+    };
+
+    union Value switch(boolean) {
+        case TRUE: double dbl;
+        case FALSE: string str;
+    };
+
+    union IntUnion switch(short) {
+        case 1: octet byte_val;
+        case 2: short short_val;
+        case 3: long long_val;
+    };
+
+    // ========== TEST TOPIC 1: All Primitive Types ==========
+    @topic
+    struct AllPrimitives {
+        @key long id;
+        boolean bool_field;
+        char char_field;
+        octet octet_field;
+        short short_field;
+        unsigned short ushort_field;
+        long long_field;
+        unsigned long ulong_field;
+        long long llong_field;
+        unsigned long long ullong_field;
+        float float_field;
+        double double_field;
+    };
+
+    // ========== TEST TOPIC 2: Composite Key ==========
+    @topic
+    struct CompositeKey {
+        @key string<32> region;
+        @key long zone;
+        @key short sector;
+        string<64> name;
+        double value;
+    };
+
+    // ========== TEST TOPIC 3: Nested Key ==========
+    struct Location {
+        @key long building;
+        @key short floor;
+        long room;
+    };
+
+    @topic
+    struct NestedKeyTopic {
+        @key Location location;
+        string<128> description;
+        double temperature;
+    };
+
+    // ========== TEST TOPIC 4: Sequences ==========
+    typedef string<16> BoundedString16;
+    
+    @topic
+    struct SequenceTopic {
+        @key long id;
+        sequence<long> unbounded_seq;
+        sequence<long, 10> bounded_seq;
+        sequence<double> double_seq;
+        sequence<BoundedString16> string_seq;
+    };
+
+    // ========== TEST TOPIC 5: Nested Sequences ==========
+    typedef sequence<long> LongSeq;
+    typedef sequence<double, 5> BoundedDoubleSeq;
+    
+    @topic
+    struct NestedSequences {
+        @key long id;
+        sequence<LongSeq> matrix;
+        sequence<BoundedDoubleSeq, 10> bounded_matrix;
+    };
+
+    // ========== TEST TOPIC 6: Arrays ==========
+    @topic
+    struct ArrayTopic {
+        @key long id;
+        long array_1d[10];
+        double array_2d[3][3];
+        short array_3d[2][3][4];
+        char char_array[20];
+    };
+
+    // ========== TEST TOPIC 7: Strings ==========
+    @topic
+    struct StringTopic {
+        @key string<32> key_str;
+        string unbounded_str;
+        string<64> bounded_str;
+        string<128> description;
+    };
+
+    // ========== TEST TOPIC 8: Optional Fields ==========
+    @topic
+    struct OptionalFields {
+        @key long id;
+        @optional long opt_long;
+        @optional double opt_double;
+        @optional string<64> opt_string;
+        @optional NestedStruct opt_struct;
+    };
+
+    // ========== TEST TOPIC 9: Mixed Content ==========
+    @topic
+    struct MixedContent {
+        @key long id;
+        Color primary_color;
+        NestedStruct details;
+        Shape geometry;
+        sequence<long> history;
+        string<64> description;
+        long matrix[2][2];
+    };
+
+    // ========== TEST TOPIC 10: Union Topic ==========
+    @topic
+    struct UnionTopic {
+        @key long id;
+        Shape shape_val;
+        Value generic_val;
+        IntUnion int_val;
+    };
+};
