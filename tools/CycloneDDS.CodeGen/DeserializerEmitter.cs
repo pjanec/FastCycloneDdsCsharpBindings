@@ -594,21 +594,28 @@ namespace CycloneDDS.CodeGen
         private int GetAlignment(string typeName)
         {
             if (typeName == "string") return 4;
-            if (typeName.StartsWith("BoundedSeq") || typeName.Contains("BoundedSeq<") || typeName.EndsWith("[]")) return 4;
+            if (typeName.EndsWith("[]")) return 4;
+            if (typeName.StartsWith("BoundedSeq") || typeName.Contains("BoundedSeq<")) return 4;
+            if (typeName.StartsWith("List") || typeName.StartsWith("System.Collections.Generic.List")) return 4;
             if (typeName.Contains("FixedString")) return 1;
 
-            return (typeName.StartsWith("System.") ? typeName.Substring(7) : typeName).ToLower() switch
+            string t = typeName;
+            if (t.StartsWith("System.")) t = t.Substring(7);
+            t = t.ToLowerInvariant();
+
+            return t switch
             {
                 "byte" or "uint8" or "sbyte" or "int8" or "bool" or "boolean" => 1,
                 "short" or "int16" or "ushort" or "uint16" => 2,
-                "int" or "int32" or "uint" or "uint32" or "float" or 
-                "vector2" or "numerics.vector2" or
-                "vector3" or "numerics.vector3" or
-                "vector4" or "numerics.vector4" or
-                "quaternion" or "numerics.quaternion" or
+                "int" or "int32" or "uint" or "uint32" or "float" or "single" => 4,
+                "vector2" or "numerics.vector2" => 4,
+                "vector3" or "numerics.vector3" => 4,
+                "vector4" or "numerics.vector4" => 4,
+                "quaternion" or "numerics.quaternion" => 4,
                 "matrix4x4" or "numerics.matrix4x4" => 4,
-                "long" or "int64" or "ulong" or "uint64" or "double" or
-                "datetime" or "timespan" or "datetimeoffset" => 8, // Forced 4-byte alignment for XCDR2
+                
+                "long" or "int64" or "ulong" or "uint64" or "double" => 8,
+                "datetime" or "timespan" or "datetimeoffset" => 8,
                 "guid" => 1,
                 _ => 1
             };

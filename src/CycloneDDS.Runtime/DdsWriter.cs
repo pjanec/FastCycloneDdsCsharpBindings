@@ -106,8 +106,12 @@ namespace CycloneDDS.Runtime
             try
             {
                 // Set Data Representation and Encoding based on Extensibility
+                // We default to XCDR2 for all standard extensibility kinds (Final, Appendable, Mutable).
+                // XCDR2 limits alignment to 4 bytes, which ensures compatibility with Native CycloneDDS
+                // expectations and our generated serializer logic.
                 if (_extensibilityKind == DdsExtensibilityKind.Appendable || 
-                    _extensibilityKind == DdsExtensibilityKind.Mutable)
+                    _extensibilityKind == DdsExtensibilityKind.Mutable ||
+                    _extensibilityKind == DdsExtensibilityKind.Final)
                 {
                     // XCDR2
                     short[] reps = { DdsApi.DDS_DATA_REPRESENTATION_XCDR2 };
@@ -116,7 +120,7 @@ namespace CycloneDDS.Runtime
                 }
                 else
                 {
-                    // XCDR1 (Final)
+                    // Fallback for unknown kinds - default to XCDR1
                     short[] reps = { DdsApi.DDS_DATA_REPRESENTATION_XCDR1 };
                     DdsApi.dds_qset_data_representation(actualQos, 1, reps);
                     _encoding = CdrEncoding.Xcdr1;

@@ -389,15 +389,32 @@ namespace CycloneDDS.CodeGen
                 "long" or "int64" or "ulong" or "uint64" or "double";
         }
         
-        private int GetAlignment(string typeName, bool isXcdr2 = false)
+        private int GetAlignment(string typeName)
         {
-            return (typeName.StartsWith("System.") ? typeName.Substring(7) : typeName).ToLower() switch
+            if (typeName == "string") return 4;
+            if (typeName.EndsWith("[]")) return 4;
+            if (typeName.StartsWith("BoundedSeq") || typeName.Contains("BoundedSeq<")) return 4;
+            if (typeName.StartsWith("List") || typeName.StartsWith("System.Collections.Generic.List")) return 4;
+            if (typeName.Contains("FixedString")) return 1;
+
+            string t = typeName;
+            if (t.StartsWith("System.")) t = t.Substring(7);
+            t = t.ToLowerInvariant();
+            
+            return t switch
             {
                 "byte" or "uint8" or "sbyte" or "int8" or "bool" or "boolean" => 1,
                 "short" or "int16" or "ushort" or "uint16" => 2,
-                "int" or "int32" or "uint" or "uint32" or "float" => 4,
+                "int" or "int32" or "uint" or "uint32" or "float" or "single" => 4,
+                "vector2" or "numerics.vector2" => 4,
+                "vector3" or "numerics.vector3" => 4,
+                "vector4" or "numerics.vector4" => 4,
+                "quaternion" or "numerics.quaternion" => 4,
+                "matrix4x4" or "numerics.matrix4x4" => 4,
+                
                 "long" or "int64" or "ulong" or "uint64" or "double" => 8,
-                "system.int64" or "system.uint64" or "system.double" => 8,
+                "datetime" or "timespan" or "datetimeoffset" => 8,
+                "guid" => 1,
                 _ => 1
             };
         }
@@ -440,7 +457,7 @@ namespace CycloneDDS.CodeGen
             {
                 string dummy = "0";
                 if (method == "WriteBool") dummy = "false";
-                int align = GetAlignment(field.TypeName, isXcdr2); string alignA = align.ToString();
+                int align = GetAlignment(field.TypeName); string alignA = align.ToString();
                 return $"sizer.Align({align}); sizer.{method}({dummy})";
             }
 
@@ -494,7 +511,7 @@ namespace CycloneDDS.CodeGen
             string? method = TypeMapper.GetWriterMethod(field.TypeName);
             if (method != null)
             {
-                int align = GetAlignment(field.TypeName, isXcdr2);
+                int align = GetAlignment(field.TypeName);
                 string alignA = align == 8 ? "writer.IsXcdr2 ? 4 : 8" : align.ToString();
                 return $"writer.Align({alignA}); writer.{method}({fieldAccess})";
             }
@@ -517,7 +534,7 @@ namespace CycloneDDS.CodeGen
 
             if (TypeMapper.IsBlittable(elementType))
             {
-                int align = GetAlignment(elementType, isXcdr2); string alignA = align.ToString();
+                int align = GetAlignment(elementType); string alignA = align.ToString();
                 int size = TypeMapper.GetSize(elementType);
                 
                 return $@"sizer.Align(4); sizer.WriteUInt32(0); // Length
@@ -534,7 +551,7 @@ namespace CycloneDDS.CodeGen
             {
                 string dummy = "0";
                 if (sizerMethod == "WriteBool") dummy = "false";
-                int align = GetAlignment(elementType, isXcdr2); string alignA = align.ToString();
+                int align = GetAlignment(elementType); string alignA = align.ToString();
                 return $@"sizer.Align(4); sizer.WriteUInt32(0); // Length
                 for (int i = 0; i < {fieldAccess}.Length; i++)
                 {{
@@ -566,7 +583,7 @@ namespace CycloneDDS.CodeGen
 
             if (TypeMapper.IsBlittable(elementType))
             {
-                int align = GetAlignment(elementType, isXcdr2);
+                int align = GetAlignment(elementType);
                 string alignA = align == 8 ? "writer.IsXcdr2 ? 4 : 8" : align.ToString();
                 return $@"writer.Align(4);
             writer.WriteUInt32((uint){fieldAccess}.Length);
@@ -581,7 +598,7 @@ namespace CycloneDDS.CodeGen
             
             // Loop fallback
             string? writerMethod = TypeMapper.GetWriterMethod(elementType);
-            int alignEl = GetAlignment(elementType, isXcdr2); string alignElA = alignEl == 8 ? "writer.IsXcdr2 ? 4 : 8" : alignEl.ToString();
+            int alignEl = GetAlignment(elementType); string alignElA = alignEl == 8 ? "writer.IsXcdr2 ? 4 : 8" : alignEl.ToString();
             string loopBody;
 
             if (writerMethod != null)
@@ -612,7 +629,7 @@ namespace CycloneDDS.CodeGen
             {
                 string dummy = "0";
                 if (sizerMethod == "WriteBool") dummy = "false";
-                int align = GetAlignment(elementType, isXcdr2); string alignA = align.ToString();
+                int align = GetAlignment(elementType); string alignA = align.ToString();
                 
                 return $@"sizer.Align(4); sizer.WriteUInt32(0); // Sequence Length
             for (int i = 0; i < {fieldAccess}.Count; i++)
@@ -648,7 +665,7 @@ namespace CycloneDDS.CodeGen
             // OPTIMIZATION for BoundedSeq primitives
             if (IsPrimitive(elementType))
             {
-                 int alignP = GetAlignment(elementType, isXcdr2);
+                 int alignP = GetAlignment(elementType);
                  string alignAP = alignP == 8 ? "writer.IsXcdr2 ? 4 : 8" : alignP.ToString();
                  // BoundedSeq exposes AsSpan() which internally uses CollectionsMarshal
                  return $@"writer.Align(4); 
@@ -663,7 +680,7 @@ namespace CycloneDDS.CodeGen
             }
             
             string? writerMethod = TypeMapper.GetWriterMethod(elementType);
-            int align = GetAlignment(elementType, isXcdr2);
+            int align = GetAlignment(elementType);
             string alignA = align == 8 ? "writer.IsXcdr2 ? 4 : 8" : align.ToString();
             
             string loopBody;
@@ -700,33 +717,7 @@ namespace CycloneDDS.CodeGen
             }}";
         }
 
-        private int GetAlignment(string typeName)
-        {
-            if (typeName == "string") return 4;
-            if (typeName.StartsWith("BoundedSeq") || typeName.EndsWith("[]")) return 4;
-            if (typeName.Contains("FixedString")) return 1;
-            
-            return (typeName.StartsWith("System.") ? typeName.Substring(7) : typeName).ToLower() switch
-            {
-                "byte" or "uint8" or "sbyte" or "int8" or "bool" or "boolean" or
-                "system.byte" or "system.sbyte" or "system.boolean" => 1,
-                "short" or "int16" or "ushort" or "uint16" or
-                "system.int16" or "system.uint16" => 2,
-                "int" or "int32" or "uint" or "uint32" or "float" or "single" or
-                "system.int32" or "system.uint32" or "system.single" or
-                "system.numerics.vector2" or
-                "system.numerics.vector3" or
-                "system.numerics.vector4" or
-                "system.numerics.quaternion" or
-                "system.numerics.matrix4x4" => 4,
-                "long" or "int64" or "ulong" or "uint64" or "double" or
-                "system.int64" or "system.uint64" or "system.double" or
-                "system.datetime" or "system.timespan" or
-                "system.datetimeoffset" => 8,
-                "system.guid" => 1,
-                _ => 1
-            };
-        }
+
 
         private string ExtractSequenceElementType(string typeName)
         {
@@ -806,7 +797,7 @@ namespace CycloneDDS.CodeGen
              // OPTIMIZATION: Block copy for primitives
              if (IsPrimitive(elementType))
              {
-                 int alignP = GetAlignment(elementType, isXcdr2);
+                 int alignP = GetAlignment(elementType);
                  string alignAP = alignP == 8 ? "writer.IsXcdr2 ? 4 : 8" : alignP.ToString();
                  return $@"writer.Align(4); 
             writer.WriteUInt32((uint){fieldAccess}.Count);
@@ -820,7 +811,7 @@ namespace CycloneDDS.CodeGen
              }
              
              string? writerMethod = TypeMapper.GetWriterMethod(elementType);
-             int align = GetAlignment(elementType, isXcdr2);
+             int align = GetAlignment(elementType);
              string alignA = align == 8 ? "writer.IsXcdr2 ? 4 : 8" : align.ToString();
              
              bool isEnum = false;
@@ -871,7 +862,7 @@ namespace CycloneDDS.CodeGen
             {
                 string dummy = "0";
                 if (sizerMethod == "WriteBool") dummy = "false";
-                int align = GetAlignment(elementType, isXcdr2); string alignA = align.ToString();
+                int align = GetAlignment(elementType); string alignA = align.ToString();
                 
                 return $@"sizer.Align(4); sizer.WriteUInt32(0); // Sequence Length
             foreach (var item in {fieldAccess})

@@ -47,8 +47,9 @@ namespace CycloneDDS.Core
 
         public void Align(int alignment)
         {
-            int currentPos = Position;
-            int padding = (alignment - (currentPos % alignment)) & (alignment - 1);
+            int currentPos = Position - 4; // Adjust for Header
+            int mask = alignment - 1;
+            int padding = (alignment - (currentPos & mask)) & mask;
             if (padding > 0)
             {
                 EnsureSize(padding);
