@@ -1,9 +1,0 @@
-compiled with vs2022 from
-
-https://github.com/pjanec/cyclonedds.git
-466ce26c08b3d68b9b686978548c2fec62081eb2
-branch: pj/exposing-serdata-api
-
-branched from https://github.com/eclipse-cyclonedds/cyclonedds.git  on 17th Jan 2026
-
-

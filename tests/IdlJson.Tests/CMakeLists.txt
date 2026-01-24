@@ -2,7 +2,10 @@ cmake_minimum_required(VERSION 3.16)
 project(IdlJsonVerifier C)
 
 # --- Configuration ---
-set(CYCLONE_INSTALL_DIR "D:/Work/FastCycloneDdsCsharpBindings/cyclone-compiled")
+if(NOT DEFINED CYCLONE_INSTALL_DIR)
+    get_filename_component(REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
+    set(CYCLONE_INSTALL_DIR "${REPO_ROOT}/cyclone-compiled")
+endif()
 set(IDLC_EXE "${CYCLONE_INSTALL_DIR}/bin/idlc.exe")
 
 # --- Find CycloneDDS ---

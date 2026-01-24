@@ -54,3 +54,5 @@ nunit-*.xml
 .vscode/
 .obsolete
 .dumps
+cyclone-compiled/
+cyclone-compiled-debug/
