@@ -280,6 +280,10 @@ namespace CycloneDDS.Runtime.Interop
         [DllImport(DLL_NAME)]
         public static extern void dds_delete_qos(IntPtr qos);
 
+        public const short DDS_DATA_REPRESENTATION_XCDR1 = 0;
+        public const short DDS_DATA_REPRESENTATION_XML   = 1;
+        public const short DDS_DATA_REPRESENTATION_XCDR2 = 2;
+
         // Data Representation QoS
         [DllImport(DLL_NAME)]
         public static extern void dds_qset_data_representation(
@@ -304,9 +308,6 @@ namespace CycloneDDS.Runtime.Interop
 
         public const int DDS_HISTORY_KEEP_LAST = 0;
         public const int DDS_HISTORY_KEEP_ALL = 1;
-
-        public const uint DDS_DATA_REPRESENTATION_XCDR1 = 0;
-        public const uint DDS_DATA_REPRESENTATION_XCDR2 = 1;
 
         // Status Structs
         [StructLayout(LayoutKind.Sequential)]

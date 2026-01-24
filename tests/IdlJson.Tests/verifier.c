@@ -99,6 +99,19 @@ int verify_descriptor(const char* type_name, const dds_topic_descriptor_t* desc,
         } \
     } while(0)
 
+// Macro to verify RoundtripTests topics
+#define VERIFY_ROUNDTRIP_TOPIC(TYPE_NAME, C_TYPE) \
+    do { \
+        cJSON* jNode = find_type(json, "RoundtripTests::" TYPE_NAME); \
+        if (jNode) { \
+            ASSERT_EQ("sizeof(RoundtripTests::" TYPE_NAME ")", sizeof(RoundtripTests_##C_TYPE), \
+                      cJSON_GetObjectItem(jNode, "Size")->valueint); \
+            verify_descriptor("RoundtripTests::" TYPE_NAME, &RoundtripTests_##C_TYPE##_desc, jNode, &errors); \
+        } else { \
+            printf("[SKIP] Type RoundtripTests::%s not found in JSON\n", TYPE_NAME); \
+        } \
+    } while(0)
+
 // Macro to verify struct/union size only
 #define VERIFY_SIZE(TYPE_NAME, C_TYPE) \
     do { \
@@ -153,6 +166,11 @@ int main(int argc, char** argv) {
     VERIFY_TOPIC("MixedContent", MixedContent);
     VERIFY_TOPIC("UnionTopic", UnionTopic);
     VERIFY_TOPIC("TypedefStruct", TypedefStruct);
+
+    // Verify RoundtripTests topics
+    VERIFY_ROUNDTRIP_TOPIC("AllPrimitives", AllPrimitives);
+    VERIFY_ROUNDTRIP_TOPIC("CompositeKey", CompositeKey);
+    VERIFY_ROUNDTRIP_TOPIC("NestedKeyTopic", NestedKeyTopic);
 
     printf("\n==================================================\n");
     if (errors == 0) printf("RESULT: PASSED (All %d topics verified)\n", 10);

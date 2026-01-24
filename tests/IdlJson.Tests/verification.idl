@@ -166,3 +166,61 @@ module Verification {
         AgeArray recent_ages;
     };
 };
+
+module RoundtripTests {
+    enum Priority { 
+        LOW, 
+        MEDIUM, 
+        HIGH, 
+        CRITICAL 
+    };
+    
+    struct Timestamp {
+        long long seconds;
+        unsigned long nanoseconds;
+    };
+
+    struct Location {
+        @key long building;
+        @key short floor;
+        long room;
+    };
+    
+    @topic
+    struct AllPrimitives {
+        @key long id;
+        boolean bool_field;
+        char char_field;
+        octet octet_field;
+        short short_field;
+        unsigned short ushort_field;
+        long long_field;
+        unsigned long ulong_field;
+        long long llong_field;
+        unsigned long long ullong_field;
+        float float_field;
+        double double_field;
+    };
+
+    @topic
+    @appendable
+    struct CompositeKey {
+        @key string<32> region;
+        @key long zone;
+        @key short sector;
+        
+        string<64> name;
+        double value;
+        Priority priority;
+    };
+
+    @topic
+    @appendable
+    struct NestedKeyTopic {
+        @key Location location;
+        
+        string<128> description;
+        double temperature;
+        Timestamp last_updated;
+    };
+};

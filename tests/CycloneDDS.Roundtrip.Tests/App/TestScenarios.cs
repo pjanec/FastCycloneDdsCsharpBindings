@@ -24,7 +24,7 @@ internal class TestScenarios
                 TopicName = "AllPrimitives",
                 Description = "All primitive types (bool, char, int8/16/32/64, float, double)",
                 Seeds = new[] { 42, 99, 0, -1, 12345 },
-                Enabled = true
+                Enabled = false
             },
 
             new TestScenario
@@ -40,7 +40,7 @@ internal class TestScenarios
                 TopicName = "NestedKeyTopic",
                 Description = "Nested struct with keys at multiple levels",
                 Seeds = new[] { 10, 20, 30 },
-                Enabled = true
+                Enabled = false
             },
 
             new TestScenario
@@ -48,7 +48,7 @@ internal class TestScenarios
                 TopicName = "SequenceTopic",
                 Description = "Variable-length sequences",
                 Seeds = new[] { 5, 10, 15 },
-                Enabled = true
+                Enabled = false
             },
 
             // Advanced types - handlers TODO

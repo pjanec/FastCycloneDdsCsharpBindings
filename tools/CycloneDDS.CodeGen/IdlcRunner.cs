@@ -83,7 +83,7 @@ namespace CycloneDDS.CodeGen
             var startInfo = new ProcessStartInfo
             {
                 FileName = idlcPath,
-                Arguments = $"-l c -o \"{outputDir}\" \"{idlFilePath}\"",
+                Arguments = $"-l json -o \"{outputDir}\" \"{idlFilePath}\"",
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -112,15 +112,12 @@ namespace CycloneDDS.CodeGen
         
         private string[] FindGeneratedFiles(string outputDir, string idlFile)
         {
-            // idlc generates: <basename>.c and <basename>.h
-            // Note: idlc might change casing or handle underscores differently, but usually it matches basename.
+            // idlc -l json generates: <basename>.json
             string baseName = Path.GetFileNameWithoutExtension(idlFile);
-            var cFile = Path.Combine(outputDir, baseName + ".c");
-            var hFile = Path.Combine(outputDir, baseName + ".h");
+            var jsonFile = Path.Combine(outputDir, baseName + ".json");
             
             var files = new System.Collections.Generic.List<string>();
-            if (File.Exists(cFile)) files.Add(cFile);
-            if (File.Exists(hFile)) files.Add(hFile);
+            if (File.Exists(jsonFile)) files.Add(jsonFile);
             
             return files.ToArray();
         }

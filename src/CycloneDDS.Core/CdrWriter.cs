@@ -60,6 +60,7 @@ namespace CycloneDDS.Core
         public void WriteInt32(int value)
         {
             EnsureSize(sizeof(int));
+            Console.WriteLine($"[CdrWriter] WriteInt32 Val={value} @ {_buffered} (Hex {value:X})");
             BinaryPrimitives.WriteInt32LittleEndian(_span.Slice(_buffered), value);
             _buffered += sizeof(int);
         }
@@ -123,6 +124,7 @@ namespace CycloneDDS.Core
         public void WriteDouble(double value)
         {
             EnsureSize(sizeof(double));
+            Console.WriteLine($"[CdrWriter] WriteDouble Val={value} @ {_buffered}");
             long val = BitConverter.DoubleToInt64Bits(value);
             BinaryPrimitives.WriteInt64LittleEndian(_span.Slice(_buffered), val);
             _buffered += sizeof(double);
@@ -169,6 +171,7 @@ namespace CycloneDDS.Core
         {
             int utf8Length = System.Text.Encoding.UTF8.GetByteCount(value);
             bool useXcdr2 = isXcdr2 ?? (_encoding == CdrEncoding.Xcdr2);
+            Console.WriteLine($"[CdrWriter] WriteString Str='{value.ToString()}' Utf8Len={utf8Length} UseXcdr2={useXcdr2} @ {_buffered}");
             
             // EXPERIMENTAL FIX: CycloneDDS native seems to expect NUL-terminated strings even in XCDR2
             // causing "normalize_string: NUL check failed"

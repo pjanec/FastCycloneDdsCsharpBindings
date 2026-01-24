@@ -4,6 +4,7 @@ using System.Linq;
 using System.Collections.Generic;
 using Microsoft.CodeAnalysis;
 using CycloneDDS.Schema;
+using CycloneDDS.CodeGen.IdlJson;
 
 namespace CycloneDDS.CodeGen
 {
@@ -203,14 +204,15 @@ namespace CycloneDDS.CodeGen
                 .GroupBy(t => t.TargetIdlFile);
 
             var idlcRunner = new IdlcRunner();
+            var jsonParser = new IdlJsonParser();
             var processedIdlFiles = new HashSet<string>();
             var localFileGroups = fileGroups.ToList();
             Console.WriteLine($"[DEBUG] Found {localFileGroups.Count} file groups");
             foreach(var g in localFileGroups) Console.WriteLine($"[DEBUG] Group: {g.Key}");
 
-            // Phase 4a: Compile C Stubs (ALL)
-            string tempCGroup = Path.Combine(outputDir, "temp_c");
-            if (!Directory.Exists(tempCGroup)) Directory.CreateDirectory(tempCGroup);
+            // Phase 4a: Compile to JSON (ALL IDL files)
+            string tempJsonDir = Path.Combine(outputDir, "temp_json");
+            if (!Directory.Exists(tempJsonDir)) Directory.CreateDirectory(tempJsonDir);
 
             foreach (var group in localFileGroups)
             {
@@ -219,8 +221,8 @@ namespace CycloneDDS.CodeGen
                 
                 if (!processedIdlFiles.Contains(idlFileName))
                 {
-                    Console.WriteLine($"[DEBUG] Running IDLC for {idlFileName} at {idlPath}");
-                    var result = idlcRunner.RunIdlc(idlPath, tempCGroup);
+                    Console.WriteLine($"[DEBUG] Running IDLC -l json for {idlFileName} at {idlPath}");
+                    var result = idlcRunner.RunIdlc(idlPath, tempJsonDir);
                     if (result.ExitCode != 0)
                     {
                          Console.Error.WriteLine($"    idlc failed for {idlFileName}: {result.StandardError}");
@@ -230,42 +232,66 @@ namespace CycloneDDS.CodeGen
                 }
             }
             
-            // Phase 4b: Parse Descriptors
-            var parser = new DescriptorParser();
+            // Phase 4b: Parse JSON and Generate Descriptors
             foreach (var group in localFileGroups)
             {
                 string idlFileName = group.Key;
-                string cFile = Path.Combine(tempCGroup, $"{idlFileName}.c");
+                string jsonFile = Path.Combine(tempJsonDir, $"{idlFileName}.json");
                 
-                if (File.Exists(cFile))
+                if (File.Exists(jsonFile))
                 {
-                    foreach(var topic in group)
+                    try
                     {
-                         if (topic.TypeInfo == null) continue;
-                         if (topic.TypeInfo.IsEnum) continue;
+                        var jsonTypes = jsonParser.Parse(jsonFile);
+                        Console.WriteLine($"[DEBUG] Parsed {jsonTypes.Count} types from {jsonFile}");
+                        
+                        foreach(var topic in group)
+                        {
+                            if (topic.TypeInfo == null) continue;
+                            if (topic.TypeInfo.IsEnum) continue;
 
-                         try 
-                         {
-                             var metadata = parser.ParseDescriptor(cFile, topic.TypeInfo.Name);
-                             var descCode = GenerateDescriptorCode(topic.TypeInfo, metadata);
-                             File.WriteAllText(Path.Combine(outputDir, $"{topic.TypeInfo.Name}.Descriptor.cs"), descCode);
-                             Console.WriteLine($"    Generated {topic.TypeInfo.Name}.Descriptor.cs");
-                         }
-                         catch (Exception ex)
-                         {
-                             Console.Error.WriteLine($"    Descriptor parsing failed for {topic.TypeInfo.Name}: {ex.Message}");
-                         }
+                            try 
+                            {
+                                // Match C# type to JSON type
+                                // C#: MyNamespace.MyTopic
+                                // IDL/JSON: MyNamespace::MyTopic
+                                string idlName = topic.CSharpFullName.Replace(".", "::");
+                                
+                                var jsonDef = jsonParser.FindType(jsonTypes, idlName);
+                                
+                                if (jsonDef != null && jsonDef.TopicDescriptor != null)
+                                {
+                                    // Generate descriptor code from JSON metadata
+                                    var descCode = GenerateDescriptorCodeFromJson(topic.TypeInfo, jsonDef.TopicDescriptor);
+                                    File.WriteAllText(Path.Combine(outputDir, $"{topic.TypeInfo.Name}.Descriptor.cs"), descCode);
+                                    Console.WriteLine($"    Generated {topic.TypeInfo.Name}.Descriptor.cs");
+                                }
+                                else
+                                {
+                                    Console.WriteLine($"    Warning: No topic descriptor found for {topic.TypeInfo.Name} (IDL: {idlName})");
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.Error.WriteLine($"    Descriptor generation failed for {topic.TypeInfo.Name}: {ex.Message}");
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.Error.WriteLine($"    JSON parsing failed for {idlFileName}: {ex.Message}");
                     }
                 }
             }
         }
 
-        private string GenerateDescriptorCode(TypeInfo topic, DescriptorMetadata metadata)
+        private string GenerateDescriptorCodeFromJson(TypeInfo topic, IdlJson.JsonTopicDescriptor descriptor)
         {
             var sb = new System.Text.StringBuilder();
             sb.AppendLine("using System;");
             sb.AppendLine("using CycloneDDS.Runtime;");
             sb.AppendLine();
+            
             if (!string.IsNullOrEmpty(topic.Namespace))
             {
                 sb.AppendLine($"namespace {topic.Namespace}");
@@ -275,26 +301,35 @@ namespace CycloneDDS.CodeGen
             sb.AppendLine($"    public partial struct {topic.Name}");
             sb.AppendLine("    {");
             
-            sb.Append("        private static readonly uint[] _ops = new uint[] {");
-            if (metadata.OpsValues != null && metadata.OpsValues.Length > 0)
+            // OPS - Direct from JSON (no calculation needed!)
+            sb.Append("        private static readonly uint[] _ops = new uint[] { ");
+            if (descriptor.Ops != null && descriptor.Ops.Length > 0)
             {
-                 sb.Append(string.Join(", ", metadata.OpsValues));
+                var opsString = string.Join(", ", descriptor.Ops.Select(op => (uint)op));
+                sb.Append(opsString);
             }
-            sb.AppendLine("};");
-
-            sb.AppendLine();
+            sb.AppendLine(" };");
             sb.AppendLine("        public static uint[] GetDescriptorOps() => _ops;");
-            
-            if (metadata.KeyDescriptors != null && metadata.KeyDescriptors.Length > 0)
+
+            // KEYS - Calculate Op Indices based on KOF instructions
+            if (descriptor.Keys != null && descriptor.Keys.Count > 0)
             {
+                var keyIndices = CalculateKeyOpIndices(descriptor.Ops, descriptor.Keys);
+
                 sb.AppendLine();
                 sb.AppendLine("        private static readonly DdsKeyDescriptor[] _keys = new DdsKeyDescriptor[]");
                 sb.AppendLine("        {");
-                foreach(var key in metadata.KeyDescriptors)
+                foreach(var key in descriptor.Keys)
                 {
-                    var field = topic.Fields.FirstOrDefault(f => string.Equals(f.Name, key.Name, StringComparison.OrdinalIgnoreCase));
+                    // Match field name to C# casing (JSON might have different casing)
+                    var field = topic.Fields.FirstOrDefault(f => 
+                        string.Equals(f.Name, key.Name, StringComparison.OrdinalIgnoreCase));
                     string fieldName = field != null ? field.Name : key.Name;
-                    sb.AppendLine($"            new DdsKeyDescriptor {{ Name = \"{fieldName}\", Offset = {key.Offset}, Index = {key.Index} }},");
+                    
+                    // Use calculated Op Index (keyIndices) instead of byte Offset
+                    uint opIndex = keyIndices.ContainsKey(key.Name) ? keyIndices[key.Name] : 0;
+
+                    sb.AppendLine($"            new DdsKeyDescriptor {{ Name = \"{fieldName}\", Offset = {opIndex}, Index = {key.Order} }},");
                 }
                 sb.AppendLine("        };");
                 sb.AppendLine("        public static DdsKeyDescriptor[] GetKeyDescriptors() => _keys;");
@@ -304,12 +339,17 @@ namespace CycloneDDS.CodeGen
                 sb.AppendLine("        public static DdsKeyDescriptor[] GetKeyDescriptors() => null;");
             }
 
+            // FLAGSET
+            sb.AppendLine();
+            sb.AppendLine($"        public static uint GetDescriptorFlagset() => {descriptor.FlagSet};");
+
             sb.AppendLine("    }");
             
             if (!string.IsNullOrEmpty(topic.Namespace))
             {
                 sb.AppendLine("}");
             }
+            
             return sb.ToString(); 
         }
 
@@ -325,6 +365,83 @@ namespace CycloneDDS.CodeGen
                 }
             }
             return typeName.TrimEnd('?');
+        }
+
+        private Dictionary<string, uint> CalculateKeyOpIndices(long[] ops, List<IdlJson.JsonKeyDescriptor> keys)
+        {
+            var result = new Dictionary<string, uint>();
+            
+            // Reconstruct the key order from JSON order to match KOF Instructions
+            // Note: ops and keys are inputs.
+            // Assumption: KOF instructions appear in the Ops stream in the same order as Keys.
+            // But KOF instructions might be grouped (DDS_OP_KOF | n).
+            
+            if (ops == null || ops.Length == 0 || keys == null || keys.Count == 0) return result;
+            
+            // Sort keys by Order to match KOF structure expectation
+            var sortedKeys = keys.OrderBy(k => k.Order).ToList();
+            int currentKeyIndex = 0;
+
+            // Scan Ops for KOF
+            for (int i = 0; i < ops.Length; i++)
+            {
+                uint op = (uint)ops[i];
+                uint opcode = (op & 0xFF000000); // Top 8 bits
+
+                if (opcode == 0x07000000) // DDS_OP_KOF
+                {
+                    // Count of keys in this KOF block
+                    // DDS_OP_KOF = 0x07 << 24
+                    // Count = op & 0x00FFFFFF? No wait.
+                    // Verification.c: DDS_OP_KOF | 1 -> 0x07000001
+                    // Verification.c: DDS_OP_KOF | 2 -> 0x07000002
+                    // Yes, low 24 bits are count.
+                    
+                    int count = (int)(op & 0x00FFFFFF);
+                    
+                    // The KOF instruction starts at 'i'. 
+                    // But dds_key_descriptor.m_op_index MUST point to this index 'i'.
+                    // Wait, if KOF covers multiple keys, do they all point to 'i'?
+                    // Or do they point to specific offsets within the KOF block?
+                    //
+                    // DDS Spec regarding dds_key_descriptor_t:
+                    // "m_op_index: index into m_ops for the key descriptor instruction"
+                    //
+                    // If multiple keys are grouped in one KOF (like nested struct keys), 
+                    // does the naive descriptor point to the same KOF instruction?
+                    //
+                    // In verification.c (NestedKeyTopic):
+                    //   /* key: location.building */
+                    //   DDS_OP_KOF | 2, 1u, 0u
+                    //
+                    //   /* key: location.floor */
+                    //   DDS_OP_KOF | 2, 1u, 2u
+                    //
+                    // It seems idlc emits a SEPARATE KOF block for EACH key, even if they look identical?
+                    // 
+                    // Wait. In verification.c for NestedKeyTopic:
+                    // Lines 2348-2353:
+                    //   /* key: location.building */   [Index 13]
+                    //   DDS_OP_KOF | 2, 1u, 0u,  
+                    //   /* key: location.floor */      [Index 16]
+                    //   DDS_OP_KOF | 2, 1u, 2u
+                    //
+                    // Yes! It emits a separate KOF trio for EACH key.
+                    // So we can assume 1 KOF instruction block = 1 Key.
+                    
+                    if (currentKeyIndex < sortedKeys.Count)
+                    {
+                        var key = sortedKeys[currentKeyIndex];
+                        result[key.Name] = (uint)i;
+                        currentKeyIndex++;
+                    }
+                    
+                    // Skip arguments
+                    i += count;
+                }
+            }
+            
+            return result;
         }
 
     }

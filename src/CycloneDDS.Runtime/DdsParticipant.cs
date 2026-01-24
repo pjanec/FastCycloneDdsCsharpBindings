@@ -327,11 +327,21 @@ namespace CycloneDDS.Runtime
             }
             
             // Create descriptor struct
+            uint flagset = 0;
+            try {
+                var flagsMethod = typeof(T).GetMethod("GetDescriptorFlagset", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+                if (flagsMethod != null)
+                {
+                    var result = flagsMethod.Invoke(null, null);
+                    if (result is uint f) flagset = f;
+                }
+            } catch {}
+
             var desc = new DdsTopicDescriptor
             {
                 m_size = (uint)Marshal.SizeOf<T>(), 
                 m_align = GetAlignment(typeof(T)), 
-                m_flagset = 0, 
+                m_flagset = flagset, 
                 m_nkeys = nkeys,
                 m_typename = typeNamePtr,
                 m_keys = keysPtr,
@@ -352,6 +362,8 @@ namespace CycloneDDS.Runtime
 
             return descPtr;
         }
+
+
 
         /// <summary>
         /// Enable sender tracking for this participant.

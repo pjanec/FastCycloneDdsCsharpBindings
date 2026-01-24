@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Buffers;
@@ -44,13 +45,14 @@ namespace CycloneDDS.Runtime
         private static readonly SerializeDelegate? _serializer;
         private static readonly SerializeDelegate? _keySerializer;
         private static readonly GetSerializedSizeDelegate? _sizer;
+        private static readonly DdsExtensibilityKind _extensibilityKind;
 
         static DdsWriter()
         {
             var attr = typeof(T).GetCustomAttribute<DdsExtensibilityAttribute>();
-            var kind = attr?.Kind ?? DdsExtensibilityKind.Appendable;
+            _extensibilityKind = attr?.Kind ?? DdsExtensibilityKind.Appendable;
 
-            switch (kind)
+            switch (_extensibilityKind)
             {
                 case DdsExtensibilityKind.Final:
                     _encodingKindLE = 0x07; // CDR2_LE
@@ -81,13 +83,9 @@ namespace CycloneDDS.Runtime
         private readonly CdrEncoding _encoding;
 
         public DdsWriter(DdsParticipant participant, string topicName, IntPtr qos = default)
-            : this(participant, topicName, qos, CdrEncoding.Xcdr2)
         {
-        }
-
-        public DdsWriter(DdsParticipant participant, string topicName, IntPtr qos, CdrEncoding encoding)
-        {
-            _encoding = encoding;
+            _participant = participant;
+            _topicName = topicName;
             _publicationMatchedHandler = OnPublicationMatched;
 
             if (_sizer == null || _serializer == null)
@@ -95,52 +93,55 @@ namespace CycloneDDS.Runtime
                 throw new InvalidOperationException($"Type {typeof(T).Name} does not exhibit expected DDS generated methods (Serialize, GetSerializedSize).");
             }
 
-            _topicName = topicName;
-            _participant = participant;
+            // QoS Setup
+            IntPtr actualQos = qos;
+            bool ownQos = false;
 
-            // 1. Get or register topic (auto-discovery)
-            // Use original QoS (compatible with existing topics)
-            DdsApi.DdsEntity topic = participant.GetOrRegisterTopic<T>(topicName, qos);
-            _topicHandle = topic;
-
-            // Handle QoS
-            IntPtr writerQos = qos;
-            bool qosCreated = false;
-            if (writerQos == IntPtr.Zero)
+            if (actualQos == IntPtr.Zero)
             {
-                writerQos = DdsApi.dds_create_qos();
-                qosCreated = true;
+                actualQos = DdsApi.dds_create_qos();
+                ownQos = true;
             }
 
             try
             {
-                // Set Data Representation
-                short[] reps;
-                if (encoding == CdrEncoding.Xcdr2)
-                    reps = new short[] { 2 }; // XCDR2
+                // Set Data Representation and Encoding based on Extensibility
+                if (_extensibilityKind == DdsExtensibilityKind.Appendable || 
+                    _extensibilityKind == DdsExtensibilityKind.Mutable)
+                {
+                    // XCDR2
+                    short[] reps = { DdsApi.DDS_DATA_REPRESENTATION_XCDR2 };
+                    DdsApi.dds_qset_data_representation(actualQos, 1, reps);
+                    _encoding = CdrEncoding.Xcdr2;
+                }
                 else
-                    reps = new short[] { 0 }; // XCDR1
-                
-                DdsApi.dds_qset_data_representation(writerQos, 1, reps);
+                {
+                    // XCDR1 (Final)
+                    short[] reps = { DdsApi.DDS_DATA_REPRESENTATION_XCDR1 };
+                    DdsApi.dds_qset_data_representation(actualQos, 1, reps);
+                    _encoding = CdrEncoding.Xcdr1;
+                }
+
+                // 1. Get or register topic (auto-discovery) - Use modified QoS
+                _topicHandle = participant.GetOrRegisterTopic<T>(topicName, actualQos);
 
                 // 2. Create Writer
                 var writer = DdsApi.dds_create_writer(
                     participant.NativeEntity,
-                    topic,
-                    writerQos,
+                    _topicHandle,
+                    actualQos,
                     IntPtr.Zero);
 
-                if (!writer.IsValid)
-                {
-                     throw new DdsException(DdsApi.DdsReturnCode.Error, "Failed to create writer");
-                }
+                if (!writer.IsValid) 
+                    throw new DdsException(DdsApi.DdsReturnCode.Error, "Failed to create writer");
+                
                 _writerHandle = new DdsEntityHandle(writer);
             }
             finally
             {
-                if (qosCreated) DdsApi.dds_delete_qos(writerQos);
+                if (ownQos) DdsApi.dds_delete_qos(actualQos);
             }
-
+            
             // Notify participant (triggers identity publishing if enabled)
             // Skip for the identity writer itself to avoid recursion
             if (typeof(T) != typeof(SenderIdentity))
@@ -474,7 +475,15 @@ namespace CycloneDDS.Runtime
         private static GetSerializedSizeDelegate CreateSizerDelegate()
         {
             var method = typeof(T).GetMethod("GetSerializedSize", new[] { typeof(int), typeof(CdrEncoding) });
-            if (method == null) throw new MissingMethodException(typeof(T).Name, "GetSerializedSize(int, CdrEncoding)");
+            if (method == null)
+            {
+                Console.WriteLine($"[DdsWriter<{typeof(T).Name}>] Method 'GetSerializedSize(int, CdrEncoding)' not found. Available methods:");
+                foreach (var m in typeof(T).GetMethods())
+                {
+                     Console.WriteLine($"  - {m.Name}({string.Join(", ", m.GetParameters().Select(p => p.ParameterType.Name))})");
+                }
+                throw new MissingMethodException(typeof(T).Name, "GetSerializedSize(int, CdrEncoding)");
+            }
 
             var dm = new DynamicMethod(
                 "GetSerializedSizeThunk",

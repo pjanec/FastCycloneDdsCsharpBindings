@@ -274,21 +274,21 @@ EXPORT int Native_CreateSubscriber(const char* topic_name) {
  * @param topic_name Topic name
  * @param seed Seed for data generation
  */
-EXPORT void Native_SendWithSeed(const char* topic_name, int seed) {
+EXPORT int Native_SendWithSeed(const char* topic_name, int seed) {
     printf("[Native] Sending on '%s' with seed %d...\n", topic_name, seed);
     
     const type_handler_t* handler = registry_lookup(topic_name);
     if (handler == NULL) {
         set_error("Type not found");
         printf("[Native] ERROR: %s\n", g_last_error);
-        return;
+        return -1;
     }
     
     entity_entry_t* entry = find_entity(topic_name);
     if (entry == NULL || entry->writer == 0) {
         set_error("Writer not created");
         printf("[Native] ERROR: %s\n", g_last_error);
-        return;
+        return -1;
     }
     
     // Allocate and fill sample
@@ -297,16 +297,19 @@ EXPORT void Native_SendWithSeed(const char* topic_name, int seed) {
     
     // Write to DDS
     int rc = dds_write(entry->writer, sample);
+    int final_result = 0;
     
     if (rc < 0) {
         set_error("dds_write failed");
         printf("[Native] ERROR: %s (rc=%d)\n", g_last_error, rc);
+        final_result = -1;
     } else {
         printf("[Native] Message sent successfully.\n");
     }
     
     // Cleanup
     handler->free_fn(sample);
+    return final_result;
 }
 
 /**
@@ -323,31 +326,32 @@ EXPORT int Native_ExpectWithSeed(const char* topic_name, int expected_seed, int 
     const type_handler_t* handler = registry_lookup(topic_name);
     if (handler == NULL) {
         set_error("Type not found");
-        printf("[Native] ERROR: %s\n", g_last_error);
         return -2;
     }
     
     entity_entry_t* entry = find_entity(topic_name);
     if (entry == NULL || entry->reader == 0) {
         set_error("Reader not created");
-        printf("[Native] ERROR: %s\n", g_last_error);
         return -2;
     }
     
-    // Wait for data loop
+    // Generate reference sample once
+    void* reference = handler->alloc_fn();
+    handler->fill_fn(reference, expected_seed);
+    
     dds_entity_t waitset = dds_create_waitset(g_participant);
     dds_waitset_attach(waitset, entry->reader, entry->reader);
     
     dds_attach_t triggered[1];
     dds_time_t deadline = dds_time() + DDS_MSECS(timeout_ms);
     
-    // Prepare sample buffer
     void* samples[1];
     dds_sample_info_t infos[1];
     samples[0] = handler->alloc_fn();
     
-    int match_found = 0;
-    
+    int result = -1;
+    set_error("Timeout waiting for data");
+
     while (dds_time() < deadline) {
         dds_duration_t rem = deadline - dds_time();
         if (rem < 0) rem = 0;
@@ -358,44 +362,28 @@ EXPORT int Native_ExpectWithSeed(const char* topic_name, int expected_seed, int 
             int take_rc = dds_take(entry->reader, samples, infos, 1, 1);
             if (take_rc > 0) {
                 if (infos[0].valid_data) {
-                    match_found = 1;
-                    break;
-                } else {
-                    // Skip metadata (dispose, unregister)
-                    printf("[Native DEBUG] Ignored sample with valid_data=0\n");
+                    if (handler->compare_fn(samples[0], reference)) {
+                        printf("[Native] Verification PASSED\n");
+                        result = 0;
+                        break;
+                    } else {
+                        // Diagnostic print
+                        printf("[Native] Ignored mismatched data (possible loopback/old)\n");
+                    }
                 }
             }
         }
     }
     
-    dds_delete(waitset);
-    
-    if (!match_found) {
-        handler->free_fn(samples[0]);
-        set_error("Timeout waiting for data");
-        printf("[Native] TIMEOUT\n");
-        return -1;
-    }
-    
-    // Generate reference sample
-    void* reference = handler->alloc_fn();
-    handler->fill_fn(reference, expected_seed);
-    
-    // Compare
-    bool match = handler->compare_fn(samples[0], reference);
-    
-    // Cleanup
     handler->free_fn(samples[0]);
     handler->free_fn(reference);
+    dds_delete(waitset);
     
-    if (match) {
-        printf("[Native] Verification PASSED\n");
-        return 0;
-    } else {
-        set_error("Data mismatch");
-        printf("[Native] Verification FAILED\n");
-        return -2;
+    if (result != 0) {
+         printf("[Native] FAILED: %s\n", g_last_error);
     }
+    
+    return result;
 }
 
 /**

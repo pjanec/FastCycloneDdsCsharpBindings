@@ -8,14 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Reference Include="CycloneDDS.Runtime.Tests">
-      <HintPath>..\tests\CycloneDDS.Runtime.Tests\bin\Debug\net8.0\CycloneDDS.Runtime.Tests.dll</HintPath>
-    </Reference>
-     <Reference Include="CycloneDDS.Runtime">
-      <HintPath>..\tests\CycloneDDS.Runtime.Tests\bin\Debug\net8.0\CycloneDDS.Runtime.dll</HintPath>
-    </Reference>
-    <Reference Include="CycloneDDS.Core">
-      <HintPath>..\tests\CycloneDDS.Runtime.Tests\bin\Debug\net8.0\CycloneDDS.Core.dll</HintPath>
-    </Reference>
+    <ProjectReference Include="..\src\CycloneDDS.Core\CycloneDDS.Core.csproj" />
+    <ProjectReference Include="..\src\CycloneDDS.Runtime\CycloneDDS.Runtime.csproj" />
   </ItemGroup>
 </Project>

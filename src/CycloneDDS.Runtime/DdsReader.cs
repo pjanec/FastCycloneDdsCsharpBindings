@@ -120,49 +120,56 @@ namespace CycloneDDS.Runtime
         {
             _dataAvailableHandler = OnDataAvailable;
             _subscriptionMatchedHandler = OnSubscriptionMatched;
+            
             if (_deserializer == null) 
                  throw new InvalidOperationException($"Type {typeof(T).Name} missing Deserialize method.");
 
             _participant = participant;
 
-            // 1. Get or register topic (auto-discovery)
-            // Use original QoS to ensure compatibility with existing topics
-            // If internal topics (like SenderIdentity) are created, we must match their original QoS.
-            DdsApi.DdsEntity topic = participant.GetOrRegisterTopic<T>(topicName, qos);
-            _topicHandle = topic;
+            // QoS Setup
+            IntPtr actualQos = qos;
+            bool ownQos = false;
 
-            // Handle QoS for Reader
-            IntPtr readerQos = qos;
-            bool qosCreated = false;
-            if (readerQos == IntPtr.Zero)
+            if (actualQos == IntPtr.Zero)
             {
-                readerQos = DdsApi.dds_create_qos();
-                qosCreated = true;
+                actualQos = DdsApi.dds_create_qos();
+                ownQos = true;
             }
 
             try
             {
-                // Set Data Representation: XCDR2 and XCDR1
-                // Skip for internal SenderIdentity to avoid BadParameter (possible QoS incompatibility)
+                // Set Data Representation: Support both XCDR1 and XCDR2
+                // Readers should generally accept EVERYTHING the C# binding supports.
                 if (topicName != "__FcdcSenderIdentity")
                 {
-                    short[] reps = new short[] { 2, 0 };
-                    DdsApi.dds_qset_data_representation(readerQos, (uint)reps.Length, reps);
+                    short[] reps = { 
+                        DdsApi.DDS_DATA_REPRESENTATION_XCDR1, 
+                        DdsApi.DDS_DATA_REPRESENTATION_XCDR2 
+                    };
+                    DdsApi.dds_qset_data_representation(actualQos, 2, reps);
                 }
 
+                // 1. Get or register topic (using potentially modified QoS)
+                _topicHandle = participant.GetOrRegisterTopic<T>(topicName, actualQos);
+
                 // 2. Create Reader
-                 var reader = DdsApi.dds_create_reader(participant.NativeEntity, topic, readerQos, IntPtr.Zero);
-                 if (!reader.IsValid)
-                 {
+                var reader = DdsApi.dds_create_reader(
+                    participant.NativeEntity,
+                    _topicHandle, 
+                    actualQos, 
+                    IntPtr.Zero);
+
+                if (!reader.IsValid)
+                {
                       int err = reader.Handle;
                       DdsApi.DdsReturnCode rc = (DdsApi.DdsReturnCode)err;
                       throw new DdsException(rc, $"Failed to create reader for '{topicName}'");
-                 }
-                 _readerHandle = new DdsEntityHandle(reader);
+                }
+                _readerHandle = new DdsEntityHandle(reader);
             }
             finally
             {
-                if (qosCreated) DdsApi.dds_delete_qos(readerQos);
+                if (ownQos) DdsApi.dds_delete_qos(actualQos);
             }
         }
 

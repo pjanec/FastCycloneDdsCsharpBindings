@@ -28,10 +28,8 @@ set idlFile=%idlFile:""=%
 rem Extract filename without extension (simple approximation for batch)
 for %%F in (%idlFile%) do set filename=%%~nF
 
-echo Generating %outputDir%\%filename%.c
-echo // Mock C file > ""%outputDir%\%filename%.c""
-echo Generating %outputDir%\%filename%.h
-echo // Mock H file > ""%outputDir%\%filename%.h""
+echo Generating %outputDir%\%filename%.json
+echo { ""Types"": [] } > ""%outputDir%\%filename%.json""
 exit /b 0
 ");
         }
@@ -107,9 +105,8 @@ exit /b 0
             // Assert
             Assert.Equal(0, result.ExitCode);
             Assert.Contains("Mock IDLC running", result.StandardOutput);
-            Assert.Contains(Path.Combine(outputDir, "TestTopic.c"), result.GeneratedFiles);
-            Assert.Contains(Path.Combine(outputDir, "TestTopic.h"), result.GeneratedFiles);
-            Assert.True(File.Exists(Path.Combine(outputDir, "TestTopic.c")));
+            Assert.Contains(Path.Combine(outputDir, "TestTopic.json"), result.GeneratedFiles);
+            Assert.True(File.Exists(Path.Combine(outputDir, "TestTopic.json")));
         }
     }
 }
