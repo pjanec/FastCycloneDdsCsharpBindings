@@ -36,7 +36,7 @@
 #define DDS_HAS_TOPIC_DISCOVERY 1
 
 /* Not for general use, specificly for testing psmx Cyclone DDS plugin */
-#define DDS_ALLOW_NESTED_DOMAIN 1
+/* #undef DDS_ALLOW_NESTED_DOMAIN */
 
 /* Not intended for general use, whether building a static library, specifically testing psmx and security */
 /* #undef DDS_IS_STATIC_LIBRARY */

@@ -14,7 +14,7 @@
 #include <stdint.h>
 
 #include "idl/tree.h"
-#include "libidlc_export.h"
+#include "libidljson_export.h"
 #include "idlc/generator.h"
 
 #if defined (__cplusplus)
@@ -25,10 +25,10 @@ extern "C" {
 #define IDLC_GENERATOR_ANNOTATIONS generator_annotations
 #define IDLC_GENERATE generate
 
-LIBIDLC_EXPORT idl_retcode_t
+LIBIDLJSON_EXPORT idl_retcode_t
 generate(const idl_pstate_t *pstate, const idlc_generator_config_t *config);
 
-LIBIDLC_EXPORT const idlc_option_t**
+LIBIDLJSON_EXPORT const idlc_option_t**
 generator_options(void);
 
 #if defined(__cplusplus)
