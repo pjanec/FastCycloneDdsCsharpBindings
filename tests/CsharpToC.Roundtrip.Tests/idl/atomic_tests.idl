@@ -662,4 +662,81 @@ module AtomicTests {
         SimpleUnionAppendable data;
     };
 
+    @appendable
+    @topic
+    struct CharTopicAppendable {
+        @key long id;
+        char value;
+    };
+
+    @appendable
+    @topic
+    struct OctetTopicAppendable {
+        @key long id;
+        octet value;
+    };
+    
+    @appendable
+    @topic
+    struct Int16TopicAppendable {
+        @key long id;
+        short value;
+    };
+    
+    @appendable
+    @topic
+    struct UInt16TopicAppendable {
+        @key long id;
+        unsigned short value;
+    };
+    
+    @appendable
+    @topic
+    struct UInt32TopicAppendable {
+        @key long id;
+        unsigned long value;
+    };
+    
+    @appendable
+    @topic
+    struct Int64TopicAppendable {
+        @key long id;
+        long long value;
+    };
+    
+    @appendable
+    @topic
+    struct UInt64TopicAppendable {
+        @key long id;
+        unsigned long long value;
+    };
+
+    @appendable
+    @topic
+    struct Float32TopicAppendable {
+        @key long id;
+        float value;
+    };
+    
+    @appendable
+    @topic
+    struct Float64TopicAppendable {
+        @key long id;
+        double value;
+    };
+
+    @appendable
+    @topic
+    struct StringUnboundedTopicAppendable {
+        @key long id;
+        string value;
+    };
+    
+    @appendable
+    @topic
+    struct StringBounded256TopicAppendable {
+        @key long id;
+        string<256> value;
+    };
+
 };

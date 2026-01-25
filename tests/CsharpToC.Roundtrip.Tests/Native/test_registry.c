@@ -16,6 +16,16 @@ void set_error(const char* msg) {
 // Forward declarations of handlers defined in atomic_tests_native.c
 extern const topic_handler_t boolean_topic_handler;
 extern const topic_handler_t int32_topic_handler;
+extern const topic_handler_t char_topic_handler;
+extern const topic_handler_t octet_topic_handler;
+extern const topic_handler_t int16_topic_handler;
+extern const topic_handler_t uint16_topic_handler;
+extern const topic_handler_t uint32_topic_handler;
+extern const topic_handler_t int64_topic_handler;
+extern const topic_handler_t uint64_topic_handler;
+extern const topic_handler_t float32_topic_handler;
+extern const topic_handler_t float64_topic_handler;
+
 extern const topic_handler_t sequence_int32_topic_handler;
 extern const topic_handler_t string_bounded_32_topic_handler;
 extern const topic_handler_t array_int32_topic_handler;
@@ -23,22 +33,59 @@ extern const topic_handler_t union_long_disc_topic_handler;
 
 extern const topic_handler_t boolean_topic_appendable_handler;
 extern const topic_handler_t int32_topic_appendable_handler;
+extern const topic_handler_t char_topic_appendable_handler;
+extern const topic_handler_t octet_topic_appendable_handler;
+extern const topic_handler_t int16_topic_appendable_handler;
+extern const topic_handler_t uint16_topic_appendable_handler;
+extern const topic_handler_t uint32_topic_appendable_handler;
+extern const topic_handler_t int64_topic_appendable_handler;
+extern const topic_handler_t uint64_topic_appendable_handler;
+extern const topic_handler_t float32_topic_appendable_handler;
+extern const topic_handler_t float64_topic_appendable_handler;
+
 extern const topic_handler_t string_bounded_32_topic_appendable_handler;
 extern const topic_handler_t sequence_int32_topic_appendable_handler;
 extern const topic_handler_t union_long_disc_topic_appendable_handler;
 
+extern const topic_handler_t string_unbounded_topic_handler;
+extern const topic_handler_t string_bounded_256_topic_handler;
+extern const topic_handler_t string_unbounded_topic_appendable_handler;
+extern const topic_handler_t string_bounded_256_topic_appendable_handler;
+
 static const topic_handler_t* handlers[] = {
     &boolean_topic_handler,
     &int32_topic_handler,
+    &char_topic_handler,
+    &octet_topic_handler,
+    &int16_topic_handler,
+    &uint16_topic_handler,
+    &uint32_topic_handler,
+    &int64_topic_handler,
+    &uint64_topic_handler,
+    &float32_topic_handler,
+    &float64_topic_handler,
     &sequence_int32_topic_handler,
     &string_bounded_32_topic_handler,
     &array_int32_topic_handler,
     &union_long_disc_topic_handler,
     &boolean_topic_appendable_handler,
     &int32_topic_appendable_handler,
+    &char_topic_appendable_handler,
+    &octet_topic_appendable_handler,
+    &int16_topic_appendable_handler,
+    &uint16_topic_appendable_handler,
+    &uint32_topic_appendable_handler,
+    &int64_topic_appendable_handler,
+    &uint64_topic_appendable_handler,
+    &float32_topic_appendable_handler,
+    &float64_topic_appendable_handler,
     &string_bounded_32_topic_appendable_handler,
     &sequence_int32_topic_appendable_handler,
     &union_long_disc_topic_appendable_handler,
+    &string_unbounded_topic_handler,
+    &string_bounded_256_topic_handler,
+    &string_unbounded_topic_appendable_handler,
+    &string_bounded_256_topic_appendable_handler,
     NULL
 };
 

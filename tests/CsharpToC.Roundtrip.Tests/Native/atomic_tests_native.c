@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 #include "dds/dds.h" 
 
 // --- Helper Macros ---
@@ -54,6 +55,141 @@ static int validate_Int32Topic(void* data, int seed) {
 }
 DEFINE_HANDLER(Int32Topic, int32_topic);
 
+// --- CharTopic ---
+static void generate_CharTopic(void* data, int seed) {
+    AtomicTests_CharTopic* msg = (AtomicTests_CharTopic*)data;
+    msg->id = seed;
+    msg->value = (char)('A' + (seed % 26));
+}
+static int validate_CharTopic(void* data, int seed) {
+    AtomicTests_CharTopic* msg = (AtomicTests_CharTopic*)data;
+    if (msg->id != seed) return -1;
+    char expected = (char)('A' + (seed % 26));
+    if (msg->value != expected) return -1;
+    return 0;
+}
+DEFINE_HANDLER(CharTopic, char_topic);
+
+// --- OctetTopic ---
+static void generate_OctetTopic(void* data, int seed) {
+    AtomicTests_OctetTopic* msg = (AtomicTests_OctetTopic*)data;
+    msg->id = seed;
+    msg->value = (uint8_t)(seed & 0xFF);
+}
+static int validate_OctetTopic(void* data, int seed) {
+    AtomicTests_OctetTopic* msg = (AtomicTests_OctetTopic*)data;
+    if (msg->id != seed) return -1;
+    uint8_t expected = (uint8_t)(seed & 0xFF);
+    if (msg->value != expected) return -1;
+    return 0;
+}
+DEFINE_HANDLER(OctetTopic, octet_topic);
+
+// --- Int16Topic ---
+static void generate_Int16Topic(void* data, int seed) {
+    AtomicTests_Int16Topic* msg = (AtomicTests_Int16Topic*)data;
+    msg->id = seed;
+    msg->value = (int16_t)(seed * 31);
+}
+static int validate_Int16Topic(void* data, int seed) {
+    AtomicTests_Int16Topic* msg = (AtomicTests_Int16Topic*)data;
+    if (msg->id != seed) return -1;
+    int16_t expected = (int16_t)(seed * 31);
+    if (msg->value != expected) return -1;
+    return 0;
+}
+DEFINE_HANDLER(Int16Topic, int16_topic);
+
+// --- UInt16Topic ---
+static void generate_UInt16Topic(void* data, int seed) {
+    AtomicTests_UInt16Topic* msg = (AtomicTests_UInt16Topic*)data;
+    msg->id = seed;
+    msg->value = (uint16_t)(seed * 31);
+}
+static int validate_UInt16Topic(void* data, int seed) {
+    AtomicTests_UInt16Topic* msg = (AtomicTests_UInt16Topic*)data;
+    if (msg->id != seed) return -1;
+    uint16_t expected = (uint16_t)(seed * 31);
+    if (msg->value != expected) return -1;
+    return 0;
+}
+DEFINE_HANDLER(UInt16Topic, uint16_topic);
+
+// --- UInt32Topic ---
+static void generate_UInt32Topic(void* data, int seed) {
+    AtomicTests_UInt32Topic* msg = (AtomicTests_UInt32Topic*)data;
+    msg->id = seed;
+    msg->value = (uint32_t)((seed * 1664525L) + 1013904223L);
+}
+static int validate_UInt32Topic(void* data, int seed) {
+    AtomicTests_UInt32Topic* msg = (AtomicTests_UInt32Topic*)data;
+    if (msg->id != seed) return -1;
+    uint32_t expected = (uint32_t)((seed * 1664525L) + 1013904223L);
+    if (msg->value != expected) return -1;
+    return 0;
+}
+DEFINE_HANDLER(UInt32Topic, uint32_topic);
+
+// --- Int64Topic ---
+static void generate_Int64Topic(void* data, int seed) {
+    AtomicTests_Int64Topic* msg = (AtomicTests_Int64Topic*)data;
+    msg->id = seed;
+    msg->value = (int64_t)seed * 1000000LL;
+}
+static int validate_Int64Topic(void* data, int seed) {
+    AtomicTests_Int64Topic* msg = (AtomicTests_Int64Topic*)data;
+    if (msg->id != seed) return -1;
+    int64_t expected = (int64_t)seed * 1000000LL;
+    if (msg->value != expected) return -1;
+    return 0;
+}
+DEFINE_HANDLER(Int64Topic, int64_topic);
+
+// --- UInt64Topic ---
+static void generate_UInt64Topic(void* data, int seed) {
+    AtomicTests_UInt64Topic* msg = (AtomicTests_UInt64Topic*)data;
+    msg->id = seed;
+    msg->value = (uint64_t)seed * 1000000ULL;
+}
+static int validate_UInt64Topic(void* data, int seed) {
+    AtomicTests_UInt64Topic* msg = (AtomicTests_UInt64Topic*)data;
+    if (msg->id != seed) return -1;
+    uint64_t expected = (uint64_t)seed * 1000000ULL;
+    if (msg->value != expected) return -1;
+    return 0;
+}
+DEFINE_HANDLER(UInt64Topic, uint64_topic);
+
+// --- Float32Topic ---
+static void generate_Float32Topic(void* data, int seed) {
+    AtomicTests_Float32Topic* msg = (AtomicTests_Float32Topic*)data;
+    msg->id = seed;
+    msg->value = (float)(seed * 3.14159f);
+}
+static int validate_Float32Topic(void* data, int seed) {
+    AtomicTests_Float32Topic* msg = (AtomicTests_Float32Topic*)data;
+    if (msg->id != seed) return -1;
+    float expected = (float)(seed * 3.14159f);
+    if (fabsf(msg->value - expected) > 0.0001f) return -1;
+    return 0;
+}
+DEFINE_HANDLER(Float32Topic, float32_topic);
+
+// --- Float64Topic ---
+static void generate_Float64Topic(void* data, int seed) {
+    AtomicTests_Float64Topic* msg = (AtomicTests_Float64Topic*)data;
+    msg->id = seed;
+    msg->value = (double)(seed * 3.14159265359);
+}
+static int validate_Float64Topic(void* data, int seed) {
+    AtomicTests_Float64Topic* msg = (AtomicTests_Float64Topic*)data;
+    if (msg->id != seed) return -1;
+    double expected = (double)(seed * 3.14159265359);
+    if (fabs(msg->value - expected) > 0.000001) return -1;
+    return 0;
+}
+DEFINE_HANDLER(Float64Topic, float64_topic);
+
 // ----------------------------------------------------------------------------
 // Strings
 // ----------------------------------------------------------------------------
@@ -83,6 +219,45 @@ static int validate_StringBounded32Topic(void* data, int seed) {
     return 0;
 }
 DEFINE_HANDLER(StringBounded32Topic, string_bounded_32_topic);
+
+// --- StringUnboundedTopic ---
+static void generate_StringUnboundedTopic(void* data, int seed) {
+    AtomicTests_StringUnboundedTopic* msg = (AtomicTests_StringUnboundedTopic*)data;
+    msg->id = seed;
+    char buffer[64];
+    snprintf(buffer, 64, "StrUnbound_%d", seed);
+    msg->value = dds_string_dup(buffer);
+}
+
+static int validate_StringUnboundedTopic(void* data, int seed) {
+    AtomicTests_StringUnboundedTopic* msg = (AtomicTests_StringUnboundedTopic*)data;
+    if (msg->id != seed) return -1;
+    char buffer[64];
+    snprintf(buffer, 64, "StrUnbound_%d", seed);
+    if (strcmp(msg->value, buffer) != 0) return -1;
+    return 0;
+}
+DEFINE_HANDLER(StringUnboundedTopic, string_unbounded_topic);
+
+// --- StringBounded256Topic ---
+static void generate_StringBounded256Topic(void* data, int seed) {
+    AtomicTests_StringBounded256Topic* msg = (AtomicTests_StringBounded256Topic*)data;
+    msg->id = seed;
+    char buffer[256];
+    snprintf(buffer, 256, "StrBound256_%d", seed);
+    strncpy(msg->value, buffer, 256);
+    msg->value[256] = '\0';
+}
+
+static int validate_StringBounded256Topic(void* data, int seed) {
+    AtomicTests_StringBounded256Topic* msg = (AtomicTests_StringBounded256Topic*)data;
+    if (msg->id != seed) return -1;
+    char buffer[256];
+    snprintf(buffer, 256, "StrBound256_%d", seed);
+    if (strncmp(msg->value, buffer, 256) != 0) return -1;
+    return 0;
+}
+DEFINE_HANDLER(StringBounded256Topic, string_bounded_256_topic);
 
 // ----------------------------------------------------------------------------
 // Arrays
@@ -235,6 +410,141 @@ static int validate_Int32TopicAppendable(void* data, int seed) {
 }
 DEFINE_HANDLER(Int32TopicAppendable, int32_topic_appendable);
 
+// --- CharTopicAppendable ---
+static void generate_CharTopicAppendable(void* data, int seed) {
+    AtomicTests_CharTopicAppendable* msg = (AtomicTests_CharTopicAppendable*)data;
+    msg->id = seed;
+    msg->value = (char)('A' + (seed % 26));
+}
+static int validate_CharTopicAppendable(void* data, int seed) {
+    AtomicTests_CharTopicAppendable* msg = (AtomicTests_CharTopicAppendable*)data;
+    if (msg->id != seed) return -1;
+    char expected = (char)('A' + (seed % 26));
+    if (msg->value != expected) return -1;
+    return 0;
+}
+DEFINE_HANDLER(CharTopicAppendable, char_topic_appendable);
+
+// --- OctetTopicAppendable ---
+static void generate_OctetTopicAppendable(void* data, int seed) {
+    AtomicTests_OctetTopicAppendable* msg = (AtomicTests_OctetTopicAppendable*)data;
+    msg->id = seed;
+    msg->value = (uint8_t)(seed & 0xFF);
+}
+static int validate_OctetTopicAppendable(void* data, int seed) {
+    AtomicTests_OctetTopicAppendable* msg = (AtomicTests_OctetTopicAppendable*)data;
+    if (msg->id != seed) return -1;
+    uint8_t expected = (uint8_t)(seed & 0xFF);
+    if (msg->value != expected) return -1;
+    return 0;
+}
+DEFINE_HANDLER(OctetTopicAppendable, octet_topic_appendable);
+
+// --- Int16TopicAppendable ---
+static void generate_Int16TopicAppendable(void* data, int seed) {
+    AtomicTests_Int16TopicAppendable* msg = (AtomicTests_Int16TopicAppendable*)data;
+    msg->id = seed;
+    msg->value = (int16_t)(seed * 31);
+}
+static int validate_Int16TopicAppendable(void* data, int seed) {
+    AtomicTests_Int16TopicAppendable* msg = (AtomicTests_Int16TopicAppendable*)data;
+    if (msg->id != seed) return -1;
+    int16_t expected = (int16_t)(seed * 31);
+    if (msg->value != expected) return -1;
+    return 0;
+}
+DEFINE_HANDLER(Int16TopicAppendable, int16_topic_appendable);
+
+// --- UInt16TopicAppendable ---
+static void generate_UInt16TopicAppendable(void* data, int seed) {
+    AtomicTests_UInt16TopicAppendable* msg = (AtomicTests_UInt16TopicAppendable*)data;
+    msg->id = seed;
+    msg->value = (uint16_t)(seed * 31);
+}
+static int validate_UInt16TopicAppendable(void* data, int seed) {
+    AtomicTests_UInt16TopicAppendable* msg = (AtomicTests_UInt16TopicAppendable*)data;
+    if (msg->id != seed) return -1;
+    uint16_t expected = (uint16_t)(seed * 31);
+    if (msg->value != expected) return -1;
+    return 0;
+}
+DEFINE_HANDLER(UInt16TopicAppendable, uint16_topic_appendable);
+
+// --- UInt32TopicAppendable ---
+static void generate_UInt32TopicAppendable(void* data, int seed) {
+    AtomicTests_UInt32TopicAppendable* msg = (AtomicTests_UInt32TopicAppendable*)data;
+    msg->id = seed;
+    msg->value = (uint32_t)((seed * 1664525L) + 1013904223L);
+}
+static int validate_UInt32TopicAppendable(void* data, int seed) {
+    AtomicTests_UInt32TopicAppendable* msg = (AtomicTests_UInt32TopicAppendable*)data;
+    if (msg->id != seed) return -1;
+    uint32_t expected = (uint32_t)((seed * 1664525L) + 1013904223L);
+    if (msg->value != expected) return -1;
+    return 0;
+}
+DEFINE_HANDLER(UInt32TopicAppendable, uint32_topic_appendable);
+
+// --- Int64TopicAppendable ---
+static void generate_Int64TopicAppendable(void* data, int seed) {
+    AtomicTests_Int64TopicAppendable* msg = (AtomicTests_Int64TopicAppendable*)data;
+    msg->id = seed;
+    msg->value = (int64_t)seed * 1000000LL;
+}
+static int validate_Int64TopicAppendable(void* data, int seed) {
+    AtomicTests_Int64TopicAppendable* msg = (AtomicTests_Int64TopicAppendable*)data;
+    if (msg->id != seed) return -1;
+    int64_t expected = (int64_t)seed * 1000000LL;
+    if (msg->value != expected) return -1;
+    return 0;
+}
+DEFINE_HANDLER(Int64TopicAppendable, int64_topic_appendable);
+
+// --- UInt64TopicAppendable ---
+static void generate_UInt64TopicAppendable(void* data, int seed) {
+    AtomicTests_UInt64TopicAppendable* msg = (AtomicTests_UInt64TopicAppendable*)data;
+    msg->id = seed;
+    msg->value = (uint64_t)seed * 1000000ULL;
+}
+static int validate_UInt64TopicAppendable(void* data, int seed) {
+    AtomicTests_UInt64TopicAppendable* msg = (AtomicTests_UInt64TopicAppendable*)data;
+    if (msg->id != seed) return -1;
+    uint64_t expected = (uint64_t)seed * 1000000ULL;
+    if (msg->value != expected) return -1;
+    return 0;
+}
+DEFINE_HANDLER(UInt64TopicAppendable, uint64_topic_appendable);
+
+// --- Float32TopicAppendable ---
+static void generate_Float32TopicAppendable(void* data, int seed) {
+    AtomicTests_Float32TopicAppendable* msg = (AtomicTests_Float32TopicAppendable*)data;
+    msg->id = seed;
+    msg->value = (float)(seed * 3.14159f);
+}
+static int validate_Float32TopicAppendable(void* data, int seed) {
+    AtomicTests_Float32TopicAppendable* msg = (AtomicTests_Float32TopicAppendable*)data;
+    if (msg->id != seed) return -1;
+    float expected = (float)(seed * 3.14159f);
+    if (fabsf(msg->value - expected) > 0.0001f) return -1;
+    return 0;
+}
+DEFINE_HANDLER(Float32TopicAppendable, float32_topic_appendable);
+
+// --- Float64TopicAppendable ---
+static void generate_Float64TopicAppendable(void* data, int seed) {
+    AtomicTests_Float64TopicAppendable* msg = (AtomicTests_Float64TopicAppendable*)data;
+    msg->id = seed;
+    msg->value = (double)(seed * 3.14159265359);
+}
+static int validate_Float64TopicAppendable(void* data, int seed) {
+    AtomicTests_Float64TopicAppendable* msg = (AtomicTests_Float64TopicAppendable*)data;
+    if (msg->id != seed) return -1;
+    double expected = (double)(seed * 3.14159265359);
+    if (fabs(msg->value - expected) > 0.000001) return -1;
+    return 0;
+}
+DEFINE_HANDLER(Float64TopicAppendable, float64_topic_appendable);
+
 // --- StringBounded32TopicAppendable ---
 static void generate_StringBounded32TopicAppendable(void* data, int seed) {
     AtomicTests_StringBounded32TopicAppendable* msg = (AtomicTests_StringBounded32TopicAppendable*)data;
@@ -328,3 +638,42 @@ static int validate_UnionLongDiscTopicAppendable(void* data, int seed) {
     return 0;
 }
 DEFINE_HANDLER(UnionLongDiscTopicAppendable, union_long_disc_topic_appendable);
+
+// --- StringUnboundedTopicAppendable ---
+static void generate_StringUnboundedTopicAppendable(void* data, int seed) {
+    AtomicTests_StringUnboundedTopicAppendable* msg = (AtomicTests_StringUnboundedTopicAppendable*)data;
+    msg->id = seed;
+    char buffer[64];
+    snprintf(buffer, 64, "StrUnbound_%d", seed);
+    msg->value = dds_string_dup(buffer);
+}
+
+static int validate_StringUnboundedTopicAppendable(void* data, int seed) {
+    AtomicTests_StringUnboundedTopicAppendable* msg = (AtomicTests_StringUnboundedTopicAppendable*)data;
+    if (msg->id != seed) return -1;
+    char buffer[64];
+    snprintf(buffer, 64, "StrUnbound_%d", seed);
+    if (strcmp(msg->value, buffer) != 0) return -1;
+    return 0;
+}
+DEFINE_HANDLER(StringUnboundedTopicAppendable, string_unbounded_topic_appendable);
+
+// --- StringBounded256TopicAppendable ---
+static void generate_StringBounded256TopicAppendable(void* data, int seed) {
+    AtomicTests_StringBounded256TopicAppendable* msg = (AtomicTests_StringBounded256TopicAppendable*)data;
+    msg->id = seed;
+    char buffer[256];
+    snprintf(buffer, 256, "StrBound256_%d", seed);
+    strncpy(msg->value, buffer, 256);
+    msg->value[256] = '\0';
+}
+
+static int validate_StringBounded256TopicAppendable(void* data, int seed) {
+    AtomicTests_StringBounded256TopicAppendable* msg = (AtomicTests_StringBounded256TopicAppendable*)data;
+    if (msg->id != seed) return -1;
+    char buffer[256];
+    snprintf(buffer, 256, "StrBound256_%d", seed);
+    if (strncmp(msg->value, buffer, 256) != 0) return -1;
+    return 0;
+}
+DEFINE_HANDLER(StringBounded256TopicAppendable, string_bounded_256_topic_appendable);

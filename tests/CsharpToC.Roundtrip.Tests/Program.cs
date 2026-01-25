@@ -56,7 +56,20 @@ namespace CsharpToC.Roundtrip.Tests
 
                 // Run Tests
                 await TestBoolean();
+                await TestChar();
+                await TestOctet();
+                await TestInt16();
+                await TestUInt16();
                 await TestInt32();
+                await TestUInt32();
+                await TestInt64();
+                await TestUInt64();
+                await TestFloat32();
+                await TestFloat64();
+                
+                await TestStringUnbounded();
+                await TestStringBounded256();
+
                 await TestStringBounded32();
                 // await TestArrayInt32(); // Skipped for now
                 await TestSequenceInt32();
@@ -64,7 +77,20 @@ namespace CsharpToC.Roundtrip.Tests
 
                 // Appendable Tests
                 await TestBooleanAppendable();
+                await TestCharAppendable();
+                await TestOctetAppendable();
+                await TestInt16Appendable();
+                await TestUInt16Appendable();
                 await TestInt32Appendable();
+                await TestUInt32Appendable();
+                await TestInt64Appendable();
+                await TestUInt64Appendable();
+                await TestFloat32Appendable();
+                await TestFloat64Appendable();
+                
+                await TestStringUnboundedAppendable();
+                await TestStringBounded256Appendable();
+                
                 await TestStringBounded32Appendable();
                 await TestSequenceInt32Appendable();
                 await TestUnionLongDiscAppendable();
@@ -234,6 +260,51 @@ namespace CsharpToC.Roundtrip.Tests
             );
         }
 
+        static async Task TestChar() => await RunRoundtrip<CharTopic>(
+            "AtomicTests::CharTopic", 150, 
+            s => new CharTopic { Id = s, Value = (byte)('A' + (s % 26)) },
+            (d, s) => d.Id == s && d.Value == (byte)('A' + (s % 26)));
+
+        static async Task TestOctet() => await RunRoundtrip<OctetTopic>(
+            "AtomicTests::OctetTopic", 200, 
+            s => new OctetTopic { Id = s, Value = (byte)(s & 0xFF) },
+            (d, s) => d.Id == s && d.Value == (byte)(s & 0xFF));
+
+        static async Task TestInt16() => await RunRoundtrip<Int16Topic>(
+            "AtomicTests::Int16Topic", 300, 
+            s => new Int16Topic { Id = s, Value = (short)(s * 31) },
+            (d, s) => d.Id == s && d.Value == (short)(s * 31));
+
+        static async Task TestUInt16() => await RunRoundtrip<UInt16Topic>(
+            "AtomicTests::UInt16Topic", 400, 
+            s => new UInt16Topic { Id = s, Value = (ushort)(s * 31) },
+            (d, s) => d.Id == s && d.Value == (ushort)(s * 31));
+
+        static async Task TestUInt32() => await RunRoundtrip<UInt32Topic>(
+            "AtomicTests::UInt32Topic", 500, 
+            s => new UInt32Topic { Id = s, Value = (uint)((s * 1664525L) + 1013904223L) },
+            (d, s) => d.Id == s && d.Value == (uint)((s * 1664525L) + 1013904223L));
+
+        static async Task TestInt64() => await RunRoundtrip<Int64Topic>(
+            "AtomicTests::Int64Topic", 600, 
+            s => new Int64Topic { Id = s, Value = (long)s * 1000000L },
+            (d, s) => d.Id == s && d.Value == (long)s * 1000000L);
+
+        static async Task TestUInt64() => await RunRoundtrip<UInt64Topic>(
+            "AtomicTests::UInt64Topic", 700, 
+            s => new UInt64Topic { Id = s, Value = (ulong)s * 1000000UL },
+            (d, s) => d.Id == s && d.Value == (ulong)s * 1000000UL);
+
+        static async Task TestFloat32() => await RunRoundtrip<Float32Topic>(
+            "AtomicTests::Float32Topic", 800, 
+            s => new Float32Topic { Id = s, Value = (float)(s * 3.14159f) },
+            (d, s) => d.Id == s && Math.Abs(d.Value - (float)(s * 3.14159f)) < 0.0001f);
+
+        static async Task TestFloat64() => await RunRoundtrip<Float64Topic>(
+            "AtomicTests::Float64Topic", 900, 
+            s => new Float64Topic { Id = s, Value = (double)(s * 3.14159265359) },
+            (d, s) => d.Id == s && Math.Abs(d.Value - (double)(s * 3.14159265359)) < 0.000001);
+
         static async Task TestInt32() 
         {
             await RunRoundtrip<Int32Topic>(
@@ -361,6 +432,51 @@ namespace CsharpToC.Roundtrip.Tests
             );
         }
 
+        static async Task TestCharAppendable() => await RunRoundtrip<CharTopicAppendable>(
+            "AtomicTests::CharTopicAppendable", 1100, 
+            s => new CharTopicAppendable { Id = s, Value = (byte)('A' + (s % 26)) },
+            (d, s) => d.Id == s && d.Value == (byte)('A' + (s % 26)));
+
+        static async Task TestOctetAppendable() => await RunRoundtrip<OctetTopicAppendable>(
+            "AtomicTests::OctetTopicAppendable", 1200, 
+            s => new OctetTopicAppendable { Id = s, Value = (byte)(s & 0xFF) },
+            (d, s) => d.Id == s && d.Value == (byte)(s & 0xFF));
+            
+        static async Task TestInt16Appendable() => await RunRoundtrip<Int16TopicAppendable>(
+            "AtomicTests::Int16TopicAppendable", 1300, 
+            s => new Int16TopicAppendable { Id = s, Value = (short)(s * 31) },
+            (d, s) => d.Id == s && d.Value == (short)(s * 31));
+            
+        static async Task TestUInt16Appendable() => await RunRoundtrip<UInt16TopicAppendable>(
+            "AtomicTests::UInt16TopicAppendable", 1400, 
+            s => new UInt16TopicAppendable { Id = s, Value = (ushort)(s * 31) },
+            (d, s) => d.Id == s && d.Value == (ushort)(s * 31));
+            
+        static async Task TestUInt32Appendable() => await RunRoundtrip<UInt32TopicAppendable>(
+            "AtomicTests::UInt32TopicAppendable", 1500, 
+            s => new UInt32TopicAppendable { Id = s, Value = (uint)((s * 1664525L) + 1013904223L) },
+            (d, s) => d.Id == s && d.Value == (uint)((s * 1664525L) + 1013904223L));
+            
+        static async Task TestInt64Appendable() => await RunRoundtrip<Int64TopicAppendable>(
+            "AtomicTests::Int64TopicAppendable", 1600, 
+            s => new Int64TopicAppendable { Id = s, Value = (long)s * 1000000L },
+            (d, s) => d.Id == s && d.Value == (long)s * 1000000L);
+            
+        static async Task TestUInt64Appendable() => await RunRoundtrip<UInt64TopicAppendable>(
+            "AtomicTests::UInt64TopicAppendable", 1700, 
+            s => new UInt64TopicAppendable { Id = s, Value = (ulong)s * 1000000UL },
+            (d, s) => d.Id == s && d.Value == (ulong)s * 1000000UL);
+
+        static async Task TestFloat32Appendable() => await RunRoundtrip<Float32TopicAppendable>(
+            "AtomicTests::Float32TopicAppendable", 1800, 
+            s => new Float32TopicAppendable { Id = s, Value = (float)(s * 3.14159f) },
+            (d, s) => d.Id == s && Math.Abs(d.Value - (float)(s * 3.14159f)) < 0.0001f);
+
+        static async Task TestFloat64Appendable() => await RunRoundtrip<Float64TopicAppendable>(
+            "AtomicTests::Float64TopicAppendable", 1900, 
+            s => new Float64TopicAppendable { Id = s, Value = (double)(s * 3.14159265359) },
+            (d, s) => d.Id == s && Math.Abs(d.Value - (double)(s * 3.14159265359)) < 0.000001);
+
         static async Task TestInt32Appendable()
         {
             await RunRoundtrip<Int32TopicAppendable>(
@@ -450,6 +566,66 @@ namespace CsharpToC.Roundtrip.Tests
                     if (disc == 3) return msg.Data.String_value == $"Union_{s}";
                     return false;
                 }
+            );
+        }
+
+        static async Task TestStringUnbounded()
+        {
+            await RunRoundtrip<StringUnboundedTopic>(
+                "AtomicTests::StringUnboundedTopic", 
+                1100,
+                (s) => { 
+                    var msg = new StringUnboundedTopic(); 
+                    msg.Id = s; 
+                    msg.Value = $"StrUnbound_{s}"; 
+                    return msg; 
+                },
+                (msg, s) => msg.Id == s && msg.Value == $"StrUnbound_{s}"
+            );
+        }
+
+        static async Task TestStringBounded256()
+        {
+            await RunRoundtrip<StringBounded256Topic>(
+                "AtomicTests::StringBounded256Topic", 
+                1200,
+                (s) => { 
+                    var msg = new StringBounded256Topic(); 
+                    msg.Id = s; 
+                    msg.Value = $"StrBound256_{s}"; 
+                    return msg; 
+                },
+                (msg, s) => msg.Id == s && msg.Value == $"StrBound256_{s}"
+            );
+        }
+
+        static async Task TestStringUnboundedAppendable()
+        {
+            await RunRoundtrip<StringUnboundedTopicAppendable>(
+                "AtomicTests::StringUnboundedTopicAppendable", 
+                2100,
+                (s) => { 
+                    var msg = new StringUnboundedTopicAppendable(); 
+                    msg.Id = s; 
+                    msg.Value = $"StrUnbound_{s}"; 
+                    return msg; 
+                },
+                (msg, s) => msg.Id == s && msg.Value == $"StrUnbound_{s}"
+            );
+        }
+
+        static async Task TestStringBounded256Appendable()
+        {
+            await RunRoundtrip<StringBounded256TopicAppendable>(
+                "AtomicTests::StringBounded256TopicAppendable", 
+                2200,
+                (s) => { 
+                    var msg = new StringBounded256TopicAppendable(); 
+                    msg.Id = s; 
+                    msg.Value = $"StrBound256_{s}"; 
+                    return msg; 
+                },
+                (msg, s) => msg.Id == s && msg.Value == $"StrBound256_{s}"
             );
         }
     }

@@ -22,6 +22,87 @@ namespace AtomicTests
         public int Value { get; set; }
     }
 
+    [DdsTopic("CharTopic")]
+    [DdsExtensibility(DdsExtensibilityKind.Final)]
+    public partial struct CharTopic
+    {
+        [DdsKey]
+        public int Id { get; set; }
+        public byte Value { get; set; }
+    }
+
+    [DdsTopic("OctetTopic")]
+    [DdsExtensibility(DdsExtensibilityKind.Final)]
+    public partial struct OctetTopic
+    {
+        [DdsKey]
+        public int Id { get; set; }
+        public byte Value { get; set; }
+    }
+    
+    [DdsTopic("Int16Topic")]
+    [DdsExtensibility(DdsExtensibilityKind.Final)]
+    public partial struct Int16Topic
+    {
+        [DdsKey]
+        public int Id { get; set; }
+        public short Value { get; set; }
+    }
+
+    [DdsTopic("UInt16Topic")]
+    [DdsExtensibility(DdsExtensibilityKind.Final)]
+    public partial struct UInt16Topic
+    {
+        [DdsKey]
+        public int Id { get; set; }
+        public ushort Value { get; set; }
+    }
+
+    [DdsTopic("UInt32Topic")]
+    [DdsExtensibility(DdsExtensibilityKind.Final)]
+    public partial struct UInt32Topic
+    {
+        [DdsKey]
+        public int Id { get; set; }
+        public uint Value { get; set; }
+    }
+
+    [DdsTopic("Int64Topic")]
+    [DdsExtensibility(DdsExtensibilityKind.Final)]
+    public partial struct Int64Topic
+    {
+        [DdsKey]
+        public int Id { get; set; }
+        public long Value { get; set; }
+    }
+
+    [DdsTopic("UInt64Topic")]
+    [DdsExtensibility(DdsExtensibilityKind.Final)]
+    public partial struct UInt64Topic
+    {
+        [DdsKey]
+        public int Id { get; set; }
+        public ulong Value { get; set; }
+    }
+
+    [DdsTopic("Float32Topic")]
+    [DdsExtensibility(DdsExtensibilityKind.Final)]
+    public partial struct Float32Topic
+    {
+        [DdsKey]
+        public int Id { get; set; }
+        public float Value { get; set; }
+    }
+
+    [DdsTopic("Float64Topic")]
+    [DdsExtensibility(DdsExtensibilityKind.Final)]
+    public partial struct Float64Topic
+    {
+        [DdsKey]
+        public int Id { get; set; }
+        public double Value { get; set; }
+    }
+
     [DdsTopic("StringBounded32Topic")]
     [DdsManaged]
     [DdsExtensibility(DdsExtensibilityKind.Final)]
@@ -31,6 +112,28 @@ namespace AtomicTests
         public int Id { get; set; }
         
         [MaxLength(32)]
+        public string Value { get; set; }
+    }
+
+    [DdsTopic("StringUnboundedTopic")]
+    [DdsManaged]
+    [DdsExtensibility(DdsExtensibilityKind.Final)]
+    public partial struct StringUnboundedTopic
+    {
+        [DdsKey]
+        public int Id { get; set; }
+        public string Value { get; set; }
+    }
+
+    [DdsTopic("StringBounded256Topic")]
+    [DdsManaged]
+    [DdsExtensibility(DdsExtensibilityKind.Final)]
+    public partial struct StringBounded256Topic
+    {
+        [DdsKey]
+        public int Id { get; set; }
+        
+        [MaxLength(256)]
         public string Value { get; set; }
     }
 
@@ -112,6 +215,87 @@ namespace AtomicTests
         public int Value { get; set; }
     }
 
+    [DdsTopic("CharTopicAppendable")]
+    [DdsExtensibility(DdsExtensibilityKind.Appendable)]
+    public partial struct CharTopicAppendable
+    {
+        [DdsKey]
+        public int Id { get; set; }
+        public byte Value { get; set; }
+    }
+
+    [DdsTopic("OctetTopicAppendable")]
+    [DdsExtensibility(DdsExtensibilityKind.Appendable)]
+    public partial struct OctetTopicAppendable
+    {
+        [DdsKey]
+        public int Id { get; set; }
+        public byte Value { get; set; }
+    }
+    
+    [DdsTopic("Int16TopicAppendable")]
+    [DdsExtensibility(DdsExtensibilityKind.Appendable)]
+    public partial struct Int16TopicAppendable
+    {
+        [DdsKey]
+        public int Id { get; set; }
+        public short Value { get; set; }
+    }
+
+    [DdsTopic("UInt16TopicAppendable")]
+    [DdsExtensibility(DdsExtensibilityKind.Appendable)]
+    public partial struct UInt16TopicAppendable
+    {
+        [DdsKey]
+        public int Id { get; set; }
+        public ushort Value { get; set; }
+    }
+
+    [DdsTopic("UInt32TopicAppendable")]
+    [DdsExtensibility(DdsExtensibilityKind.Appendable)]
+    public partial struct UInt32TopicAppendable
+    {
+        [DdsKey]
+        public int Id { get; set; }
+        public uint Value { get; set; }
+    }
+
+    [DdsTopic("Int64TopicAppendable")]
+    [DdsExtensibility(DdsExtensibilityKind.Appendable)]
+    public partial struct Int64TopicAppendable
+    {
+        [DdsKey]
+        public int Id { get; set; }
+        public long Value { get; set; }
+    }
+
+    [DdsTopic("UInt64TopicAppendable")]
+    [DdsExtensibility(DdsExtensibilityKind.Appendable)]
+    public partial struct UInt64TopicAppendable
+    {
+        [DdsKey]
+        public int Id { get; set; }
+        public ulong Value { get; set; }
+    }
+
+    [DdsTopic("Float32TopicAppendable")]
+    [DdsExtensibility(DdsExtensibilityKind.Appendable)]
+    public partial struct Float32TopicAppendable
+    {
+        [DdsKey]
+        public int Id { get; set; }
+        public float Value { get; set; }
+    }
+
+    [DdsTopic("Float64TopicAppendable")]
+    [DdsExtensibility(DdsExtensibilityKind.Appendable)]
+    public partial struct Float64TopicAppendable
+    {
+        [DdsKey]
+        public int Id { get; set; }
+        public double Value { get; set; }
+    }
+
     [DdsTopic("StringBounded32TopicAppendable")]
     [DdsManaged]
     [DdsExtensibility(DdsExtensibilityKind.Appendable)]
@@ -121,6 +305,28 @@ namespace AtomicTests
         public int Id { get; set; }
         
         [MaxLength(32)]
+        public string Value { get; set; }
+    }
+
+    [DdsTopic("StringUnboundedTopicAppendable")]
+    [DdsManaged]
+    [DdsExtensibility(DdsExtensibilityKind.Appendable)]
+    public partial struct StringUnboundedTopicAppendable
+    {
+        [DdsKey]
+        public int Id { get; set; }
+        public string Value { get; set; }
+    }
+
+    [DdsTopic("StringBounded256TopicAppendable")]
+    [DdsManaged]
+    [DdsExtensibility(DdsExtensibilityKind.Appendable)]
+    public partial struct StringBounded256TopicAppendable
+    {
+        [DdsKey]
+        public int Id { get; set; }
+        
+        [MaxLength(256)]
         public string Value { get; set; }
     }
 
