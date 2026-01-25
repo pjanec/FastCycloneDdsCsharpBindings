@@ -116,7 +116,7 @@ internal class Program
         {
             "AllPrimitives" => RunTypedScenario<AllPrimitives>(scenario),
             "CompositeKey" => RunTypedScenario<CompositeKey>(scenario),
-            "NestedKeyTopic" => RunTypedScenario<NestedKeyTopic>(scenario),
+            "NestedKeyTopic" => RunTypedScenario<AtomicTests.NestedKeyTopic>(scenario),
             "SequenceTopic" => RunTypedScenario<SequenceTopic>(scenario),
             "ArrayInt32Topic" => RunTypedScenario<ArrayInt32Topic>(scenario),
             "ArrayFloat64Topic" => RunTypedScenario<ArrayFloat64Topic>(scenario),

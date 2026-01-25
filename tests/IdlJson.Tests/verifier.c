@@ -294,6 +294,9 @@ int main(int argc, char** argv) {
     VERIFY_ATOMIC_TOPIC("ArrayInt32TopicAppendable", ArrayInt32TopicAppendable);
     VERIFY_ATOMIC_TOPIC("ArrayFloat64TopicAppendable", ArrayFloat64TopicAppendable);
     VERIFY_ATOMIC_TOPIC("ArrayStringTopicAppendable", ArrayStringTopicAppendable);
+    VERIFY_ATOMIC_TOPIC("Array2DInt32TopicAppendable", Array2DInt32TopicAppendable);
+    VERIFY_ATOMIC_TOPIC("Array3DInt32TopicAppendable", Array3DInt32TopicAppendable);
+    VERIFY_ATOMIC_TOPIC("ArrayStructTopicAppendable", ArrayStructTopicAppendable);
 
 
     printf("\n==================================================\n");

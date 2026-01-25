@@ -89,10 +89,10 @@ namespace CycloneDDS.CodeGen
                 if (topic.IsTopic || topic.IsStruct || topic.IsUnion)
                 {
                     var serializerCode = _serializerEmitter.EmitSerializer(topic, registry);
-                    File.WriteAllText(Path.Combine(outputDir, $"{topic.Name}.Serializer.cs"), serializerCode);
+                    File.WriteAllText(Path.Combine(outputDir, $"{topic.FullName}.Serializer.cs"), serializerCode);
 
                     var deserializerCode = _deserializerEmitter.EmitDeserializer(topic, registry);
-                    File.WriteAllText(Path.Combine(outputDir, $"{topic.Name}.Deserializer.cs"), deserializerCode);
+                    File.WriteAllText(Path.Combine(outputDir, $"{topic.FullName}.Deserializer.cs"), deserializerCode);
                     Console.WriteLine($"    Generated Serializers for {topic.Name}");
                 }
             }
@@ -263,7 +263,7 @@ namespace CycloneDDS.CodeGen
                                 {
                                     // Generate descriptor code from JSON metadata
                                     var descCode = GenerateDescriptorCodeFromJson(topic.TypeInfo, jsonDef.TopicDescriptor);
-                                    File.WriteAllText(Path.Combine(outputDir, $"{topic.TypeInfo.Name}.Descriptor.cs"), descCode);
+                                    File.WriteAllText(Path.Combine(outputDir, $"{topic.TypeInfo.FullName}.Descriptor.cs"), descCode);
                                     Console.WriteLine($"    Generated {topic.TypeInfo.Name}.Descriptor.cs");
                                 }
                                 else

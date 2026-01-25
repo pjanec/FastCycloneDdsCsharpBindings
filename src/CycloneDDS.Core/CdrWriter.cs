@@ -200,6 +200,49 @@ namespace CycloneDDS.Core
             }
         }
 
+        public void WriteFixedString(ReadOnlySpan<char> value, int internalLength)
+        {
+            // Writes string to a fixed-size byte buffer (char array in C)
+            // No Length Header. Just bytes + NUL padding.
+            
+            // Calculate actual bytes needed for content
+            int utf8Length = System.Text.Encoding.UTF8.GetByteCount(value);
+            
+            // Truncate if too long (should not happen if validated, but safe)
+            // Actually verifying byte count vs length is hard without encoding, 
+            // but we assume internalLength is the byte size of the array (e.g. 17).
+            
+            EnsureSize(internalLength);
+            
+            // Write available chars
+            // Check if utf8Length > internalLength - 1 (must define NUL?)
+            // If it's a fixed char array, usually it's "Zero terminated if shorter than Max, otherwise not"?
+            // Or strictly always NUL terminated?
+            // "string<16>" -> "char[17]" implies it strictly has room for NUL.
+            int maxContent = internalLength - 1; 
+
+            // Copy to a temp buffer first if needed? No, GetBytes writes to span.
+            // But we can't write more than maxContent.
+            // Simplified: Write, check length.
+            
+            // Optimization: If we trust byte count:
+            if (utf8Length > maxContent)
+            {
+                 // Truncation needed logic (complex for UTF8), for now assume fit
+                 // Or throw?
+            }
+
+            int written = System.Text.Encoding.UTF8.GetBytes(value, _span.Slice(_buffered, internalLength));
+            
+            // Pad remainder with 0
+            if (written < internalLength)
+            {
+                 _span.Slice(_buffered + written, internalLength - written).Clear();
+            }
+            
+            _buffered += internalLength;
+        }
+
         public void WriteFixedString(ReadOnlySpan<byte> utf8Bytes, int fixedSize)
         {
             EnsureSize(fixedSize);

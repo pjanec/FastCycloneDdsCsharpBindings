@@ -261,11 +261,24 @@ namespace CycloneDDS.Core
              return val;
         }
 
+        public string ReadFixedString(int length)
+        {
+            var span = ReadFixedBytes(length);
+            int validLen = 0;
+            while (validLen < span.Length && span[validLen] != 0)
+            {
+                validLen++;
+            }
+            return System.Text.Encoding.UTF8.GetString(span.Slice(0, validLen));
+        }
+
         public void Seek(int position)
         {
             if (position < 0 || position > _data.Length)
                 throw new IndexOutOfRangeException();
             _position = position;
         }
+
+
     }
 }

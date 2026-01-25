@@ -415,12 +415,17 @@ namespace CycloneDDS.CodeGen
             string elementType = field.TypeName.Substring(0, field.TypeName.Length - 2);
             string fieldAccess = $"view.{ToPascalCase(field.Name)}"; // ToPascalCase added
 
+            int arrayLen = GetArrayLength(field);
+            string lengthRead = arrayLen >= 0 
+                 ? $"int length{field.Name} = {arrayLen};"
+                 : $@"reader.Align(4);
+            int length{field.Name} = (int)reader.ReadUInt32();";
+
             if (TypeMapper.IsBlittable(elementType))
             {
                  int align = GetAlignment(elementType);
                  string alignA = align == 8 ? "reader.IsXcdr2 ? 4 : 8" : align.ToString();
-                 return $@"reader.Align(4);
-            int length{field.Name} = (int)reader.ReadUInt32();
+                 return $@"{lengthRead}
             if (length{field.Name} > 0)
             {{
                 reader.Align({alignA});
@@ -439,8 +444,7 @@ namespace CycloneDDS.CodeGen
             
              if (readMethod != null)
              {
-                 return $@"reader.Align(4);
-            int length{field.Name} = (int)reader.ReadUInt32();
+                 return $@"{lengthRead}
             {fieldAccess} = new {elementType}[length{field.Name}];
             for (int i = 0; i < length{field.Name}; i++)
             {{
@@ -451,8 +455,20 @@ namespace CycloneDDS.CodeGen
              
              if (elementType == "string" || elementType == "String" || elementType == "System.String")
              {
-                 return $@"reader.Align(4);
-            int length{field.Name} = (int)reader.ReadUInt32();
+                 var maxLenAttr = field.GetAttribute("System.ComponentModel.DataAnnotations.MaxLengthAttribute") 
+                                 ?? field.GetAttribute("MaxLength");
+                 if (maxLenAttr != null)
+                 {
+                    int maxLen = (int)maxLenAttr.Arguments[0];
+                    return $@"{lengthRead}
+            {fieldAccess} = new string[length{field.Name}];
+            for (int i = 0; i < length{field.Name}; i++)
+            {{
+                {fieldAccess}[i] = reader.ReadFixedString({maxLen} + 1);
+            }}";
+                 }
+
+                 return $@"{lengthRead}
             {fieldAccess} = new string[length{field.Name}];
             for (int i = 0; i < length{field.Name}; i++)
             {{
@@ -461,8 +477,7 @@ namespace CycloneDDS.CodeGen
             }}";
              }
 
-             return $@"reader.Align(4);
-            int length{field.Name} = (int)reader.ReadUInt32();
+             return $@"{lengthRead}
             {fieldAccess} = new {elementType}[length{field.Name}];
             for (int i = 0; i < length{field.Name}; i++)
             {{
@@ -726,6 +741,28 @@ namespace CycloneDDS.CodeGen
                  if (idAttr.Arguments[0] is string s && int.TryParse(s, out int sid)) return sid;
             }
             return defaultId;
+        }
+
+        private int GetMaxLength(FieldInfo field)
+        {
+            var attr = field.GetAttribute("MaxLength");
+            if (attr != null && attr.CaseValues != null && attr.CaseValues.Count > 0)
+            {
+                 if (attr.CaseValues[0] is int val) return val;
+                 if (attr.CaseValues[0] is string s && int.TryParse(s, out int i)) return i;
+            }
+            return -1;
+        }
+
+        private int GetArrayLength(FieldInfo field)
+        {
+            var attr = field.GetAttribute("ArrayLength");
+            if (attr != null && attr.CaseValues != null && attr.CaseValues.Count > 0)
+            {
+                 if (attr.CaseValues[0] is int val) return val;
+                 if (attr.CaseValues[0] is string s && int.TryParse(s, out int i)) return i;
+            }
+            return -1;
         }
 
         private string ToPascalCase(string name)

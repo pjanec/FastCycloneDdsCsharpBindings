@@ -774,4 +774,25 @@ module AtomicTests {
         string<16> names[5];
     };
 
+    @appendable
+    @topic
+    struct Array2DInt32TopicAppendable {
+        @key long id;
+        long matrix[3][4];
+    };
+
+    @appendable
+    @topic
+    struct Array3DInt32TopicAppendable {
+        @key long id;
+        long cube[2][3][4];
+    };
+
+    @appendable
+    @topic
+    struct ArrayStructTopicAppendable {
+        @key long id;
+        AtomicTests::Point2D points[3];
+    };
+
 };

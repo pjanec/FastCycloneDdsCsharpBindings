@@ -627,7 +627,19 @@ namespace CycloneDDS.CodeGen
             string loopBody;
 
             if (elementType == "string" || elementType == "String" || elementType == "System.String")
-                loopBody = $"writer.Align(4); writer.WriteString({fieldAccess}[i], writer.IsXcdr2);";
+            { 
+                var maxLenAttr = field.GetAttribute("System.ComponentModel.DataAnnotations.MaxLengthAttribute") 
+                                 ?? field.GetAttribute("MaxLength");
+                if (maxLenAttr != null)
+                {
+                    int maxLen = (int)maxLenAttr.Arguments[0];
+                    loopBody = $"writer.WriteFixedString({fieldAccess}[i], {maxLen + 1});";
+                }
+                else
+                {
+                    loopBody = $"writer.Align(4); writer.WriteString({fieldAccess}[i], writer.IsXcdr2);";
+                }
+            }
             else if (writerMethod != null)
                 loopBody = $"writer.Align({alignElA}); writer.{writerMethod}({fieldAccess}[i]);";
             else
@@ -928,6 +940,17 @@ namespace CycloneDDS.CodeGen
             {{
                 sizer.Skip(item.GetSerializedSize(sizer.Position, encoding));
             }}";
+        }
+
+        private int GetMaxLength(FieldInfo field)
+        {
+            var attr = field.GetAttribute("MaxLength");
+            if (attr != null && attr.CaseValues != null && attr.CaseValues.Count > 0)
+            {
+                 if (attr.CaseValues[0] is int val) return val;
+                 if (attr.CaseValues[0] is string s && int.TryParse(s, out int i)) return i;
+            }
+            return -1;
         }
 
         private string ToPascalCase(string name)
