@@ -62,6 +62,13 @@ namespace CsharpToC.Roundtrip.Tests
                 await TestSequenceInt32();
                 await TestUnionLongDisc();
 
+                // Appendable Tests
+                await TestBooleanAppendable();
+                await TestInt32Appendable();
+                await TestStringBounded32Appendable();
+                await TestSequenceInt32Appendable();
+                await TestUnionLongDiscAppendable();
+
                 Console.WriteLine("==================================================");
                 Console.WriteLine("ALL TESTS PASSED");
                 Console.WriteLine("==================================================");
@@ -312,6 +319,115 @@ namespace CsharpToC.Roundtrip.Tests
                     int disc = (s % 3) + 1;
                     
                     var u = new SimpleUnion();
+                    u._d = disc; 
+                    
+                    if (disc == 1) { 
+                        u.Int_value = s * 100;
+                    } else if (disc == 2) {
+                        u.Double_value = s * 1.5;
+                    } else if (disc == 3) {
+                        u.String_value = $"Union_{s}";
+                    }
+                    msg.Data = u;
+                    return msg;
+                },
+                (msg, s) => {
+                    if (msg.Id != s) return false;
+                    int disc = (s % 3) + 1;
+                    if (msg.Data._d != disc) return false; 
+                    
+                    if (disc == 1) return msg.Data.Int_value == s * 100;
+                    if (disc == 2) return Math.Abs(msg.Data.Double_value - (s * 1.5)) < 0.0001;
+                    if (disc == 3) return msg.Data.String_value == $"Union_{s}";
+                    return false;
+                }
+            );
+        }
+
+        // --- Appendable Tests ---
+
+        static async Task TestBooleanAppendable()
+        {
+            await RunRoundtrip<BooleanTopicAppendable>(
+                "AtomicTests::BooleanTopicAppendable", 
+                1100,
+                (s) => { 
+                    var msg = new BooleanTopicAppendable(); 
+                    msg.Id = s; 
+                    msg.Value = (s % 2) != 0; 
+                    return msg; 
+                },
+                (msg, s) => msg.Id == s && msg.Value == ((s % 2) != 0)
+            );
+        }
+
+        static async Task TestInt32Appendable()
+        {
+            await RunRoundtrip<Int32TopicAppendable>(
+                "AtomicTests::Int32TopicAppendable", 
+                1200,
+                (s) => { 
+                    var msg = new Int32TopicAppendable(); 
+                    msg.Id = s; 
+                    msg.Value = (int)((s * 1664525L) + 1013904223L); 
+                    return msg; 
+                },
+                (msg, s) => msg.Id == s && msg.Value == (int)((s * 1664525L) + 1013904223L)
+            );
+        }
+
+        static async Task TestStringBounded32Appendable()
+        {
+            await RunRoundtrip<StringBounded32TopicAppendable>(
+                "AtomicTests::StringBounded32TopicAppendable", 
+                1300,
+                (s) => { 
+                    var msg = new StringBounded32TopicAppendable(); 
+                    msg.Id = s; 
+                    msg.Value = $"Str_{s}"; 
+                    return msg; 
+                },
+                (msg, s) => msg.Id == s && msg.Value == $"Str_{s}"
+            );
+        }
+
+        static async Task TestSequenceInt32Appendable()
+        {
+            await RunRoundtrip<SequenceInt32TopicAppendable>(
+                "AtomicTests::SequenceInt32TopicAppendable", 
+                1500,
+                (s) => { 
+                    var msg = new SequenceInt32TopicAppendable();
+                    msg.Id = s; 
+                    int len = s % 6;
+                    var list = new System.Collections.Generic.List<int>();
+                    for(int i=0; i<len; i++) list.Add((int)((s + i) * 31));
+                    msg.Values = list;
+                    return msg;
+                },
+                (msg, s) => {
+                    if (msg.Id != s) return false;
+                    int len = s % 6;
+                    if ((msg.Values == null) && (len == 0)) return true;
+                    if (msg.Values == null) return false;
+                    if (msg.Values.Count != len) return false;
+                    for(int i=0; i<len; i++) if (msg.Values[i] != (int)((s + i) * 31)) return false;
+                    return true;
+                }
+            );
+        }
+
+        static async Task TestUnionLongDiscAppendable()
+        {
+            await RunRoundtrip<UnionLongDiscTopicAppendable>(
+                "AtomicTests::UnionLongDiscTopicAppendable", 
+                1600,
+                (s) => { 
+                    var msg = new UnionLongDiscTopicAppendable();
+                    msg.Id = s; 
+                    int disc = (s % 3) + 1;
+                    
+                    var u = new SimpleUnionAppendable();
                     u._d = disc; 
                     
                     if (disc == 1) { 

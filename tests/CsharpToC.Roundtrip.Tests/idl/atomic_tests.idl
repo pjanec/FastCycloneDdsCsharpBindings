@@ -616,4 +616,50 @@ module AtomicTests {
         double double_val;
     };
     
-}; // module AtomicTests
+    // ========================================================================
+    // ROUNDTRIP SPECIFIC APPENDABLE DUPLICATES
+    // ========================================================================
+
+    @appendable
+    @topic
+    struct BooleanTopicAppendable {
+        @key long id;
+        boolean value;
+    };
+
+    @appendable
+    @topic
+    struct Int32TopicAppendable {
+        @key long id;
+        long value;
+    };
+
+    @appendable
+    @topic
+    struct StringBounded32TopicAppendable {
+        @key long id;
+        string<32> value;
+    };
+
+    @appendable
+    @topic
+    struct SequenceInt32TopicAppendable {
+        @key long id;
+        sequence<long> values;
+    };
+
+    @appendable
+    union SimpleUnionAppendable switch(long) {
+        case 1: long int_value;
+        case 2: double double_value;
+        case 3: string string_value;
+    };
+
+    @appendable
+    @topic
+    struct UnionLongDiscTopicAppendable {
+        @key long id;
+        SimpleUnionAppendable data;
+    };
+
+};

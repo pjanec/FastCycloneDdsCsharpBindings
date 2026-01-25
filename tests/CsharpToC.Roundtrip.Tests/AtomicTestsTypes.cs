@@ -89,4 +89,79 @@ namespace AtomicTests
         
         public SimpleUnion Data { get; set; }
     }
+
+    // ========================================================================
+    // ROUNDTRIP SPECIFIC APPENDABLE DUPLICATES
+    // ========================================================================
+
+    [DdsTopic("BooleanTopicAppendable")]
+    [DdsExtensibility(DdsExtensibilityKind.Appendable)]
+    public partial struct BooleanTopicAppendable
+    {
+        [DdsKey]
+        public int Id { get; set; }
+        public bool Value { get; set; }
+    }
+
+    [DdsTopic("Int32TopicAppendable")]
+    [DdsExtensibility(DdsExtensibilityKind.Appendable)]
+    public partial struct Int32TopicAppendable
+    {
+        [DdsKey]
+        public int Id { get; set; }
+        public int Value { get; set; }
+    }
+
+    [DdsTopic("StringBounded32TopicAppendable")]
+    [DdsManaged]
+    [DdsExtensibility(DdsExtensibilityKind.Appendable)]
+    public partial struct StringBounded32TopicAppendable
+    {
+        [DdsKey]
+        public int Id { get; set; }
+        
+        [MaxLength(32)]
+        public string Value { get; set; }
+    }
+
+    [DdsTopic("SequenceInt32TopicAppendable")]
+    [DdsManaged]
+    [DdsExtensibility(DdsExtensibilityKind.Appendable)]
+    public partial struct SequenceInt32TopicAppendable
+    {
+        [DdsKey]
+        public int Id { get; set; }
+        
+        public List<int> Values { get; set; }
+    }
+
+    [DdsUnion]
+    [DdsStruct]
+    [DdsManaged]
+    [DdsExtensibility(DdsExtensibilityKind.Appendable)]
+    public partial struct SimpleUnionAppendable
+    {
+        [DdsDiscriminator]
+        public int _d { get; set; }
+
+        [DdsCase(1)]
+        public int Int_value { get; set; }
+
+        [DdsCase(2)]
+        public double Double_value { get; set; }
+
+        [DdsCase(3)]
+        public string String_value { get; set; }
+    }
+
+    [DdsTopic("UnionLongDiscTopicAppendable")]
+    [DdsManaged]
+    [DdsExtensibility(DdsExtensibilityKind.Appendable)]
+    public partial struct UnionLongDiscTopicAppendable
+    {
+        [DdsKey]
+        public int Id { get; set; }
+        
+        public SimpleUnionAppendable Data { get; set; }
+    }
 }

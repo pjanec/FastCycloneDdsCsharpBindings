@@ -20,7 +20,12 @@ extern const topic_handler_t sequence_int32_topic_handler;
 extern const topic_handler_t string_bounded_32_topic_handler;
 extern const topic_handler_t array_int32_topic_handler;
 extern const topic_handler_t union_long_disc_topic_handler;
-// Add more external handlers here
+
+extern const topic_handler_t boolean_topic_appendable_handler;
+extern const topic_handler_t int32_topic_appendable_handler;
+extern const topic_handler_t string_bounded_32_topic_appendable_handler;
+extern const topic_handler_t sequence_int32_topic_appendable_handler;
+extern const topic_handler_t union_long_disc_topic_appendable_handler;
 
 static const topic_handler_t* handlers[] = {
     &boolean_topic_handler,
@@ -29,6 +34,11 @@ static const topic_handler_t* handlers[] = {
     &string_bounded_32_topic_handler,
     &array_int32_topic_handler,
     &union_long_disc_topic_handler,
+    &boolean_topic_appendable_handler,
+    &int32_topic_appendable_handler,
+    &string_bounded_32_topic_appendable_handler,
+    &sequence_int32_topic_appendable_handler,
+    &union_long_disc_topic_appendable_handler,
     NULL
 };
 
