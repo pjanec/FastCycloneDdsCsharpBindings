@@ -172,6 +172,100 @@ int main(int argc, char** argv) {
     VERIFY_ROUNDTRIP_TOPIC("CompositeKey", CompositeKey);
     VERIFY_ROUNDTRIP_TOPIC("NestedKeyTopic", NestedKeyTopic);
 
+    // Macro for AtomicTests
+    #define VERIFY_ATOMIC_TOPIC(TYPE_NAME, C_TYPE) \
+    do { \
+        cJSON* jNode = find_type(json, "AtomicTests::" TYPE_NAME); \
+        if (jNode) { \
+            ASSERT_EQ("sizeof(AtomicTests::" TYPE_NAME ")", sizeof(AtomicTests_##C_TYPE), \
+                      cJSON_GetObjectItem(jNode, "Size")->valueint); \
+            verify_descriptor("AtomicTests::" TYPE_NAME, &AtomicTests_##C_TYPE##_desc, jNode, &errors); \
+        } else { \
+            printf("[SKIP] Type AtomicTests::%s not found in JSON\n", TYPE_NAME); \
+        } \
+    } while(0)
+
+    // Verify AtomicTests (Batch 1: Basic Primitives)
+    VERIFY_ATOMIC_TOPIC("BooleanTopic", BooleanTopic);
+    VERIFY_ATOMIC_TOPIC("CharTopic", CharTopic);
+    VERIFY_ATOMIC_TOPIC("OctetTopic", OctetTopic);
+    VERIFY_ATOMIC_TOPIC("Int16Topic", Int16Topic);
+    VERIFY_ATOMIC_TOPIC("UInt16Topic", UInt16Topic);
+    VERIFY_ATOMIC_TOPIC("Int32Topic", Int32Topic);
+    VERIFY_ATOMIC_TOPIC("UInt32Topic", UInt32Topic);
+    VERIFY_ATOMIC_TOPIC("Int64Topic", Int64Topic);
+    VERIFY_ATOMIC_TOPIC("UInt64Topic", UInt64Topic);
+    VERIFY_ATOMIC_TOPIC("Float32Topic", Float32Topic);
+    VERIFY_ATOMIC_TOPIC("Float64Topic", Float64Topic);
+    VERIFY_ATOMIC_TOPIC("StringUnboundedTopic", StringUnboundedTopic);
+    VERIFY_ATOMIC_TOPIC("StringBounded32Topic", StringBounded32Topic);
+    VERIFY_ATOMIC_TOPIC("StringBounded256Topic", StringBounded256Topic);
+
+    // Verify AtomicTests (Batch 2: Enums)
+    VERIFY_ATOMIC_TOPIC("EnumTopic", EnumTopic);
+    VERIFY_ATOMIC_TOPIC("ColorEnumTopic", ColorEnumTopic);
+
+    // Verify AtomicTests (Batch 3: Nested Structs)
+    VERIFY_ATOMIC_TOPIC("NestedStructTopic", NestedStructTopic);
+    VERIFY_ATOMIC_TOPIC("Nested3DTopic", Nested3DTopic);
+    VERIFY_ATOMIC_TOPIC("DoublyNestedTopic", DoublyNestedTopic);
+    VERIFY_ATOMIC_TOPIC("ComplexNestedTopic", ComplexNestedTopic);
+
+    // Verify AtomicTests (Batch 4: Unions)
+    VERIFY_ATOMIC_TOPIC("UnionLongDiscTopic", UnionLongDiscTopic);
+    VERIFY_ATOMIC_TOPIC("UnionBoolDiscTopic", UnionBoolDiscTopic);
+    VERIFY_ATOMIC_TOPIC("UnionEnumDiscTopic", UnionEnumDiscTopic);
+    VERIFY_ATOMIC_TOPIC("UnionShortDiscTopic", UnionShortDiscTopic);
+
+    // Verify AtomicTests (Batch 5: Optional Fields)
+    VERIFY_ATOMIC_TOPIC("OptionalInt32Topic", OptionalInt32Topic);
+    VERIFY_ATOMIC_TOPIC("OptionalFloat64Topic", OptionalFloat64Topic);
+    VERIFY_ATOMIC_TOPIC("OptionalStringTopic", OptionalStringTopic);
+    VERIFY_ATOMIC_TOPIC("OptionalStructTopic", OptionalStructTopic);
+    VERIFY_ATOMIC_TOPIC("OptionalEnumTopic", OptionalEnumTopic);
+    VERIFY_ATOMIC_TOPIC("MultiOptionalTopic", MultiOptionalTopic);
+
+    // Verify AtomicTests (Batch 6: Sequences)
+    VERIFY_ATOMIC_TOPIC("SequenceInt32Topic", SequenceInt32Topic);
+    VERIFY_ATOMIC_TOPIC("BoundedSequenceInt32Topic", BoundedSequenceInt32Topic);
+    VERIFY_ATOMIC_TOPIC("SequenceInt64Topic", SequenceInt64Topic);
+    VERIFY_ATOMIC_TOPIC("SequenceFloat32Topic", SequenceFloat32Topic);
+    VERIFY_ATOMIC_TOPIC("SequenceFloat64Topic", SequenceFloat64Topic);
+    VERIFY_ATOMIC_TOPIC("SequenceBooleanTopic", SequenceBooleanTopic);
+    VERIFY_ATOMIC_TOPIC("SequenceOctetTopic", SequenceOctetTopic);
+    VERIFY_ATOMIC_TOPIC("SequenceStringTopic", SequenceStringTopic);
+    VERIFY_ATOMIC_TOPIC("SequenceEnumTopic", SequenceEnumTopic);
+    VERIFY_ATOMIC_TOPIC("SequenceStructTopic", SequenceStructTopic);
+    VERIFY_ATOMIC_TOPIC("SequenceUnionTopic", SequenceUnionTopic);
+
+    // Verify AtomicTests (Batch 7: Arrays)
+    VERIFY_ATOMIC_TOPIC("ArrayInt32Topic", ArrayInt32Topic);
+    VERIFY_ATOMIC_TOPIC("ArrayFloat64Topic", ArrayFloat64Topic);
+    VERIFY_ATOMIC_TOPIC("ArrayStringTopic", ArrayStringTopic);
+    VERIFY_ATOMIC_TOPIC("Array2DInt32Topic", Array2DInt32Topic);
+    VERIFY_ATOMIC_TOPIC("Array3DInt32Topic", Array3DInt32Topic);
+    VERIFY_ATOMIC_TOPIC("ArrayStructTopic", ArrayStructTopic);
+
+    // Verify AtomicTests (Batch 8: Extensibility)
+    VERIFY_ATOMIC_TOPIC("AppendableInt32Topic", AppendableInt32Topic);
+    VERIFY_ATOMIC_TOPIC("AppendableStructTopic", AppendableStructTopic);
+    VERIFY_ATOMIC_TOPIC("FinalInt32Topic", FinalInt32Topic);
+    VERIFY_ATOMIC_TOPIC("FinalStructTopic", FinalStructTopic);
+    VERIFY_ATOMIC_TOPIC("MutableInt32Topic", MutableInt32Topic);
+    VERIFY_ATOMIC_TOPIC("MutableStructTopic", MutableStructTopic);
+
+    // Verify AtomicTests (Batch 9: Composite Keys)
+    VERIFY_ATOMIC_TOPIC("TwoKeyInt32Topic", TwoKeyInt32Topic);
+    VERIFY_ATOMIC_TOPIC("TwoKeyStringTopic", TwoKeyStringTopic);
+    VERIFY_ATOMIC_TOPIC("ThreeKeyTopic", ThreeKeyTopic);
+    VERIFY_ATOMIC_TOPIC("FourKeyTopic", FourKeyTopic);
+
+    // Verify AtomicTests (Batch 10: Nested Keys)
+    VERIFY_ATOMIC_TOPIC("NestedKeyTopic", NestedKeyTopic);
+    VERIFY_ATOMIC_TOPIC("NestedKeyGeoTopic", NestedKeyGeoTopic);
+    VERIFY_ATOMIC_TOPIC("NestedTripleKeyTopic", NestedTripleKeyTopic);
+
+
     printf("\n==================================================\n");
     if (errors == 0) printf("RESULT: PASSED (All %d topics verified)\n", 10);
     else printf("RESULT: FAILED (%d errors)\n", errors);

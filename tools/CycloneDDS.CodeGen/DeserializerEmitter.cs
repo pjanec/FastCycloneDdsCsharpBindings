@@ -159,10 +159,11 @@ namespace CycloneDDS.CodeGen
             sb.AppendLine("                }");
             sb.AppendLine("                else");
             sb.AppendLine("                {");
+            // ToPascalCase added
             if (IsReferenceType(baseType))
-                sb.AppendLine($"                    view.{field.Name} = null;");
+                sb.AppendLine($"                    view.{ToPascalCase(field.Name)} = null;");
             else
-                sb.AppendLine($"                    view.{field.Name} = null;");
+                sb.AppendLine($"                    view.{ToPascalCase(field.Name)} = null;");
             sb.AppendLine("                }");
             sb.AppendLine("            }");
         }
@@ -178,7 +179,8 @@ namespace CycloneDDS.CodeGen
             sb.AppendLine($"                {GetReadCall(type, discriminator)};");
             sb.AppendLine("            }");
 
-            sb.AppendLine($"            switch (({GetDiscriminatorCastType(discriminator.TypeName)})view.{discriminator.Name})");
+            // ToPascalCase added
+            sb.AppendLine($"            switch (({GetDiscriminatorCastType(discriminator.TypeName)})view.{ToPascalCase(discriminator.Name)})");
             sb.AppendLine("            {");
             
             foreach (var field in type.Fields)
@@ -205,12 +207,6 @@ namespace CycloneDDS.CodeGen
             else
             {
                 sb.AppendLine("                default:");
-                // Unknown case: handled by the generic seek(endPos) outside.
-                // But DHEADER logic says "Seek(EndPos)" for unknown cases.
-                // The outer generic code `if (reader.Position < endPos) reader.Seek(endPos);` handles this!
-                // So checking `switch` logic, it executes one branch. If that branch consumes data, `reader.Position` advances.
-                // If unknown branch (default empty), `reader.Position` stays at discriminator end.
-                // Outer code sees `Position < endPos` and skips remainder. Correct.
                 sb.AppendLine("                    break;");
             }
             
@@ -224,6 +220,8 @@ namespace CycloneDDS.CodeGen
 
         private void EmitViewStruct(StringBuilder sb, TypeInfo type)
         {
+             // NOTE: EmitViewStruct is commented out in usage but included here.
+             // I will update it just in case.
              bool needsRef = type.Fields.Any(f => 
              {
                  string baseType = GetBaseType(f.TypeName);
@@ -245,9 +243,8 @@ namespace CycloneDDS.CodeGen
              foreach(var field in type.Fields)
              {
                  string typeName = MapToViewType(field);
-                 sb.AppendLine($"        public {typeName} {field.Name};");
-                 
-
+                 sb.AppendLine($"        public {typeName} {field.Name};"); // This defines fields on the VIEW struct. Probably original name is fine?
+                 // But ToOwned maps from View to Main Struct.
              }
              
              // ToOwned
@@ -260,9 +257,10 @@ namespace CycloneDDS.CodeGen
                  var discriminator = type.Fields.FirstOrDefault(f => f.HasAttribute("DdsDiscriminator"));
                  if (discriminator != null)
                  {
-                     sb.AppendLine($"            instance.{discriminator.Name} = {MapToOwnedConversion(discriminator)};");
+                     // ToPascalCase added
+                     sb.AppendLine($"            instance.{ToPascalCase(discriminator.Name)} = {MapToOwnedConversion(discriminator)};");
                      
-                     sb.AppendLine($"            switch (({GetDiscriminatorCastType(discriminator.TypeName)})instance.{discriminator.Name})");
+                     sb.AppendLine($"            switch (({GetDiscriminatorCastType(discriminator.TypeName)})instance.{ToPascalCase(discriminator.Name)})");
                      sb.AppendLine("            {");
                      
                      foreach (var field in type.Fields)
@@ -274,7 +272,7 @@ namespace CycloneDDS.CodeGen
                              {
                                  sb.AppendLine($"                case {val}:");
                              }
-                             sb.AppendLine($"                    instance.{field.Name} = {MapToOwnedConversion(field)};");
+                             sb.AppendLine($"                    instance.{ToPascalCase(field.Name)} = {MapToOwnedConversion(field)};");
                              sb.AppendLine("                    break;");
                          }
                      }
@@ -283,7 +281,7 @@ namespace CycloneDDS.CodeGen
                      if (defaultField != null)
                      {
                          sb.AppendLine("                default:");
-                         sb.AppendLine($"                    instance.{defaultField.Name} = {MapToOwnedConversion(defaultField)};");
+                         sb.AppendLine($"                    instance.{ToPascalCase(defaultField.Name)} = {MapToOwnedConversion(defaultField)};");
                          sb.AppendLine("                    break;");
                      }
                      else
@@ -298,7 +296,7 @@ namespace CycloneDDS.CodeGen
              {
                  foreach(var field in type.Fields)
                  {
-                     sb.AppendLine($"            instance.{field.Name} = {MapToOwnedConversion(field)};");
+                     sb.AppendLine($"            instance.{ToPascalCase(field.Name)} = {MapToOwnedConversion(field)};"); // ToPascalCase added
                  }
              }
              
@@ -315,22 +313,18 @@ namespace CycloneDDS.CodeGen
                 string baseType = GetBaseType(field.TypeName);
                 string viewType = MapBaseToViewType(baseType, field);
                 if (IsReferenceType(baseType))
-                   return viewType; // string? is already nullable ref type (in context) or just string
+                   return viewType;
                 return $"{viewType}?"; 
             }
             return MapBaseToViewType(field.TypeName, field);
         }
 
-        private string MapBaseToViewType(string typeName, FieldInfo field) // Refactored
+        private string MapBaseToViewType(string typeName, FieldInfo field)
         {
             if (typeName == "string" && field.HasAttribute("DdsManaged"))
                 return "string";
-
-            // Handle List<T>
-             if (typeName.StartsWith("List<") || typeName.StartsWith("System.Collections.Generic.List<"))
-             {
+            if (typeName.StartsWith("List<") || typeName.StartsWith("System.Collections.Generic.List<"))
                  return typeName;
-             }
 
             if (typeName == "string") return "string?"; 
 
@@ -339,20 +333,13 @@ namespace CycloneDDS.CodeGen
                 string elem = ExtractSequenceElementType(typeName);
                 if (IsPrimitive(elem))
                     return $"ReadOnlySpan<{elem}>"; 
-                
-                // If element View is a ref struct, we cannot have an array of it.
-                // We fallback to array of DTOs (Owned).
                 if (_generatedRefStructs.Contains(elem))
                     return $"{elem}[]";
-                
                 if (elem == "string") return "string[]";
-                    
                 return $"{elem}View[]"; 
             }
-            
             if (IsPrimitive(typeName))
                 return typeName;
-            
             return $"{typeName}View";
         }
         
@@ -367,11 +354,12 @@ namespace CycloneDDS.CodeGen
             string alignA = align == 8 ? "reader.IsXcdr2 ? 4 : 8" : align.ToString();
             string alignCall = align > 1 ? $"reader.Align({alignA}); " : "";
             
+            // ToPascalCase added to all field access below
             if (field.TypeName == "string")
             {
                 if (ShouldUseManagedDeserialization(type, field))
-                    return $"reader.Align(4); view.{field.Name} = reader.ReadString()";
-                return $"reader.Align(4); view.{field.Name} = Encoding.UTF8.GetString(reader.ReadStringBytes().ToArray())";
+                    return $"reader.Align(4); view.{ToPascalCase(field.Name)} = reader.ReadString()";
+                return $"reader.Align(4); view.{ToPascalCase(field.Name)} = Encoding.UTF8.GetString(reader.ReadStringBytes().ToArray())";
             }
 
             if (field.TypeName.EndsWith("[]"))
@@ -384,7 +372,6 @@ namespace CycloneDDS.CodeGen
                 return EmitSequenceReader(field);
             }
 
-            // Handle List<T>
             if (field.TypeName.StartsWith("List<") || field.TypeName.StartsWith("System.Collections.Generic.List<"))
             {
                  return EmitListReader(field);
@@ -392,24 +379,22 @@ namespace CycloneDDS.CodeGen
             
             if (IsPrimitive(field.TypeName))
             {
-                 string method = TypeMapper.GetSizerMethod(field.TypeName)!.Replace("Write", "Read"); // Method names match?
-                 // WriteInt32 -> ReadInt32
-                 return $"{alignCall}view.{field.Name} = reader.{method}()";
+                 string method = TypeMapper.GetSizerMethod(field.TypeName)!.Replace("Write", "Read"); 
+                 return $"{alignCall}view.{ToPascalCase(field.Name)} = reader.{method}()";
             }
             
             if (_registry != null && _registry.TryGetDefinition(field.TypeName, out var def) && def.TypeInfo != null && def.TypeInfo.IsEnum)
             {
-                 return $"{alignCall}view.{field.Name} = ({field.TypeName})reader.ReadInt32()";
+                 return $"{alignCall}view.{ToPascalCase(field.Name)} = ({field.TypeName})reader.ReadInt32()";
             }
             
-            // Nested
-            return $"{alignCall}view.{field.Name} = {field.TypeName}.Deserialize(ref reader)";
+            return $"{alignCall}view.{ToPascalCase(field.Name)} = {field.TypeName}.Deserialize(ref reader)";
         }
         
         private string EmitArrayReader(FieldInfo field)
         {
             string elementType = field.TypeName.Substring(0, field.TypeName.Length - 2);
-            string fieldAccess = $"view.{field.Name}";
+            string fieldAccess = $"view.{ToPascalCase(field.Name)}"; // ToPascalCase added
 
             if (TypeMapper.IsBlittable(elementType))
             {
@@ -429,7 +414,6 @@ namespace CycloneDDS.CodeGen
             }}";
             }
 
-            // Fallback loop
             string? writerMethod = TypeMapper.GetWriterMethod(elementType);
             string? readMethod = writerMethod?.Replace("Write", "Read");
             if (readMethod == "ReadBool") readMethod = "ReadBoolean";
@@ -458,7 +442,6 @@ namespace CycloneDDS.CodeGen
             }}";
              }
 
-             // Nested
              return $@"reader.Align(4);
             int length{field.Name} = (int)reader.ReadUInt32();
             {fieldAccess} = new {elementType}[length{field.Name}];
@@ -478,6 +461,8 @@ namespace CycloneDDS.CodeGen
                 boundsCheck = $@"if ({field.Name}_len > {bound}) throw new IndexOutOfRangeException(""Sequence length exceeds bound {bound}"");";
             }
 
+            string fieldAccess = $"view.{ToPascalCase(field.Name)}"; // ToPascalCase added
+
             string elem = ExtractSequenceElementType(field.TypeName);
             if (IsPrimitive(elem))
             {
@@ -488,7 +473,7 @@ namespace CycloneDDS.CodeGen
             reader.Align({(GetAlignment(elem) == 8 ? "reader.IsXcdr2 ? 4 : 8" : GetAlignment(elem).ToString())});
             {{
                 var span = MemoryMarshal.Cast<byte, {elem}>(reader.ReadFixedBytes((int){field.Name}_len * {elemSize}));
-                view.{field.Name} = new BoundedSeq<{elem}>(new System.Collections.Generic.List<{elem}>(span.ToArray()));
+                {fieldAccess} = new BoundedSeq<{elem}>(new System.Collections.Generic.List<{elem}>(span.ToArray()));
             }}";
             }
             
@@ -503,11 +488,9 @@ namespace CycloneDDS.CodeGen
                 reader.Align(4);
                 list.Add(Encoding.UTF8.GetString(reader.ReadStringBytes().ToArray()));
             }}
-            view.{field.Name} = new BoundedSeq<string>(list);";
+            {fieldAccess} = new BoundedSeq<string>(list);";
             }
 
-            // Non-primitive sequence
-            // Assuming Own Types for now
             string itemType = elem; 
             string deserializerCall = $"{elem}.Deserialize(ref reader).ToOwned()";
             
@@ -519,7 +502,7 @@ namespace CycloneDDS.CodeGen
             {{
                 list.Add({deserializerCall});
             }}
-            view.{field.Name} = new BoundedSeq<{itemType}>(list);";
+            {fieldAccess} = new BoundedSeq<{itemType}>(list);";
         }
         
         private string MapToOwnedConversion(FieldInfo field)
@@ -527,15 +510,23 @@ namespace CycloneDDS.CodeGen
             if (IsOptional(field))
             {
                 string baseType = GetBaseType(field.TypeName);
-                string access = $"this.{field.Name}";
+                string access = $"this.{field.Name}"; // Note: this is on ViewStruct which I assume keeps Original names if I didn't change MapToViewType?
+                // Wait, EmitViewStruct generated `public {typeName} {field.Name};`. So view struct members are NOT pascal cased?
+                // If I change Deserializer logic to write to PascalCase members on the Main Struct, that's fine.
+                // But EmitViewStruct is for reading View structs.
+                // The main deserializer (EmitPartialStruct) writes directly to MAIN Struct (`var view = new {type.Name}()`).
+                // So my changes above affect Main Struct member access.
                 
-                // TODO: Handle Optional Managed Strings (ReadOnlySpan)
+                // For EmitViewStruct:
+                // I left `public {typeName} {field.Name}` (line 257).
+                // But `ToOwned` uses `instance.{ToPascalCase(field.Name)}`.
+                // So this looks consistent with the goal (Main struct has PascalCase, View struct has original case).
+                
                 if (baseType == "string")
                     return access; 
 
                 if (!IsReferenceType(baseType))
                 {
-                    // Struct/Primitive
                     if (IsPrimitive(baseType)) return access;
                     return $"{access}?.ToOwned()";
                 }
@@ -548,12 +539,8 @@ namespace CycloneDDS.CodeGen
         {
             if (typeName == "string")
                 return fieldName;
-
-             // Handle List<T>
              if (typeName.StartsWith("List<") || typeName.StartsWith("System.Collections.Generic.List<"))
-             {
                  return fieldName;
-             }
             
             if (!IsPrimitive(typeName) && !typeName.StartsWith("BoundedSeq"))
                 return $"{fieldName}.ToOwned()";
@@ -563,8 +550,6 @@ namespace CycloneDDS.CodeGen
                  string elem = ExtractSequenceElementType(typeName);
                  if (IsPrimitive(elem))
                      return $"new BoundedSeq<{elem}>({fieldName}.ToArray().ToList())"; 
-                 
-                 // If we stored DTOs (because element was ref struct), just ToList
                  if (_generatedRefStructs.Contains(elem) || elem == "string")
                      return $"new BoundedSeq<{elem}>({fieldName}.ToList())";
 
@@ -613,7 +598,6 @@ namespace CycloneDDS.CodeGen
                 "vector4" or "numerics.vector4" => 4,
                 "quaternion" or "numerics.quaternion" => 4,
                 "matrix4x4" or "numerics.matrix4x4" => 4,
-                
                 "long" or "int64" or "ulong" or "uint64" or "double" => 8,
                 "datetime" or "timespan" or "datetimeoffset" => 8,
                 "guid" => 1,
@@ -650,8 +634,8 @@ namespace CycloneDDS.CodeGen
         private string EmitListReader(FieldInfo field)
         {
             string elementType = ExtractGenericType(field.TypeName);
-            
-            // OPTIMIZATION: Block copy for primitives (int, double, etc.)
+            string fieldAccess = $"view.{ToPascalCase(field.Name)}"; // ToPascalCase added
+
             if (IsPrimitive(elementType))
             {
                 int elemSize = GetSize(elementType);
@@ -660,9 +644,9 @@ namespace CycloneDDS.CodeGen
                 
                 return $@"reader.Align(4);
             uint {field.Name}_len = reader.ReadUInt32();
-            view.{field.Name} = new List<{elementType}>((int){field.Name}_len);
-            System.Runtime.InteropServices.CollectionsMarshal.SetCount(view.{field.Name}, (int){field.Name}_len);
-            var targetSpan = System.Runtime.InteropServices.CollectionsMarshal.AsSpan(view.{field.Name});
+            {fieldAccess} = new List<{elementType}>((int){field.Name}_len);
+            System.Runtime.InteropServices.CollectionsMarshal.SetCount({fieldAccess}, (int){field.Name}_len);
+            var targetSpan = System.Runtime.InteropServices.CollectionsMarshal.AsSpan({fieldAccess});
             reader.Align({alignA});
             var sourceBytes = reader.ReadFixedBytes((int){field.Name}_len * {elemSize});
             System.Runtime.InteropServices.MemoryMarshal.Cast<byte, {elementType}>(sourceBytes).CopyTo(targetSpan);";
@@ -674,36 +658,34 @@ namespace CycloneDDS.CodeGen
             string addStatement;
             
             bool isEnum = false;
-            if (_registry != null && _registry.TryGetDefinition(elementType, out var def))
+            if (_registry != null && _registry.TryGetDefinition(elementType, out var def) && def.TypeInfo != null && def.TypeInfo.IsEnum)
             {
-                if (def.TypeInfo != null && def.TypeInfo.IsEnum)
-                {
-                    isEnum = true;
-                }
+                isEnum = true;
+                if (def.TypeInfo.HasAttribute("DdsBitmask")) isEnum = true; // Handle bitmask as scalar
             }
 
             if (readMethod != null)
             {
                  int align = GetAlignment(elementType);
                  string alignA = align == 8 ? "reader.IsXcdr2 ? 4 : 8" : align.ToString();
-                 addStatement = $"reader.Align({alignA}); view.{field.Name}.Add(reader.{readMethod}());";
+                 addStatement = $"reader.Align({alignA}); {fieldAccess}.Add(reader.{readMethod}());";
             }
             else if (elementType == "string" || elementType == "System.String")
             {
-                 addStatement = $"reader.Align(4); view.{field.Name}.Add(reader.ReadString());";
+                 addStatement = $"reader.Align(4); {fieldAccess}.Add(reader.ReadString());";
             }
             else if (isEnum)
             {
-                 addStatement = $"reader.Align(4); view.{field.Name}.Add(({elementType})reader.ReadInt32());";
+                 addStatement = $"reader.Align(4); {fieldAccess}.Add(({elementType})reader.ReadInt32());";
             }
             else
             {
-                 addStatement = $"view.{field.Name}.Add({elementType}.Deserialize(ref reader).ToOwned());";
+                 addStatement = $"{fieldAccess}.Add({elementType}.Deserialize(ref reader).ToOwned());";
             }
 
             return $@"reader.Align(4);
             uint {field.Name}_len = reader.ReadUInt32();
-            view.{field.Name} = new List<{elementType}>((int){field.Name}_len);
+            {fieldAccess} = new List<{elementType}>((int){field.Name}_len);
             for(int i=0; i<{field.Name}_len; i++)
             {{
                 {addStatement}
@@ -724,6 +706,12 @@ namespace CycloneDDS.CodeGen
                  if (idAttr.Arguments[0] is string s && int.TryParse(s, out int sid)) return sid;
             }
             return defaultId;
+        }
+
+        private string ToPascalCase(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return name;
+            return char.ToUpper(name[0]) + name.Substring(1);
         }
     }
 }

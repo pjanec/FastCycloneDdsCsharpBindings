@@ -138,32 +138,43 @@ namespace CycloneDDS.Runtime
 
             try
             {
-                // Set Data Representation: Support both XCDR1 and XCDR2
-                // Readers should generally accept EVERYTHING the C# binding supports.
-                if (topicName != "__FcdcSenderIdentity")
-                {
-                    short[] reps = { 
-                        DdsApi.DDS_DATA_REPRESENTATION_XCDR1, 
-                        DdsApi.DDS_DATA_REPRESENTATION_XCDR2 
-                    };
-                    DdsApi.dds_qset_data_representation(actualQos, 2, reps);
-                }
-
-                // 1. Get or register topic (using potentially modified QoS)
+                // 1. Get or register topic (using default/base QoS)
                 _topicHandle = participant.GetOrRegisterTopic<T>(topicName, actualQos);
 
-                // 2. Create Reader
-                var reader = DdsApi.dds_create_reader(
+                DdsApi.DdsEntity reader = default;
+
+                // STRATEGY: Retry logic for DataRepresentation to handle strict Topics (XCDR1 vs XCDR2)
+                // Attempt 1: XCDR1
+                if (topicName != "__FcdcSenderIdentity")
+                {
+                    short[] reps = { DdsApi.DDS_DATA_REPRESENTATION_XCDR1 };
+                    DdsApi.dds_qset_data_representation(actualQos, 1, reps);
+                }
+                
+                reader = DdsApi.dds_create_reader(
                     participant.NativeEntity,
                     _topicHandle, 
                     actualQos, 
                     IntPtr.Zero);
 
+                // Attempt 2: XCDR2 (if first failed)
+                if (!reader.IsValid && topicName != "__FcdcSenderIdentity")
+                {
+                    short[] reps = { DdsApi.DDS_DATA_REPRESENTATION_XCDR2 };
+                    DdsApi.dds_qset_data_representation(actualQos, 1, reps);
+                    
+                    reader = DdsApi.dds_create_reader(
+                        participant.NativeEntity,
+                        _topicHandle, 
+                        actualQos, 
+                        IntPtr.Zero);
+                }
+
                 if (!reader.IsValid)
                 {
                       int err = reader.Handle;
                       DdsApi.DdsReturnCode rc = (DdsApi.DdsReturnCode)err;
-                      throw new DdsException(rc, $"Failed to create reader for '{topicName}'");
+                      throw new DdsException(rc, $"Failed to create reader for '{topicName}' (tried XCDR1 and XCDR2)");
                 }
                 _readerHandle = new DdsEntityHandle(reader);
             }
@@ -697,7 +708,32 @@ namespace CycloneDDS.Runtime
             }
             return null;
         }
-        
+
+        public byte[]? GetRawCdrBytes(int index)
+        {
+            if (index < 0 || index >= _count) throw new IndexOutOfRangeException();
+            if (_infos == null || _samples == null) throw new ObjectDisposedException("ViewScope");
+            
+            // If invalid data, return null
+            if (_infos[index].ValidData == 0) return null;
+            
+            IntPtr serdata = _samples[index];
+            if (serdata == IntPtr.Zero) return null;
+
+            uint size = DdsApi.ddsi_serdata_size(serdata);
+            if (size == 0) return Array.Empty<byte>();
+
+            byte[] bytes = new byte[size];
+            unsafe
+            {
+                fixed (byte* p = bytes)
+                {
+                    DdsApi.ddsi_serdata_to_ser(serdata, UIntPtr.Zero, (UIntPtr)size, (IntPtr)p);
+                }
+            }
+            return bytes;
+        }
+
         public int Count => _count;
 
         public Enumerator GetEnumerator() => new Enumerator(this, _filter);

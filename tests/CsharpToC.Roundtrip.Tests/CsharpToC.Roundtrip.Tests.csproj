@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>12.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <PlatformTarget>x64</PlatformTarget>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <RootNamespace>CsharpToC.Roundtrip.Tests</RootNamespace>
+    <AssemblyName>CsharpToC.Roundtrip.Tests</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\CycloneDDS.Runtime\CycloneDDS.Runtime.csproj" />
+    <ProjectReference Include="..\..\src\CycloneDDS.Core\CycloneDDS.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Copy native DLL (CsharpToC_Roundtrip_Native.dll) -->
+    <None Include="Native\build\Release\CsharpToC_Roundtrip_Native.dll" 
+          Condition="Exists('Native\build\Release\CsharpToC_Roundtrip_Native.dll')"
+          CopyToOutputDirectory="Always" 
+          Link="CsharpToC_Roundtrip_Native.dll" />
+
+    <!-- Copy CycloneDDS DLLs -->
+    <None Include="..\..\cyclone-compiled\bin\ddsc.dll" 
+          Condition="Exists('..\..\cyclone-compiled\bin\ddsc.dll')" 
+          CopyToOutputDirectory="PreserveNewest" 
+          Link="ddsc.dll" />
+    <None Include="..\..\cyclone-compiled\bin\cycloneddsidl.dll" 
+          Condition="Exists('..\..\cyclone-compiled\bin\cycloneddsidl.dll')" 
+          CopyToOutputDirectory="PreserveNewest" 
+          Link="cycloneddsidl.dll" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <CycloneDdsIdl Include="idl\atomic_tests.idl" Link="atomic_tests.idl" />
+  </ItemGroup>
+
+  <Import Project="..\..\tools\CycloneDDS.CodeGen\CycloneDDS.targets" />
+
+</Project>

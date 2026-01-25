@@ -1,229 +1,3 @@
-module Verification {
-    // ========== ENUMS ==========
-    enum Color { RED, GREEN, BLUE, YELLOW };
-    enum Status { PENDING, ACTIVE, SUSPENDED, TERMINATED };
-    enum Priority { LOW, MEDIUM, HIGH, CRITICAL };
-    
-    // ========== BASIC STRUCTS ==========
-    struct Point2D {
-        double x;
-        double y;
-    };
-
-    struct Point3D {
-        double x;
-        double y;
-        double z;
-    };
-
-    struct NestedStruct {
-        char c;
-        long l;
-        short s;
-    };
-
-    // ========== UNIONS ==========
-    union Shape switch(long) {
-        case 1: Point2D p2d;
-        case 2: Point3D p3d;
-        case 3: long radius;
-    };
-
-    union Value switch(boolean) {
-        case TRUE: double dbl;
-        case FALSE: string str;
-    };
-
-    union IntUnion switch(short) {
-        case 1: octet byte_val;
-        case 2: short short_val;
-        case 3: long long_val;
-    };
-
-    // ========== TEST TOPIC 1: All Primitive Types ==========
-    @topic
-    struct AllPrimitives {
-        @key long id;
-        boolean bool_field;
-        char char_field;
-        octet octet_field;
-        short short_field;
-        unsigned short ushort_field;
-        long long_field;
-        unsigned long ulong_field;
-        long long llong_field;
-        unsigned long long ullong_field;
-        float float_field;
-        double double_field;
-    };
-
-    // ========== TEST TOPIC 2: Composite Key ==========
-    @topic
-    struct CompositeKey {
-        @key string<32> region;
-        @key long zone;
-        @key short sector;
-        string<64> name;
-        double value;
-    };
-
-    // ========== TEST TOPIC 3: Nested Key ==========
-    struct Location {
-        @key long building;
-        @key short floor;
-        long room;
-    };
-
-    @topic
-    struct NestedKeyTopic {
-        @key Location location;
-        string<128> description;
-        double temperature;
-    };
-
-    // ========== TEST TOPIC 4: Sequences ==========
-    typedef string<16> BoundedString16;
-    
-    @topic
-    struct SequenceTopic {
-        @key long id;
-        sequence<long> unbounded_seq;
-        sequence<long, 10> bounded_seq;
-        sequence<double> double_seq;
-        sequence<BoundedString16> string_seq;
-    };
-
-    // ========== TEST TOPIC 5: Nested Sequences ==========
-    typedef sequence<long> LongSeq;
-    typedef sequence<double, 5> BoundedDoubleSeq;
-    
-    @topic
-    struct NestedSequences {
-        @key long id;
-        sequence<LongSeq> matrix;
-        sequence<BoundedDoubleSeq, 10> bounded_matrix;
-    };
-
-    // ========== TEST TOPIC 6: Arrays ==========
-    @topic
-    struct ArrayTopic {
-        @key long id;
-        long array_1d[10];
-        double array_2d[3][3];
-        short array_3d[2][3][4];
-        char char_array[20];
-    };
-
-    // ========== TEST TOPIC 7: Strings ==========
-    @topic
-    struct StringTopic {
-        @key string<32> key_str;
-        string unbounded_str;
-        string<64> bounded_str;
-        string<128> description;
-    };
-
-    // ========== TEST TOPIC 8: Optional Fields ==========
-    @topic
-    struct OptionalFields {
-        @key long id;
-        @optional long opt_long;
-        @optional double opt_double;
-        @optional string<64> opt_string;
-        @optional NestedStruct opt_struct;
-    };
-
-    // ========== TEST TOPIC 9: Mixed Content ==========
-    @topic
-    struct MixedContent {
-        @key long id;
-        Color primary_color;
-        NestedStruct details;
-        Shape geometry;
-        sequence<long> history;
-        string<64> description;
-        long matrix[2][2];
-    };
-
-    // ========== TEST TOPIC 10: Union Topic ==========
-    @topic
-    struct UnionTopic {
-        @key long id;
-        Shape shape_val;
-        Value generic_val;
-        IntUnion int_val;
-    };
-
-    // ========== TYPEDEFS & ALIASES ==========
-    typedef long MyLong;
-    typedef MyLong Age;
-    typedef Age AgeArray[10];
-
-    @topic
-    struct TypedefStruct {
-        @key MyLong id;
-        Age age;
-        AgeArray recent_ages;
-    };
-};
-
-module RoundtripTests {
-    enum Priority { 
-        LOW, 
-        MEDIUM, 
-        HIGH, 
-        CRITICAL 
-    };
-    
-    struct Timestamp {
-        long long seconds;
-        unsigned long nanoseconds;
-    };
-
-    struct Location {
-        @key long building;
-        @key short floor;
-        long room;
-    };
-    
-    @topic
-    struct AllPrimitives {
-        @key long id;
-        boolean bool_field;
-        char char_field;
-        octet octet_field;
-        short short_field;
-        unsigned short ushort_field;
-        long long_field;
-        unsigned long ulong_field;
-        long long llong_field;
-        unsigned long long ullong_field;
-        float float_field;
-        double double_field;
-    };
-
-    @topic
-    @appendable
-    struct CompositeKey {
-        @key string<32> region;
-        @key long zone;
-        @key short sector;
-        
-        string<64> name;
-        double value;
-        Priority priority;
-    };
-
-    @topic
-    @appendable
-    struct NestedKeyTopic {
-        @key Location location;
-        
-        string<128> description;
-        double temperature;
-        Timestamp last_updated;
-    };
-};
 // ============================================================================
 // C# to C Atomic Test Topics - Minimalistic DDS Interoperability Testing
 // ============================================================================
@@ -427,7 +201,7 @@ module AtomicTests {
     union SimpleUnion switch(long) {
         case 1: long int_value;
         case 2: double double_value;
-        case 3: string<64> string_value;
+        case 3: string string_value;
     };
     
     @topic
@@ -452,7 +226,7 @@ module AtomicTests {
     union ColorUnion switch(ColorEnum) {
         case RED: long red_data;
         case GREEN: double green_data;
-        case BLUE: string<32> blue_data;
+        case BLUE: string blue_data;
         case YELLOW: Point2D yellow_point;
     };
     
@@ -750,54 +524,53 @@ module AtomicTests {
     };
     
     // ========================================================================
-    // SECTION 11: ADVANCED COMBINATIONS - COMMENTED OUT FOR NOW
+    // SECTION 11: ADVANCED COMBINATIONS (Test After Basics Pass)
     // ========================================================================
-    /*
-    @topic
-    struct SequenceOfOptionalTopic {
-        @key long id;
-        sequence<@optional long> opt_values;
-    };
     
-    @topic
-    struct OptionalSequenceTopic {
-        @key long id;
-        @optional sequence<long> opt_sequence;
-    };
+    // @topic
+    // struct SequenceOfOptionalTopic {
+    //     @key long id;
+    //     sequence<@optional long> opt_values;
+    // };
     
-    @topic
-    struct NestedSequenceTopic {
-        @key long id;
-        sequence<sequence<long>> matrix;
-    };
+    // @topic
+    // struct OptionalSequenceTopic {
+    //     @key long id;
+    //     @optional sequence<long> opt_sequence;
+    // };
     
-    @topic
-    struct SequenceOfStructWithSequenceTopic {
-        @key long id;
-        sequence<Container> containers;
-    };
+    // @topic
+    // struct NestedSequenceTopic {
+    //     @key long id;
+    //     sequence<sequence<long>> matrix;
+    // };
     
-    @appendable
-    @topic
-    struct AppendableWithSequenceTopic {
-        @key long id;
-        sequence<Point2D> points;
-        @optional string<64> description;
-    };
+    // @topic
+    // struct SequenceOfStructWithSequenceTopic {
+    //     @key long id;
+    //     sequence<Container> containers;
+    // };
     
-    @topic
-    struct ArrayOfSequenceTopic {
-        @key long id;
-        sequence<long>[3] seq_array;
-    };
+    // @appendable
+    // @topic
+    // struct AppendableWithSequenceTopic {
+    //     @key long id;
+    //     sequence<Point2D> points;
+    //     @optional string<64> description;
+    // };
     
-    @topic
-    struct ComplexKeyTopic {
-        @key long id;
-        @key Point2D key_point;
-        sequence<double> measurements;
-    };
-    */
+    // @topic
+    // struct ArrayOfSequenceTopic {
+    //     @key long id;
+    //     sequence<long>[3] seq_array;
+    // };
+    
+    // @topic
+    // struct ComplexKeyTopic {
+    //     @key long id;
+    //     @key Point2D key_point;
+    //     sequence<double> measurements;
+    // };
     
     // ========================================================================
     // SECTION 12: EDGE CASES

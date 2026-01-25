@@ -1,0 +1,31 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.2" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\CycloneDDS.Runtime\CycloneDDS.Runtime.csproj" />
+    <ProjectReference Include="..\..\..\src\CycloneDDS.Core\CycloneDDS.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\CsharpToC.Roundtrip.Tests\CdrDumper.cs" Link="CdrDumper.cs" />
+    <Compile Include="..\CsharpToC.Roundtrip.Tests\SerializerHelper.cs" Link="SerializerHelper.cs" />
+    <Compile Include="..\CsharpToC.Roundtrip.Tests\AtomicTestsTypes.cs" Link="AtomicTestsTypes.cs" />
+  </ItemGroup>
+
+  <Import Project="..\..\..\tools\CycloneDDS.CodeGen\CycloneDDS.targets" />
+
+</Project>

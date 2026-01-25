@@ -337,9 +337,23 @@ namespace CycloneDDS.Runtime
                 }
             } catch {}
 
+            uint sampleSize = 0;
+            try
+            {
+                sampleSize = (uint)Marshal.SizeOf<T>();
+            }
+            catch
+            {
+                // T might be a managed type (e.g. containing List<T>) that validly works with
+                // custom serializers but isn't a marshalable struct.
+                // We default to 0 (or a small non-zero) if marshal fails.
+                // Some DDS implementations need non-zero size.
+                sampleSize = 128; // Increased from 4 just in case
+            }
+
             var desc = new DdsTopicDescriptor
             {
-                m_size = (uint)Marshal.SizeOf<T>(), 
+                m_size = sampleSize, 
                 m_align = GetAlignment(typeof(T)), 
                 m_flagset = flagset, 
                 m_nkeys = nkeys,
