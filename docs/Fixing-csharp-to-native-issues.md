@@ -495,3 +495,24 @@ Here is the breakdown of the results:
 
 The generated code is now clean \(no debug prints\) and fully functional for this complex XCDR2 test case.
 ---
+I have successfully fixed the issues with TestSequenceUnion, TestUnionBoolDisc, and TestUnionLongDisc by aligning the Extensibility settings for Unions to Final \(XCDR1\) across both the IDL and C# and ensuring the Runtime allows the default Data Representation.
+
+Here are the fixes I applied:
+
+1. **Enforced Final Extensibility for Unions \(IDL & C#\)**:
+
+    - **IDL**: Added `@final` to SimpleUnion, BoolUnion, ColorUnion, and ShortUnion in atomic\_tests.idl.
+    - **C#**: Added \[DdsExtensibility\(DdsExtensibilityKind.Final\)\] to the corresponding structs in AtomicTestsTypes.cs.
+    - **Why**: Previously, the Unions were defaulting to "Mutable" \(XTypes default for Unions\) or mixed states, causing C# to expect XCDR2 while Native \(defaulting to legacy behavior\) sent XCDR1, leading to deserialization failures or type mismatches.
+2. **Corrected QoS Handling**:
+
+    - **Runtime**: In DdsWriter.cs and DdsReader.cs, I modified the QoS setup to **not** explicitly set `DataRepresentation` for Final types.
+    - **Why**: Setting it explicitly to `XCDR1` caused a "Failed to create writer" error in some contexts. Letting it default allows the Native layer to handle Final types naturally \(typically defaulting to XCDR1\) without conflict.
+3. **Verification**:
+
+    - Rebuilt both the Native C library \(generating updated descriptors\) and the C# project.
+    - Ran TestUnionBoolDisc, TestUnionLongDisc, and the requested TestSequenceUnion.
+    - **Result**: All tests passed successfully with byte-for-byte verification.
+
+You can now run the full suite or specific tests using:
+---

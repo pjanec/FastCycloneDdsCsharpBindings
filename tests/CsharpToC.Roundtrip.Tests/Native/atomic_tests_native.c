@@ -475,6 +475,291 @@ static int validate_SequenceInt32Topic(void* data, int seed) {
 }
 DEFINE_HANDLER(SequenceInt32Topic, sequence_int32_topic);
 
+// --- BoundedSequenceInt32Topic ---
+static void generate_BoundedSequenceInt32Topic(void* data, int seed) {
+    AtomicTests_BoundedSequenceInt32Topic* msg = (AtomicTests_BoundedSequenceInt32Topic*)data;
+    msg->id = seed;
+    uint32_t len = (seed % 10) + 1; // 1 to 10
+    msg->values._maximum = len;
+    msg->values._length = len;
+    msg->values._release = true;
+    msg->values._buffer = dds_alloc(sizeof(int32_t) * len);
+    for (uint32_t i = 0; i < len; i++) {
+        msg->values._buffer[i] = (int32_t)(seed + i);
+    }
+}
+
+static int validate_BoundedSequenceInt32Topic(void* data, int seed) {
+    AtomicTests_BoundedSequenceInt32Topic* msg = (AtomicTests_BoundedSequenceInt32Topic*)data;
+    if (msg->id != seed) return -1;
+    uint32_t len = (seed % 10) + 1;
+    if (msg->values._length != len) return -1;
+    for (uint32_t i = 0; i < len; i++) {
+        if (msg->values._buffer[i] != (int32_t)(seed + i)) return -1;
+    }
+    return 0;
+}
+DEFINE_HANDLER(BoundedSequenceInt32Topic, bounded_sequence_int32_topic);
+
+// --- SequenceInt64Topic ---
+static void generate_SequenceInt64Topic(void* data, int seed) {
+    AtomicTests_SequenceInt64Topic* msg = (AtomicTests_SequenceInt64Topic*)data;
+    msg->id = seed;
+    uint32_t len = (seed % 5) + 1;
+    msg->values._maximum = len;
+    msg->values._length = len;
+    msg->values._release = true;
+    msg->values._buffer = dds_alloc(sizeof(int64_t) * len);
+    for (uint32_t i = 0; i < len; i++) {
+        msg->values._buffer[i] = (int64_t)((seed + i) * 1000L);
+    }
+}
+
+static int validate_SequenceInt64Topic(void* data, int seed) {
+    AtomicTests_SequenceInt64Topic* msg = (AtomicTests_SequenceInt64Topic*)data;
+    if (msg->id != seed) return -1;
+    uint32_t len = (seed % 5) + 1;
+    if (msg->values._length != len) return -1;
+    for (uint32_t i = 0; i < len; i++) {
+        if (msg->values._buffer[i] != (int64_t)((seed + i) * 1000L)) return -1;
+    }
+    return 0;
+}
+DEFINE_HANDLER(SequenceInt64Topic, sequence_int64_topic);
+
+// --- SequenceFloat32Topic ---
+static void generate_SequenceFloat32Topic(void* data, int seed) {
+    AtomicTests_SequenceFloat32Topic* msg = (AtomicTests_SequenceFloat32Topic*)data;
+    msg->id = seed;
+    uint32_t len = (seed % 5) + 1;
+    msg->values._maximum = len;
+    msg->values._length = len;
+    msg->values._release = true;
+    msg->values._buffer = dds_alloc(sizeof(float) * len);
+    for (uint32_t i = 0; i < len; i++) {
+        msg->values._buffer[i] = (float)((seed + i) * 1.1f);
+    }
+}
+
+static int validate_SequenceFloat32Topic(void* data, int seed) {
+    AtomicTests_SequenceFloat32Topic* msg = (AtomicTests_SequenceFloat32Topic*)data;
+    if (msg->id != seed) return -1;
+    uint32_t len = (seed % 5) + 1;
+    if (msg->values._length != len) return -1;
+    for (uint32_t i = 0; i < len; i++) {
+        if (fabs(msg->values._buffer[i] - (float)((seed + i) * 1.1f)) > 0.001) return -1;
+    }
+    return 0;
+}
+DEFINE_HANDLER(SequenceFloat32Topic, sequence_float32_topic);
+
+// --- SequenceFloat64Topic ---
+static void generate_SequenceFloat64Topic(void* data, int seed) {
+    AtomicTests_SequenceFloat64Topic* msg = (AtomicTests_SequenceFloat64Topic*)data;
+    msg->id = seed;
+    uint32_t len = (seed % 5) + 1;
+    msg->values._maximum = len;
+    msg->values._length = len;
+    msg->values._release = true;
+    msg->values._buffer = dds_alloc(sizeof(double) * len);
+    for (uint32_t i = 0; i < len; i++) {
+        msg->values._buffer[i] = (double)((seed + i) * 2.2);
+    }
+}
+
+static int validate_SequenceFloat64Topic(void* data, int seed) {
+    AtomicTests_SequenceFloat64Topic* msg = (AtomicTests_SequenceFloat64Topic*)data;
+    if (msg->id != seed) return -1;
+    uint32_t len = (seed % 5) + 1;
+    if (msg->values._length != len) return -1;
+    for (uint32_t i = 0; i < len; i++) {
+        if (fabs(msg->values._buffer[i] - (double)((seed + i) * 2.2)) > 0.0001) return -1;
+    }
+    return 0;
+}
+DEFINE_HANDLER(SequenceFloat64Topic, sequence_float64_topic);
+
+// --- SequenceBooleanTopic ---
+static void generate_SequenceBooleanTopic(void* data, int seed) {
+    AtomicTests_SequenceBooleanTopic* msg = (AtomicTests_SequenceBooleanTopic*)data;
+    msg->id = seed;
+    uint32_t len = (seed % 5) + 1;
+    msg->values._maximum = len;
+    msg->values._length = len;
+    msg->values._release = true;
+    msg->values._buffer = dds_alloc(sizeof(bool) * len);
+    for (uint32_t i = 0; i < len; i++) {
+        msg->values._buffer[i] = ((seed + i) % 2) == 0;
+    }
+}
+
+static int validate_SequenceBooleanTopic(void* data, int seed) {
+    AtomicTests_SequenceBooleanTopic* msg = (AtomicTests_SequenceBooleanTopic*)data;
+    if (msg->id != seed) return -1;
+    uint32_t len = (seed % 5) + 1;
+    if (msg->values._length != len) return -1;
+    for (uint32_t i = 0; i < len; i++) {
+        if (msg->values._buffer[i] != (((seed + i) % 2) == 0)) return -1;
+    }
+    return 0;
+}
+DEFINE_HANDLER(SequenceBooleanTopic, sequence_boolean_topic);
+
+// --- SequenceOctetTopic ---
+static void generate_SequenceOctetTopic(void* data, int seed) {
+    AtomicTests_SequenceOctetTopic* msg = (AtomicTests_SequenceOctetTopic*)data;
+    msg->id = seed;
+    uint32_t len = (seed % 5) + 1;
+    msg->bytes._maximum = len; 
+    msg->bytes._length = len;
+    msg->bytes._release = true;
+    msg->bytes._buffer = dds_alloc(sizeof(uint8_t) * len);
+    for (uint32_t i = 0; i < len; i++) {
+        msg->bytes._buffer[i] = (uint8_t)((seed + i) % 255);
+    }
+}
+
+static int validate_SequenceOctetTopic(void* data, int seed) {
+    AtomicTests_SequenceOctetTopic* msg = (AtomicTests_SequenceOctetTopic*)data;
+    if (msg->id != seed) return -1;
+    uint32_t len = (seed % 5) + 1;
+    if (msg->bytes._length != len) return -1;
+    for (uint32_t i = 0; i < len; i++) {
+        if (msg->bytes._buffer[i] != (uint8_t)((seed + i) % 255)) return -1;
+    }
+    return 0;
+}
+DEFINE_HANDLER(SequenceOctetTopic, sequence_octet_topic);
+
+// --- SequenceStringTopic ---
+static void generate_SequenceStringTopic(void* data, int seed) {
+    AtomicTests_SequenceStringTopic* msg = (AtomicTests_SequenceStringTopic*)data;
+    msg->id = seed;
+    uint32_t len = (seed % 5) + 1;
+    msg->values._maximum = len;
+    msg->values._length = len;
+    msg->values._release = true;
+    msg->values._buffer = dds_alloc(sizeof(AtomicTests_String32) * len);
+    for (uint32_t i = 0; i < len; i++) {
+        snprintf(msg->values._buffer[i], 33, "S_%d_%d", seed, i);
+    }
+}
+
+static int validate_SequenceStringTopic(void* data, int seed) {
+    AtomicTests_SequenceStringTopic* msg = (AtomicTests_SequenceStringTopic*)data;
+    if (msg->id != seed) return -1;
+    uint32_t len = (seed % 5) + 1;
+    if (msg->values._length != len) return -1;
+    for (uint32_t i = 0; i < len; i++) {
+        char buf[33];
+        snprintf(buf, 33, "S_%d_%d", seed, i);
+        if (strcmp(msg->values._buffer[i], buf) != 0) return -1;
+    }
+    return 0;
+}
+DEFINE_HANDLER(SequenceStringTopic, sequence_string_topic);
+
+// --- SequenceEnumTopic ---
+static void generate_SequenceEnumTopic(void* data, int seed) {
+    AtomicTests_SequenceEnumTopic* msg = (AtomicTests_SequenceEnumTopic*)data;
+    msg->id = seed;
+    uint32_t len = (seed % 3) + 1;
+    msg->values._maximum = len;
+    msg->values._length = len;
+    msg->values._release = true;
+    msg->values._buffer = dds_alloc(sizeof(AtomicTests_SimpleEnum) * len);
+    for (uint32_t i = 0; i < len; i++) {
+        msg->values._buffer[i] = (AtomicTests_SimpleEnum)((seed + i) % 3);
+    }
+}
+
+static int validate_SequenceEnumTopic(void* data, int seed) {
+    AtomicTests_SequenceEnumTopic* msg = (AtomicTests_SequenceEnumTopic*)data;
+    if (msg->id != seed) return -1;
+    uint32_t len = (seed % 3) + 1;
+    if (msg->values._length != len) return -1;
+    for (uint32_t i = 0; i < len; i++) {
+        if (msg->values._buffer[i] != (AtomicTests_SimpleEnum)((seed + i) % 3)) return -1;
+    }
+    return 0;
+}
+DEFINE_HANDLER(SequenceEnumTopic, sequence_enum_topic);
+
+// --- SequenceStructTopic ---
+static void generate_SequenceStructTopic(void* data, int seed) {
+    AtomicTests_SequenceStructTopic* msg = (AtomicTests_SequenceStructTopic*)data;
+    msg->id = seed;
+    uint32_t len = (seed % 3) + 1;
+    msg->points._maximum = len; 
+    msg->points._length = len;
+    msg->points._release = true;
+    msg->points._buffer = dds_alloc(sizeof(AtomicTests_Point2D) * len);
+    for (uint32_t i = 0; i < len; i++) {
+        msg->points._buffer[i].x = (double)((seed + i) + 0.1);
+        msg->points._buffer[i].y = (double)((seed + i) + 0.2);
+    }
+}
+
+static int validate_SequenceStructTopic(void* data, int seed) {
+    AtomicTests_SequenceStructTopic* msg = (AtomicTests_SequenceStructTopic*)data;
+    if (msg->id != seed) return -1;
+    uint32_t len = (seed % 3) + 1;
+    if (msg->points._length != len) return -1;
+    for (uint32_t i = 0; i < len; i++) {
+        if (fabs(msg->points._buffer[i].x - ((seed + i) + 0.1)) > 0.0001) return -1;
+        if (fabs(msg->points._buffer[i].y - ((seed + i) + 0.2)) > 0.0001) return -1;
+    }
+    return 0;
+}
+DEFINE_HANDLER(SequenceStructTopic, sequence_struct_topic);
+
+// --- SequenceUnionTopic ---
+static void generate_SequenceUnionTopic(void* data, int seed) {
+    AtomicTests_SequenceUnionTopic* msg = (AtomicTests_SequenceUnionTopic*)data;
+    msg->id = seed;
+    uint32_t len = (seed % 2) + 1;
+    msg->unions._maximum = len; 
+    msg->unions._length = len;
+    msg->unions._release = true;
+    msg->unions._buffer = dds_alloc(sizeof(AtomicTests_SimpleUnion) * len);
+    
+    for (uint32_t i = 0; i < len; i++) {
+        int discriminator = ((seed + i) % 3) + 1;
+        msg->unions._buffer[i]._d = discriminator;
+        if (discriminator == 1) {
+            msg->unions._buffer[i]._u.int_value = (seed + i) * 10;
+        } else if (discriminator == 2) {
+            msg->unions._buffer[i]._u.double_value = (seed + i) * 2.5;
+        } else if (discriminator == 3) {
+             char buf[32];
+            snprintf(buf, 32, "U_%d_%d", seed, i);
+            msg->unions._buffer[i]._u.string_value = dds_string_dup(buf);
+        }
+    }
+}
+
+static int validate_SequenceUnionTopic(void* data, int seed) {
+    AtomicTests_SequenceUnionTopic* msg = (AtomicTests_SequenceUnionTopic*)data;
+    if (msg->id != seed) return -1;
+    uint32_t len = (seed % 2) + 1;
+    if (msg->unions._length != len) return -1;
+    for (uint32_t i = 0; i < len; i++) {
+        int discriminator = ((seed + i) % 3) + 1;
+        if (msg->unions._buffer[i]._d != discriminator) return -1;
+        if (discriminator == 1) {
+            if (msg->unions._buffer[i]._u.int_value != (seed + i) * 10) return -1;
+        } else if (discriminator == 2) {
+            if (fabs(msg->unions._buffer[i]._u.double_value - ((seed + i) * 2.5)) > 0.0001) return -1;
+        } else if (discriminator == 3) {
+            char buf[32];
+            snprintf(buf, 32, "U_%d_%d", seed, i);
+            if (strcmp(msg->unions._buffer[i]._u.string_value, buf) != 0) return -1;
+        }
+    }
+    return 0;
+}
+DEFINE_HANDLER(SequenceUnionTopic, sequence_union_topic);
+
 // ----------------------------------------------------------------------------
 // Unions
 // ----------------------------------------------------------------------------
@@ -521,6 +806,114 @@ static int validate_UnionLongDiscTopic(void* data, int seed) {
     return 0;
 }
 DEFINE_HANDLER(UnionLongDiscTopic, union_long_disc_topic);
+
+// --- UnionBoolDiscTopic ---
+static void generate_UnionBoolDiscTopic(void* data, int seed) {
+    AtomicTests_UnionBoolDiscTopic* msg = (AtomicTests_UnionBoolDiscTopic*)data;
+    msg->id = seed;
+    msg->data._d = ((seed % 2) == 0); // TRUE or FALSE
+    if (msg->data._d) {
+        msg->data._u.true_val = seed * 50;
+    } else {
+        msg->data._u.false_val = seed * 1.5;
+    }
+}
+
+static int validate_UnionBoolDiscTopic(void* data, int seed) {
+    AtomicTests_UnionBoolDiscTopic* msg = (AtomicTests_UnionBoolDiscTopic*)data;
+    if (msg->id != seed) return -1;
+    bool expected_disc = ((seed % 2) == 0);
+    if (msg->data._d != expected_disc) return -1;
+    if (expected_disc) {
+        if (msg->data._u.true_val != seed * 50) return -1;
+    } else {
+        if (msg->data._u.false_val != seed * 1.5) return -1;
+    }
+    return 0;
+}
+DEFINE_HANDLER(UnionBoolDiscTopic, union_bool_disc_topic);
+
+// --- UnionEnumDiscTopic ---
+static void generate_UnionEnumDiscTopic(void* data, int seed) {
+    AtomicTests_UnionEnumDiscTopic* msg = (AtomicTests_UnionEnumDiscTopic*)data;
+    msg->id = seed;
+    msg->data._d = (AtomicTests_ColorEnum)(seed % 4);
+    switch (msg->data._d) {
+        case AtomicTests_RED:
+            msg->data._u.red_data = seed * 20;
+            break;
+        case AtomicTests_GREEN:
+            msg->data._u.green_data = seed * 2.5;
+            break;
+        case AtomicTests_BLUE:
+        {
+            char buf[32];
+            snprintf(buf, 32, "Blue_%d", seed);
+            msg->data._u.blue_data = dds_string_dup(buf);
+            break;
+        }
+        case AtomicTests_YELLOW:
+            msg->data._u.yellow_point.x = seed * 1.1;
+            msg->data._u.yellow_point.y = seed * 2.2;
+            break;
+        default: break;
+    }
+}
+
+static int validate_UnionEnumDiscTopic(void* data, int seed) {
+    AtomicTests_UnionEnumDiscTopic* msg = (AtomicTests_UnionEnumDiscTopic*)data;
+    if (msg->id != seed) return -1;
+    AtomicTests_ColorEnum expected_disc = (AtomicTests_ColorEnum)(seed % 4);
+    if (msg->data._d != expected_disc) return -1;
+    switch (expected_disc) {
+        case AtomicTests_RED:
+            if (msg->data._u.red_data != seed * 20) return -1;
+            break;
+        case AtomicTests_GREEN:
+            if (msg->data._u.green_data != seed * 2.5) return -1;
+            break;
+        case AtomicTests_BLUE:
+        {
+            char buf[32];
+            snprintf(buf, 32, "Blue_%d", seed);
+            if (strcmp(msg->data._u.blue_data, buf) != 0) return -1;
+            break;
+        }
+        case AtomicTests_YELLOW:
+            if (msg->data._u.yellow_point.x != seed * 1.1 || msg->data._u.yellow_point.y != seed * 2.2) return -1;
+            break;
+    }
+    return 0;
+}
+DEFINE_HANDLER(UnionEnumDiscTopic, union_enum_disc_topic);
+
+// --- UnionShortDiscTopic ---
+static void generate_UnionShortDiscTopic(void* data, int seed) {
+    AtomicTests_UnionShortDiscTopic* msg = (AtomicTests_UnionShortDiscTopic*)data;
+    msg->id = seed;
+    msg->data._d = (int16_t)((seed % 4) + 1);
+    switch (msg->data._d) {
+        case 1: msg->data._u.byte_val = (uint8_t)(seed % 255); break;
+        case 2: msg->data._u.short_val = (int16_t)(seed * 10); break;
+        case 3: msg->data._u.long_val = seed * 1000; break;
+        case 4: msg->data._u.float_val = (float)(seed * 3.14); break;
+    }
+}
+
+static int validate_UnionShortDiscTopic(void* data, int seed) {
+    AtomicTests_UnionShortDiscTopic* msg = (AtomicTests_UnionShortDiscTopic*)data;
+    if (msg->id != seed) return -1;
+    int16_t expected_disc = (int16_t)((seed % 4) + 1);
+    if (msg->data._d != expected_disc) return -1;
+     switch (msg->data._d) {
+        case 1: if (msg->data._u.byte_val != (uint8_t)(seed % 255)) return -1; break;
+        case 2: if (msg->data._u.short_val != (int16_t)(seed * 10)) return -1; break;
+        case 3: if (msg->data._u.long_val != seed * 1000) return -1; break;
+        case 4: if (fabs(msg->data._u.float_val - (float)(seed * 3.14)) > 0.001) return -1; break;
+    }
+    return 0;
+}
+DEFINE_HANDLER(UnionShortDiscTopic, union_short_disc_topic);
 
 // ============================================================================
 // APPENDABLE DUPLICATES HANDLERS

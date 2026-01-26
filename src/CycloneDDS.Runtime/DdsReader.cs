@@ -152,20 +152,18 @@ namespace CycloneDDS.Runtime
                 {
                     // Internal identity topic usually XCDR1 or defaults
                     reps = new short[] { DdsApi.DDS_DATA_REPRESENTATION_XCDR1 };
+                    DdsApi.dds_qset_data_representation(actualQos, (uint)reps.Length, reps);
                 }
                 else if (extensibility == DdsExtensibilityKind.Appendable || extensibility == DdsExtensibilityKind.Mutable)
                 {
                     // Appendable/Mutable MUST use XCDR2 to support DHEADER
                     reps = new short[] { DdsApi.DDS_DATA_REPRESENTATION_XCDR2 };
+                    DdsApi.dds_qset_data_representation(actualQos, (uint)reps.Length, reps);
                 }
                 else
                 {
-                    // Final types: Prefer XCDR1 for compatibility, but XCDR2 is valid too.
-                    // Sticking to XCDR1 for Final ensures compatibility with your existing AtomicTests.
-                    reps = new short[] { DdsApi.DDS_DATA_REPRESENTATION_XCDR1 };
+                    // Final types: Prefer default
                 }
-
-                DdsApi.dds_qset_data_representation(actualQos, (uint)reps.Length, reps);
 
                 reader = DdsApi.dds_create_reader(
                     participant.NativeEntity,

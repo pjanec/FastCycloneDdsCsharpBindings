@@ -241,6 +241,7 @@ namespace AtomicTests
     }
 
     [DdsUnion]
+    [DdsExtensibility(DdsExtensibilityKind.Final)]
     public partial struct SimpleUnion
     {
         [DdsDiscriminator]
@@ -265,6 +266,7 @@ namespace AtomicTests
     }
 
     [DdsUnion]
+    [DdsExtensibility(DdsExtensibilityKind.Final)]
     public partial struct BoolUnion
     {
         [DdsDiscriminator]
@@ -285,6 +287,7 @@ namespace AtomicTests
     }
 
     [DdsUnion]
+    [DdsExtensibility(DdsExtensibilityKind.Final)]
     public partial struct ColorUnion
     {
         [DdsDiscriminator]
@@ -311,6 +314,7 @@ namespace AtomicTests
     }
 
     [DdsUnion]
+    [DdsExtensibility(DdsExtensibilityKind.Final)]
     public partial struct ShortUnion
     {
         [DdsDiscriminator]
@@ -430,7 +434,7 @@ namespace AtomicTests
         [DdsKey]
         public int Id;
         [DdsManaged]
-        public List<int> Values;
+        public List<long> Values;
     }
 
     [DdsTopic("SequenceFloat32Topic")]

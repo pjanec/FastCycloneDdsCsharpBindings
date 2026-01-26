@@ -123,15 +123,13 @@ namespace CycloneDDS.Runtime
                     // Force XCDR2 for XTypes
                     reps = new short[] { DdsApi.DDS_DATA_REPRESENTATION_XCDR2 };
                     _encoding = CdrEncoding.Xcdr2;
+                    DdsApi.dds_qset_data_representation(actualQos, (uint)reps.Length, reps);
                 }
                 else
                 {
-                    // Default/Final uses XCDR1
-                    reps = new short[] { DdsApi.DDS_DATA_REPRESENTATION_XCDR1 };
+                    // Default/Final uses defaults (don't force XCDR1)
                     _encoding = CdrEncoding.Xcdr1;
                 }
-
-                DdsApi.dds_qset_data_representation(actualQos, (uint)reps.Length, reps);
 
                 writer = DdsApi.dds_create_writer(
                     participant.NativeEntity,
