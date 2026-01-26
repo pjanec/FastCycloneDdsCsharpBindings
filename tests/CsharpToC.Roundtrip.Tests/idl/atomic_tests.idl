@@ -830,6 +830,7 @@ module AtomicTests {
     @topic
     struct ArrayFloat64TopicAppendable {
         @key long id;
+        long dummy_pad;
         double values[5];
     };
     

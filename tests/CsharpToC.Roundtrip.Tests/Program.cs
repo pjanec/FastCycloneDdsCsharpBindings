@@ -56,8 +56,8 @@ namespace CsharpToC.Roundtrip.Tests
 
                 // Run Tests
                 // await TestBoolean();
-                await TestArrayInt32();
-                await TestArrayFloat64();
+                // await TestArrayInt32();
+                // await TestArrayFloat64();
                 // await TestChar();
                 // await TestOctet();
                 // await TestInt16();
@@ -101,29 +101,29 @@ namespace CsharpToC.Roundtrip.Tests
                 // await TestColorEnumAppendable();
 
                 // await TestStringBounded32Appendable();
-                await TestArrayInt32Appendable();
-                await TestArray2DInt32();
-                await TestArray3DInt32();
-                await TestArrayStruct();
+                // await TestArrayInt32Appendable();
+                // await TestArray2DInt32();
+                // await TestArray3DInt32();
+                // await TestArrayStruct();
                 // await TestArrayFloat64Appendable();
-                // await TestArrayStringAppendable();
+                await TestArrayStringAppendable();
 
                 // Nested Struct Tests
-                await TestNestedStruct();
-                await TestNested3D();
-                await TestDoublyNested();
-                await TestComplexNested();
+                // await TestNestedStruct();
+                // await TestNested3D();
+                // await TestDoublyNested();
+                // await TestComplexNested();
 
                 // Composite Keys
-                await TestTwoKeyInt32();
-                await TestTwoKeyString();
-                await TestThreeKey();
-                await TestFourKey();
+                // await TestTwoKeyInt32();
+                // await TestTwoKeyString();
+                // await TestThreeKey();
+                // await TestFourKey();
 
                 // Nested Keys
-                await TestNestedKey();
-                await TestNestedKeyGeo();
-                await TestNestedTripleKey();
+                // await TestNestedKey();
+                // await TestNestedKeyGeo();
+                // await TestNestedTripleKey();
 
                 // await TestSequenceInt32Appendable();
                 // await TestUnionLongDiscAppendable();

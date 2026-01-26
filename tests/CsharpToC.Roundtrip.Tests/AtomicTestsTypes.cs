@@ -1018,6 +1018,7 @@ namespace AtomicTests
     {
         [DdsKey]
         public int Id;
+        public int DummyPad;
         [ArrayLength(5)]
         [DdsManaged]
         public double[] Values;

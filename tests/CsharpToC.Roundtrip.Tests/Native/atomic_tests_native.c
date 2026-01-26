@@ -390,9 +390,18 @@ static void generate_ArrayFloat64TopicAppendable(void* data, int seed) {
 }
 static int validate_ArrayFloat64TopicAppendable(void* data, int seed) {
     AtomicTests_ArrayFloat64TopicAppendable* msg = (AtomicTests_ArrayFloat64TopicAppendable*)data;
+    printf("[Native] Validate ArrayFloat64TopicAppendable ptr=%p\n", msg);
+    fflush(stdout);
+    if (msg == NULL) return -1;
+    printf("[Native] Checking ID. Expected=%d\n", seed);
+    printf("[Native] Got ID=%d\n", msg->id);
+    fflush(stdout);
     if (msg->id != seed) return -1;
     for(int i=0; i<5; i++) {
         double expected = (double)(seed + i) * 1.1;
+        printf("[Native] Checking Value[%d]. Expected=%f\n", i, expected);
+        printf("[Native] Got Value[%d]=%f\n", i, msg->values[i]);
+        fflush(stdout);
         if (fabs(msg->values[i] - expected) > 0.0001) return -1;
     }
     return 0;

@@ -34,6 +34,11 @@ namespace CycloneDDS.Core
                     if (data[1] >= 6)
                     {
                         _encoding = CdrEncoding.Xcdr2;
+                        // Skip Encapsulation Header (4 bytes)
+                        if (_data.Length >= 4)
+                        {
+                            _position = 4;
+                        }
                     }
                 }
             }

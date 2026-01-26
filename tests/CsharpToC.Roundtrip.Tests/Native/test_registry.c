@@ -201,14 +201,18 @@ EXPORT int Native_SendWithSeed(const char* topic_name, int seed) {
     }
     
     // Create topic
+    printf("[Native] Creating topic %s...\n", topic_name);
     dds_entity_t topic = dds_create_topic(participant, handler->descriptor, handler->name, NULL, NULL);
     if (topic < 0) {
         snprintf(last_error, sizeof(last_error), "dds_create_topic failed: %d", topic);
         return -1;
     }
+    printf("[Native] Topic created. Handle: %d\n", topic);
     
     // Create writer
+    printf("[Native] Creating writer for topic %s...\n", topic_name);
     dds_entity_t writer = dds_create_writer(publisher, topic, NULL, NULL);
+    printf("[Native] Writer created. Handle: %d\n", writer);
 
     if (writer < 0) {
         snprintf(last_error, sizeof(last_error), "dds_create_writer failed: %d", writer);
@@ -220,12 +224,16 @@ EXPORT int Native_SendWithSeed(const char* topic_name, int seed) {
     // Allocate memory matching struct size
     // Note: This relies on handler->size being correct
     // For simplicity, we use a large buffer or malloc
+    printf("[Native] Allocating %llu bytes for topic %s\n", (unsigned long long)handler->size, topic_name);
     void* data = malloc(handler->size);
     memset(data, 0, handler->size);
+    printf("[Native] Generating data...\n");
     handler->generate(data, seed);
     
+    printf("[Native] Calling dds_write...\n");
     // Write
     int rc = dds_write(writer, data);
+    printf("[Native] dds_write returned %d\n", rc);
     if (rc < 0) {
         snprintf(last_error, sizeof(last_error), "dds_write failed: %d", rc);
     }
@@ -289,6 +297,7 @@ EXPORT int Native_ExpectWithSeed(const char* topic_name, int seed, int timeout_m
     while (waited < timeout_ms) {
         int rc = dds_take(reader, samples, infos, 1, 1);
         if (rc > 0) {
+            printf("[Native] dds_take rc=%d, valid_data=%d, samples[0]=%p\n", rc, infos[0].valid_data, samples[0]);
             if (infos[0].valid_data) {
                 // Validate
                 if (handler->validate(samples[0], seed) == 0) {
