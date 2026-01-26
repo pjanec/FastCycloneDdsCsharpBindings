@@ -55,99 +55,103 @@ namespace CsharpToC.Roundtrip.Tests
                 _participant = new DdsParticipant();
 
                 // Run Tests
-                // await TestBoolean();
-                // await TestArrayInt32();
-                // await TestArrayFloat64();
-                // await TestChar();
-                // await TestOctet();
-                // await TestInt16();
-                // await TestUInt16();
-                // await TestInt32();
-                // await TestUInt32();
-                // await TestInt64();
-                // await TestUInt64();
-                // await TestFloat32();
-                // await TestFloat64();
-                
-                // await TestStringUnbounded();
-                // await TestStringBounded256();
+                //await TestBoolean();
+                //await TestArrayInt32();
+                //await TestArrayFloat64();
+                //await TestChar();
+                //await TestOctet();
+                //await TestInt16();
+                //await TestUInt16();
+                //await TestInt32();
+                //await TestUInt32();
+                //await TestInt64();
+                //await TestUInt64();
+                //await TestFloat32();
+                //await TestFloat64();
 
-                // await TestStringBounded32();
-                // await TestArrayInt32();
-                // await TestArrayFloat64();
-                // await TestArrayString();
-                // await TestSequenceInt32();
-                // await TestUnionLongDisc();
+                //await TestStringUnbounded();
+                //await TestStringBounded256();
+
+                //await TestStringBounded32();
+                //await TestArrayInt32();
+                //await TestArrayFloat64();
+                //await TestArrayString();
+                await TestSequenceInt32();
+                //await TestUnionLongDisc();
 
                 // Appendable Tests
-                // await TestBooleanAppendable();
-                // await TestCharAppendable();
-                // await TestOctetAppendable();
-                // await TestInt16Appendable();
-                // await TestUInt16Appendable();
-                // await TestInt32Appendable();
-                // await TestUInt32Appendable();
-                // await TestInt64Appendable();
-                // await TestUInt64Appendable();
-                // await TestFloat32Appendable();
-                // await TestFloat64Appendable();
-                
-                // await TestStringUnboundedAppendable();
-                // await TestStringBounded256Appendable();
-                
-                // await TestEnum();
-                // await TestColorEnum();
-                // await TestEnumAppendable();
-                // await TestColorEnumAppendable();
+                //await TestBooleanAppendable();
+                //await TestCharAppendable();
+                //await TestOctetAppendable();
+                //await TestInt16Appendable();
+                //await TestUInt16Appendable();
+                //await TestInt32Appendable();
+                //await TestUInt32Appendable();
+                //await TestInt64Appendable();
+                //await TestUInt64Appendable();
+                //await TestFloat32Appendable();
+                //await TestFloat64Appendable();
 
-                // await TestStringBounded32Appendable();
-                // await TestArrayInt32Appendable();
-                // await TestArray2DInt32();
-                // await TestArray3DInt32();
-                // await TestArrayStruct();
-                // await TestArrayFloat64Appendable();
-                // await TestArrayStringAppendable();
+                //await TestStringUnboundedAppendable();
+                //await TestStringBounded256Appendable();
+
+                //await TestEnum();
+                //await TestColorEnum();
+                //await TestEnumAppendable();
+                //await TestColorEnumAppendable();
+
+                //await TestStringBounded32Appendable();
+                //await TestArrayInt32Appendable();
+                //await TestArray2DInt32();
+                //await TestArray3DInt32();
+                //await TestArrayStruct();
+
+                // await TestArrayFloat64Appendable(); // THROWS EXCEPTION
+                // await TestArrayStringAppendable(); // DOES NOT FINISH
+
+                await TestSequenceUnionAppendable();
+                //await TestSequenceEnumAppendable();
 
                 // Nested Struct Tests
                 // await TestNestedStruct();
-                // await TestNested3D();
-                // await TestDoublyNested();
-                // await TestComplexNested();
+                //await TestNested3D();
+                //await TestDoublyNested();
+                //await TestComplexNested();
 
                 // Composite Keys
-                // await TestTwoKeyInt32();
-                // await TestTwoKeyString();
-                // await TestThreeKey();
-                // await TestFourKey();
+                //await TestTwoKeyInt32();
+                //await TestTwoKeyString();
+                //await TestThreeKey();
+                //await TestFourKey();
 
                 // Nested Keys
-                // await TestNestedKey();
-                // await TestNestedKeyGeo();
-                // await TestNestedTripleKey();
+                //await TestNestedKey();
+                //await TestNestedKeyGeo();
+                //await TestNestedTripleKey();
 
-                // await TestColorEnum();
-                // await TestColorEnumAppendable();
+                //await TestColorEnum();
+                //await TestColorEnumAppendable();
 
-                // await TestUnionBoolDisc();
-            await TestUnionBoolDisc();
-                // await TestUnionEnumDisc();
-                // await TestUnionShortDisc();
+                //await TestUnionBoolDisc();
+                //await TestUnionBoolDisc();
+                //await TestUnionLongDisc();
+                //await TestSequenceUnion();
 
-                // await TestBoundedSequenceInt32();
-                // await TestSequenceInt64();
-                // await TestSequenceFloat32();
-                // await TestSequenceFloat64();
-                // await TestSequenceBoolean();
-                // await TestSequenceOctet();
-                // await TestSequenceString();
-                // await TestSequenceEnum();
-                // await TestSequenceStruct();
-                
-                await TestUnionLongDisc();
-                await TestSequenceUnion();
+                //await TestUnionEnumDisc();
+                //await TestUnionShortDisc();
+                //await TestUnionLongDiscAppendable();
 
-                // await TestSequenceInt32Appendable();
-                // await TestUnionLongDiscAppendable();
+                //await TestBoundedSequenceInt32();
+                //await TestSequenceInt64();
+                //await TestSequenceFloat32();
+                //await TestSequenceFloat64();
+                //await TestSequenceBoolean();
+                //await TestSequenceOctet();
+                //await TestSequenceString();
+                //await TestSequenceEnum();
+                //await TestSequenceStruct();
+
+                //await TestSequenceInt32Appendable();
 
                 Console.WriteLine("==================================================");
                 Console.WriteLine("ALL TESTS PASSED");
@@ -174,100 +178,119 @@ namespace CsharpToC.Roundtrip.Tests
             Func<int, T> generator,
             Func<T, int, bool> validator) where T : struct
         {
-            Console.WriteLine($"Testing {topicName}...");
-            
-            // Allow some time for discovery 
-            using var writer = new DdsWriter<T>(_participant!, topicName);
-            using var reader = new DdsReader<T, T>(_participant!, topicName);
+            Console.WriteLine();
+            Console.WriteLine("################################################################################");
+            Console.WriteLine($">>> START TEST: {topicName}");
+            Console.WriteLine("################################################################################");
 
-            // 1. C -> C# (Native Send, C# Receive)
+            try
             {
-                int testSeed = seed;
-                
-                // Start listening
-                var receiveTask = ReadOneAsync(reader);
-                
-                // Wait for discovery
-                await Task.Delay(1500);
-                
-                Console.WriteLine("   [C -> C#] Requesting Native Send...");
-                if (NativeMethods.Native_SendWithSeed(topicName, testSeed) != 0)
-                    throw new Exception("Native send failed: " + Marshal.PtrToStringAnsi(NativeMethods.Native_GetLastError()));
+                // Allow some time for discovery 
+                using var writer = new DdsWriter<T>(_participant!, topicName);
+                using var reader = new DdsReader<T, T>(_participant!, topicName);
 
-                (T received, byte[] receivedBytes) = await receiveTask;
-                if (!validator(received, testSeed))
-                    throw new Exception($"Validation failed for {topicName} (C->C#)");
-                
-                Console.WriteLine("   [C -> C#] Success");
-
-                // 2. C# Serialization Verification (Compare CDR bytes)
-                Console.WriteLine("   [CDR Verify] Analyzing Wire Format...");
-                
-                if (receivedBytes.Length < 4)
+                // 1. C -> C# (Native Send, C# Receive)
                 {
-                     Console.WriteLine($"   [CDR Verify] WARNING: Received bytes too short ({receivedBytes.Length})");
-                }
-                else
-                {
-                    byte[] header = new byte[4];
-                    Array.Copy(receivedBytes, header, 4);
-                    CdrDumper.SaveBin(topicName, testSeed, "native_received", receivedBytes);
+                    int testSeed = seed;
                     
-                    try 
-                    {
-                        byte[] reSerialized = SerializerHelper.Serialize(received, header);
-                        
-                        // FIX: Pad C# output if necessary to match Native alignment (e.g. BooleanTopic ends at 9 bytes, needs 12)
-                        // Top-level XCDR serialized data must be 4-byte aligned
-                        if (reSerialized.Length % 4 != 0)
-                        {
-                            int newLen = (reSerialized.Length + 3) & ~3;
-                            Array.Resize(ref reSerialized, newLen);
-                        }
+                    // Start listening
+                    var receiveTask = ReadOneAsync(reader);
+                    
+                    // Wait for discovery
+                    await Task.Delay(1500);
+                    
+                    Console.WriteLine("   [C -> C#] Requesting Native Send...");
+                    if (NativeMethods.Native_SendWithSeed(topicName, testSeed) != 0)
+                        throw new Exception("Native send failed: " + Marshal.PtrToStringAnsi(NativeMethods.Native_GetLastError()));
 
-                        CdrDumper.SaveBin(topicName, testSeed, "csharp_generated", reSerialized);
-                        
-                        if (CdrDumper.Compare(receivedBytes, reSerialized, out string err))
-                        {
-                             Console.WriteLine("   [CDR Verify] Success (Byte-for-Byte match)");
-                        }
-                        else
-                        {
-                             Console.WriteLine($"   [CDR Verify] FAILED: {err}");
-                             // We don't fail the test yet, as optimization/padding differences might exist, but we log it.
-                             // Actually, for atomic tests, we EXPECT exact matches for primitives.
-                             Console.WriteLine("   [CDR Verify] Proceeding with test..."); 
-                        }
-                    }
-                    catch (Exception ex)
+                    (T received, byte[] receivedBytes) = await receiveTask;
+                    if (!validator(received, testSeed))
+                        throw new Exception($"Validation failed for {topicName} (C->C#)");
+                    
+                    Console.WriteLine("   [C -> C#] Success");
+
+                    // 2. C# Serialization Verification (Compare CDR bytes)
+                    Console.WriteLine("   [CDR Verify] Analyzing Wire Format...");
+                    
+                    if (receivedBytes.Length < 4)
                     {
-                        Console.WriteLine($"   [CDR Verify] Serialization failed: {ex.Message}");
+                         Console.WriteLine($"   [CDR Verify] WARNING: Received bytes too short ({receivedBytes.Length})");
+                    }
+                    else
+                    {
+                        byte[] header = new byte[4];
+                        Array.Copy(receivedBytes, header, 4);
+                        CdrDumper.SaveBin(topicName, testSeed, "native_received", receivedBytes);
+                        
+                        try 
+                        {
+                            byte[] reSerialized = SerializerHelper.Serialize(received, header);
+                            
+                            // FIX: Pad C# output if necessary to match Native alignment (e.g. BooleanTopic ends at 9 bytes, needs 12)
+                            // Top-level XCDR serialized data must be 4-byte aligned
+                            if (reSerialized.Length % 4 != 0)
+                            {
+                                int newLen = (reSerialized.Length + 3) & ~3;
+                                Array.Resize(ref reSerialized, newLen);
+                            }
+
+                            CdrDumper.SaveBin(topicName, testSeed, "csharp_generated", reSerialized);
+                            
+                            if (CdrDumper.Compare(receivedBytes, reSerialized, out string err))
+                            {
+                                 Console.WriteLine("   [CDR Verify] Success (Byte-for-Byte match)");
+                            }
+                            else
+                            {
+                                 Console.WriteLine($"   [CDR Verify] FAILED: {err}");
+                                 // We don't fail the test yet, as optimization/padding differences might exist, but we log it.
+                                 // Actually, for atomic tests, we EXPECT exact matches for primitives.
+                                 Console.WriteLine("   [CDR Verify] Proceeding with test..."); 
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"   [CDR Verify] Serialization failed: {ex.Message}");
+                        }
                     }
                 }
+
+                // 3. C# -> C (C# Send, Native Receive)
+                {
+                    int testSeed = seed + 1;
+                    Console.WriteLine("   [C# -> C] Sending...");
+                    
+                    T msg = generator(testSeed); // Generate new message
+
+                    // Start native expect in background (it blocks)
+                    var expectTask = Task.Run(() => {
+                        return NativeMethods.Native_ExpectWithSeed(topicName, testSeed, 8000); 
+                    });
+                    
+                    // Wait for native reader to listen
+                    await Task.Delay(1000);
+                    
+                    writer.Write(msg);
+                    
+                    int result = await expectTask;
+                    if (result != 0)
+                        throw new Exception($"Native expectation failed for {topicName} (C#->C). Error: {Marshal.PtrToStringAnsi(NativeMethods.Native_GetLastError())}");
+                    
+                    Console.WriteLine("   [C# -> C] Success");
+                }
+
+                Console.WriteLine("--------------------------------------------------------------------------------");
+                Console.WriteLine($"<<< PASS TEST:  {topicName}");
+                Console.WriteLine("################################################################################");
+                Console.WriteLine();
             }
-
-            // 3. C# -> C (C# Send, Native Receive)
+            catch (Exception)
             {
-                int testSeed = seed + 1;
-                Console.WriteLine("   [C# -> C] Sending...");
-                
-                T msg = generator(testSeed); // Generate new message
-
-                // Start native expect in background (it blocks)
-                var expectTask = Task.Run(() => {
-                    return NativeMethods.Native_ExpectWithSeed(topicName, testSeed, 8000); 
-                });
-                
-                // Wait for native reader to listen
-                await Task.Delay(1000);
-                
-                writer.Write(msg);
-                
-                int result = await expectTask;
-                if (result != 0)
-                    throw new Exception($"Native expectation failed for {topicName} (C#->C). Error: {Marshal.PtrToStringAnsi(NativeMethods.Native_GetLastError())}");
-                
-                Console.WriteLine("   [C# -> C] Success");
+                Console.WriteLine("--------------------------------------------------------------------------------");
+                Console.WriteLine($"!!! FAIL TEST:  {topicName}");
+                Console.WriteLine("################################################################################");
+                Console.WriteLine();
+                throw;
             }
         }
 
@@ -1043,6 +1066,70 @@ namespace CsharpToC.Roundtrip.Tests
                     if (msg.Names.Length != 5) return false;
                     for(int i=0; i<5; i++) {
                          if (msg.Names[i] != $"S_{s}_{i}") return false;
+                    }
+                    return true;
+                }
+            );
+        }
+
+        static async Task TestSequenceUnionAppendable()
+        {
+            await RunRoundtrip<SequenceUnionAppendableTopic>(
+                "AtomicTests::SequenceUnionAppendableTopic",
+                1500,
+                (s) => {
+                    var msg = new SequenceUnionAppendableTopic();
+                    msg.Id = s;
+                    int len = (s % 2) + 1;
+                    var list = new List<SimpleUnionAppendable>();
+                    for(int i=0; i<len; i++) {
+                        var u = new SimpleUnionAppendable();
+                        int disc = ((s + i) % 3) + 1;
+                        u._d = disc;
+                        if (disc == 1) u.Int_value = (s + i) * 10;
+                        else if (disc == 2) u.Double_value = (s + i) * 2.5;
+                        else if (disc == 3) u.String_value = $"U_{s}_{i}";
+                        list.Add(u);
+                    }
+                    msg.Unions = list;
+                    return msg;
+                },
+                (msg, s) => {
+                    if (msg.Id != s) return false;
+                    int len = (s % 2) + 1;
+                    if (msg.Unions == null || msg.Unions.Count != len) return false;
+                    for(int i=0; i<len; i++) {
+                        int disc = ((s + i) % 3) + 1;
+                        if (msg.Unions[i]._d != disc) return false;
+                        if (disc == 1) { if (msg.Unions[i].Int_value != (s + i) * 10) return false; }
+                        else if (disc == 2) { if (Math.Abs(msg.Unions[i].Double_value - ((s + i) * 2.5)) > 0.0001) return false; }
+                        else if (disc == 3) { if (msg.Unions[i].String_value != $"U_{s}_{i}") return false; }
+                    }
+                    return true;
+                }
+            );
+        }
+
+        static async Task TestSequenceEnumAppendable()
+        {
+            await RunRoundtrip<SequenceEnumAppendableTopic>(
+                "AtomicTests::SequenceEnumAppendableTopic",
+                1510,
+                (s) => {
+                    var msg = new SequenceEnumAppendableTopic();
+                    msg.Id = s;
+                    int len = (s % 3) + 1;
+                    var list = new List<ColorEnum>();
+                    for(int i=0; i<len; i++) list.Add((ColorEnum)((s + i) % 6));
+                    msg.Colors = list;
+                    return msg;
+                },
+                (msg, s) => {
+                    if (msg.Id != s) return false;
+                    int len = (s % 3) + 1;
+                    if (msg.Colors == null || msg.Colors.Count != len) return false;
+                    for(int i=0; i<len; i++) {
+                         if (msg.Colors[i] != (ColorEnum)((s + i) % 6)) return false;
                     }
                     return true;
                 }

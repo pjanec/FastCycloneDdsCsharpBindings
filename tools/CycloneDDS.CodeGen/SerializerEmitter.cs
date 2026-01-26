@@ -412,33 +412,89 @@ namespace CycloneDDS.CodeGen
         
         private int GetAlignment(string typeName)
         {
-            if (typeName == "string") return 4;
-            if (typeName.EndsWith("[]")) return 4;
-            if (typeName.StartsWith("BoundedSeq") || typeName.Contains("BoundedSeq<")) return 4;
-            if (typeName.StartsWith("List") || typeName.StartsWith("System.Collections.Generic.List")) return 4;
-            if (typeName.Contains("FixedString")) return 1;
-
+            // Primitives
             string t = typeName;
             if (t.StartsWith("System.")) t = t.Substring(7);
             t = t.ToLowerInvariant();
             
-            return t switch
+            switch(t)
             {
-                "byte" or "uint8" or "sbyte" or "int8" or "bool" or "boolean" => 1,
-                "short" or "int16" or "ushort" or "uint16" => 2,
-                "int" or "int32" or "uint" or "uint32" or "float" or "single" => 4,
-                "vector2" or "numerics.vector2" => 4,
-                "vector3" or "numerics.vector3" => 4,
-                "vector4" or "numerics.vector4" => 4,
-                "quaternion" or "numerics.quaternion" => 4,
-                "matrix4x4" or "numerics.matrix4x4" => 4,
+                case "byte": case "uint8": case "sbyte": case "int8": case "bool": case "boolean": return 1;
+                case "short": case "int16": case "ushort": case "uint16": return 2;
+                case "int": case "int32": case "uint": case "uint32": case "float": case "single": return 4;
+                case "vector2": case "numerics.vector2": return 4;
+                case "vector3": case "numerics.vector3": return 4;
+                case "vector4": case "numerics.vector4": return 4;
+                case "quaternion": case "numerics.quaternion": return 4;
+                case "matrix4x4": case "numerics.matrix4x4": return 4;
                 
-                "long" or "int64" or "ulong" or "uint64" or "double" => 8,
-                "datetime" or "timespan" or "datetimeoffset" => 8,
-                "guid" => 1,
-                _ => 1
-            };
+                case "long": case "int64": case "ulong": case "uint64": case "double": return 8;
+                case "datetime": case "timespan": case "datetimeoffset": return 8;
+                case "guid": return 1;
+            }
+
+            if (typeName == "string") return 4;
+            if (typeName.Contains("FixedString")) return 1;
+
+            // Arrays / Sequences / Lists
+            if (typeName.EndsWith("[]") || typeName.StartsWith("List") || typeName.StartsWith("System.Collections.Generic.List") || typeName.StartsWith("BoundedSeq"))
+            {
+                 // NATIVE BEHAVIOR HACK: Propagate alignment of elements
+                 string elementType = ExtractElementType(typeName);
+                 return GetAlignment(elementType);
+            }
+
+            // Registry Lookup
+            if (_registry != null)
+            {
+                if (_registry.TryGetDefinition(typeName, out var def) && def.TypeInfo != null)
+                    return GetTypeAlignment(def.TypeInfo);
+                
+                // Try replacing dots with colons for scoped lookup
+                if (_registry.TryGetDefinition(typeName.Replace(".", "::"), out var def2) && def2.TypeInfo != null)
+                    return GetTypeAlignment(def2.TypeInfo);
+            }
+
+            // Fallback
+            return 1;
         }
+
+        private string ExtractElementType(string typeName)
+        {
+            if (typeName.EndsWith("[]")) return typeName.Substring(0, typeName.Length - 2);
+            int start = typeName.IndexOf('<');
+            int end = typeName.LastIndexOf('>');
+            if (start > 0 && end > start) return typeName.Substring(start + 1, end - start - 1);
+            return "int"; // fallback
+        }
+
+        private int GetTypeAlignment(TypeInfo type)
+        {
+            int maxAlign = 1;
+
+            if (type.IsUnion) 
+            {
+                 maxAlign = 4; // Discriminator
+            }
+
+            // Simple recursion protection by name check? 
+            // We assume DAG for now as we don't pass visited list.
+            
+            foreach(var field in type.Fields)
+            {
+                // We must be careful not to recurse indefinitely if a type contains a List of itself.
+                // Since GetAlignment for List calls GetAlignment for Element (Type).
+                // However, standard says List alignment is 4. We Changd it to Propagate.
+                // If A contains List<A>. GetAl(A) -> GetAl(List<A>) -> GetAl(A). Loop.
+                
+                if (field.TypeName.Contains(type.Name)) continue; // Skip recursive fields
+
+                int fa = GetAlignment(field.TypeName);
+                if (fa > maxAlign) maxAlign = fa;
+            }
+            return maxAlign;
+        }
+
 
         private string GetSizerCall(FieldInfo field, bool isXcdr2, bool isAppendableStruct = false)
         {
@@ -451,7 +507,7 @@ namespace CycloneDDS.CodeGen
             // Handle List<T>
             if (field.TypeName.StartsWith("List<") || field.TypeName.StartsWith("System.Collections.Generic.List<"))
             {
-                 return EmitListSizer(field, isXcdr2);
+                 return EmitListSizer(field, isXcdr2, isAppendableStruct);
             }
 
             // 2. Sequences
@@ -508,7 +564,7 @@ namespace CycloneDDS.CodeGen
             // Handle List<T>
             if (field.TypeName.StartsWith("List<") || field.TypeName.StartsWith("System.Collections.Generic.List<"))
             {
-                 return EmitListWriter(field, isXcdr2);
+                 return EmitListWriter(field, isXcdr2, isAppendableStruct);
             }
 
             // 2. Sequences
@@ -533,7 +589,7 @@ namespace CycloneDDS.CodeGen
             if (method != null)
             {
                 int align = GetAlignment(field.TypeName);
-                string alignA = align == 8 ? "writer.IsXcdr2 ? 4 : 8" : align.ToString();
+                string alignA = align == 8 ? "8" : align.ToString();
                 return $"writer.Align({alignA}); writer.{method}({fieldAccess})";
             }
             
@@ -614,7 +670,7 @@ namespace CycloneDDS.CodeGen
             if (TypeMapper.IsBlittable(elementType))
             {
                 int align = GetAlignment(elementType);
-                string alignA = align == 8 ? "writer.IsXcdr2 ? 4 : 8" : align.ToString();
+                string alignA = align == 8 ? "8" : align.ToString();
                 return $@"{lengthWrite}
             if ({fieldAccess}.Length > 0)
             {{
@@ -627,7 +683,7 @@ namespace CycloneDDS.CodeGen
             
             // Loop fallback
             string? writerMethod = TypeMapper.GetWriterMethod(elementType);
-            int alignEl = GetAlignment(elementType); string alignElA = alignEl == 8 ? "writer.IsXcdr2 ? 4 : 8" : alignEl.ToString();
+            int alignEl = GetAlignment(elementType); string alignElA = alignEl == 8 ? "8" : alignEl.ToString();
             string loopBody;
 
             if (elementType == "string" || elementType == "String" || elementType == "System.String")
@@ -730,7 +786,7 @@ namespace CycloneDDS.CodeGen
             if (TypeMapper.IsBlittable(elementType))
             {
                  int alignP = GetAlignment(elementType);
-                 string alignAP = alignP == 8 ? "writer.IsXcdr2 ? 4 : 8" : alignP.ToString();
+                 string alignAP = alignP == 8 ? "8" : alignP.ToString();
                  // BoundedSeq exposes AsSpan() which internally uses CollectionsMarshal
                  return $@"writer.Align(4); 
             writer.WriteUInt32((uint){fieldAccess}.Count);
@@ -745,7 +801,7 @@ namespace CycloneDDS.CodeGen
             
             string? writerMethod = TypeMapper.GetWriterMethod(elementType);
             int align = GetAlignment(elementType);
-            string alignA = align == 8 ? "writer.IsXcdr2 ? 4 : 8" : align.ToString();
+            string alignA = align == 8 ? "8" : align.ToString();
             
             string loopBody;
 
@@ -853,8 +909,11 @@ namespace CycloneDDS.CodeGen
             return typeName.Substring(start, end - start).Trim();
         }
 
-        private string EmitListWriter(FieldInfo field, bool isXcdr2)
+        private string EmitListWriter(FieldInfo field, bool isXcdr2, bool isAppendableStruct)
         {
+             // DEBUG LOG
+             System.Console.WriteLine($"[DEBUG] EmitListWriter for {field.Name} type={field.TypeName}");
+
              string fieldAccess = $"this.{ToPascalCase(field.Name)}";
              string elementType = ExtractGenericType(field.TypeName);
              
@@ -862,8 +921,13 @@ namespace CycloneDDS.CodeGen
              if (IsPrimitive(elementType))
              {
                  int alignP = GetAlignment(elementType);
-                 string alignAP = alignP == 8 ? "writer.IsXcdr2 ? 4 : 8" : alignP.ToString();
-                 return $@"writer.Align(4); 
+                 string alignAP = alignP == 8 ? "8" : alignP.ToString();
+                 
+                 string dheaderStartP = "";
+                 string dheaderEndP = "";
+
+
+                 return $@"{dheaderStartP}writer.Align(4); 
             writer.WriteUInt32((uint){fieldAccess}.Count);
             if ({fieldAccess}.Count > 0)
             {{
@@ -871,12 +935,29 @@ namespace CycloneDDS.CodeGen
                 var span = System.Runtime.InteropServices.CollectionsMarshal.AsSpan({fieldAccess});
                 var byteSpan = System.Runtime.InteropServices.MemoryMarshal.AsBytes(span);
                 writer.WriteBytes(byteSpan);
-            }}";
+            }}{dheaderEndP}";
              }
              
              string? writerMethod = TypeMapper.GetWriterMethod(elementType);
              int align = GetAlignment(elementType);
-             string alignA = align == 8 ? "writer.IsXcdr2 ? 4 : 8" : align.ToString();
+
+             // XCDR2: If element is Appendable/Mutable, we used to force alignment to 4.
+             // BUT, if the body needs 8-byte alignment, forcing 4 misaligns the body (Length 4 + DHEADER 4 = 8 offset).
+             // So we should respect natural alignment.
+
+
+             string alignA = align == 8 ? "8" : align.ToString();
+             string lengthAlign = align > 4 ? align.ToString() : "4";
+             
+             string dheaderStart = "";
+             string dheaderEnd = "";
+
+             if (isAppendableStruct && isXcdr2)
+             {
+                 dheaderStart = $"int listDheaderPos{ToPascalCase(field.Name)} = writer.Position; writer.WriteUInt32(0); int listStart{ToPascalCase(field.Name)} = writer.Position; ";
+                 dheaderEnd = $" writer.WriteUInt32At(listDheaderPos{ToPascalCase(field.Name)}, (uint)(writer.Position - listStart{ToPascalCase(field.Name)}));";
+             }
+
              
              bool isEnum = false;
              if (_registry != null && _registry.TryGetDefinition(elementType, out var def))
@@ -902,14 +983,14 @@ namespace CycloneDDS.CodeGen
                  loopBody = "item.Serialize(ref writer);";
              }
              
-             return $@"writer.Align(4); writer.WriteUInt32((uint){fieldAccess}.Count);
+             return $@"{dheaderStart}writer.Align({lengthAlign}); writer.WriteUInt32((uint){fieldAccess}.Count);
             foreach (var item in {fieldAccess})
             {{
                 {loopBody}
-            }}";
+            }}{dheaderEnd}";
         }
 
-        private string EmitListSizer(FieldInfo field, bool isXcdr2)
+        private string EmitListSizer(FieldInfo field, bool isXcdr2, bool isAppendableStruct)
         {
             string fieldAccess = $"this.{ToPascalCase(field.Name)}";
             string elementType = ExtractGenericType(field.TypeName);
@@ -921,14 +1002,29 @@ namespace CycloneDDS.CodeGen
             {
                 if (def.TypeInfo != null && def.TypeInfo.IsEnum) isEnum = true;
             }
+
+            int align = GetAlignment(elementType);
             
+            // XCDR2: If element is Appendable/Mutable, we used to force alignment to 4.
+            // BUT, if the body needs 8-byte alignment, forcing 4 misaligns the body (Length 4 + DHEADER 4 = 8 offset).
+            // So we should respect natural alignment.
+
+
+            string lengthAlign = align > 4 ? align.ToString() : "4";
+            
+            string dheader = "";
+            if (isAppendableStruct && isXcdr2)
+            {
+               dheader = "sizer.Align(4); sizer.WriteUInt32(0); ";
+            }
+
+
             if (sizerMethod != null)
             {
                 string dummy = "0";
                 if (sizerMethod == "WriteBool") dummy = "false";
-                int align = GetAlignment(elementType); string alignA = align.ToString();
                 
-                return $@"sizer.Align(4); sizer.WriteUInt32(0); // Sequence Length
+                return $@"{dheader}sizer.Align({lengthAlign}); sizer.WriteUInt32(0); // Sequence Length
             foreach (var item in {fieldAccess})
             {{
                 sizer.Align({align}); sizer.{sizerMethod}({dummy});
@@ -937,7 +1033,7 @@ namespace CycloneDDS.CodeGen
             
             if (elementType == "string" || elementType == "System.String")
             {
-                return $@"sizer.Align(4); sizer.WriteUInt32(0); // Sequence Length
+                return $@"{dheader}sizer.Align(4); sizer.WriteUInt32(0); // Sequence Length
             foreach (var item in {fieldAccess})
             {{
                 sizer.Align(4); sizer.WriteString(item, isXcdr2);
@@ -946,14 +1042,14 @@ namespace CycloneDDS.CodeGen
 
             if (isEnum)
             {
-                return $@"sizer.Align(4); sizer.WriteUInt32(0); // Sequence Length
+                return $@"{dheader}sizer.Align(4); sizer.WriteUInt32(0); // Sequence Length
             foreach (var item in {fieldAccess})
             {{
                 sizer.Align(4); sizer.WriteInt32(0);
             }}";
             }
             
-            return $@"sizer.Align(4); sizer.WriteUInt32(0); // Sequence Length
+            return $@"{dheader}sizer.Align({lengthAlign}); sizer.WriteUInt32(0); // Sequence Length
             foreach (var item in {fieldAccess})
             {{
                 sizer.Skip(item.GetSerializedSize(sizer.Position, encoding));

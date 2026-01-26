@@ -866,4 +866,18 @@ module AtomicTests {
         AtomicTests::Point2D points[3];
     };
 
+    @appendable
+    @topic
+    struct SequenceUnionAppendableTopic {
+        @key long id;
+        sequence<SimpleUnionAppendable> unions;
+    };
+
+    @appendable
+    @topic
+    struct SequenceEnumAppendableTopic {
+        @key long id;
+        sequence<ColorEnum> colors;
+    };
+
 };

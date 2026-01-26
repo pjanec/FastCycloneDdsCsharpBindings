@@ -18,6 +18,7 @@ namespace CycloneDDS.Core
         {
             _data = data;
             _position = 0;
+            // Console.WriteLine($"[CdrReader] Init. Len={data.Length}"); // Debug
             
             if (encoding.HasValue)
             {
@@ -38,6 +39,7 @@ namespace CycloneDDS.Core
                         if (_data.Length >= 4)
                         {
                             _position = 4;
+                            // Console.WriteLine($"[CdrReader] Auto-XCDR2. Skip 4. Pos={_position}");
                         }
                     }
                 }
@@ -49,9 +51,10 @@ namespace CycloneDDS.Core
 
         public void Align(int alignment)
         {
-            int currentPos = _position - 4; // Adjust for Header
+            int currentPos = _position;
             int mask = alignment - 1;
             int padding = (alignment - (currentPos & mask)) & mask;
+            Console.WriteLine($"[CdrReader] Align({alignment}) @ {_position}. Pad={padding}. NewPos={_position+padding}");
             if (padding > 0)
             {
                 if (_position + padding > _data.Length)
@@ -63,9 +66,13 @@ namespace CycloneDDS.Core
         public int ReadInt32()
         {
             if (_position + sizeof(int) > _data.Length)
+            {
+                Console.WriteLine($"[CdrReader] ReadInt32 FAIL @ {_position}. Len={_data.Length}");
                 throw new IndexOutOfRangeException();
+            }
             
             int value = BinaryPrimitives.ReadInt32LittleEndian(_data.Slice(_position));
+            Console.WriteLine($"[CdrReader] ReadInt32 @ {_position} = {value}");
             _position += sizeof(int);
             return value;
         }
@@ -73,9 +80,13 @@ namespace CycloneDDS.Core
         public uint ReadUInt32()
         {
             if (_position + sizeof(uint) > _data.Length)
-                throw new IndexOutOfRangeException();
+            {
+               Console.WriteLine($"[CdrReader] ReadUInt32 FAIL @ {_position}. Len={_data.Length}");
+               throw new IndexOutOfRangeException();
+            }
             
             uint value = BinaryPrimitives.ReadUInt32LittleEndian(_data.Slice(_position));
+            Console.WriteLine($"[CdrReader] ReadUInt32 @ {_position} = {value}");
             _position += sizeof(uint);
             return value;
         }

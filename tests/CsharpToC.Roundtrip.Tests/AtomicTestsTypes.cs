@@ -1073,4 +1073,24 @@ namespace AtomicTests
         public Point2D[] Points;
     }
 
+    [DdsTopic("SequenceUnionAppendableTopic")]
+    [DdsExtensibility(DdsExtensibilityKind.Appendable)]
+    public partial struct SequenceUnionAppendableTopic
+    {
+        [DdsKey]
+        public int Id;
+        [DdsManaged]
+        public List<SimpleUnionAppendable> Unions;
+    }
+
+    [DdsTopic("SequenceEnumAppendableTopic")]
+    [DdsExtensibility(DdsExtensibilityKind.Appendable)]
+    public partial struct SequenceEnumAppendableTopic
+    {
+        [DdsKey]
+        public int Id;
+        [DdsManaged]
+        public List<ColorEnum> Colors;
+    }
+
 }

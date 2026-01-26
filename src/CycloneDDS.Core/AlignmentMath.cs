@@ -16,11 +16,9 @@ namespace CycloneDDS.Core
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int Align(int currentPosition, int alignment)
         {
-            // Adjust for XCDR stream offset (Header is 4 bytes)
-            // Alignment is relative to the body, not the absolute stream start in this context
-            int effectivePos = currentPosition - 4;
+            // Standard alignment relative to stream start (0)
             int mask = alignment - 1;
-            int padding = (alignment - (effectivePos & mask)) & mask;
+            int padding = (alignment - (currentPosition & mask)) & mask;
             return currentPosition + padding;
         }
     }

@@ -47,7 +47,7 @@ namespace CycloneDDS.Core
 
         public void Align(int alignment)
         {
-            int currentPos = Position - 4; // Adjust for Header
+            int currentPos = Position;
             int mask = alignment - 1;
             int padding = (alignment - (currentPos & mask)) & mask;
             if (padding > 0)
@@ -176,7 +176,7 @@ namespace CycloneDDS.Core
             // EXPERIMENTAL FIX: CycloneDDS native seems to expect NUL-terminated strings even in XCDR2
             // causing "normalize_string: NUL check failed"
             // So we use XCDR1 style encoding (Len+1, NUL) for everything.
-            if (false) // Disabled XCDR2 optimization (useXcdr2)
+            if (false) // Disabled XCDR2 optimization
             {
                 // XCDR2: Length is byte count. NO NUL terminator.
                 WriteInt32(utf8Length);

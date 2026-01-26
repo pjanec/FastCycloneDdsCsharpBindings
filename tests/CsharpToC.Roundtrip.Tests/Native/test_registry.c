@@ -93,6 +93,8 @@ extern const topic_handler_t nested_triple_key_topic_handler;
 extern const topic_handler_t union_bool_disc_topic_handler;
 extern const topic_handler_t union_enum_disc_topic_handler;
 extern const topic_handler_t union_short_disc_topic_handler;
+extern const topic_handler_t sequence_union_appendable_topic_handler;
+extern const topic_handler_t sequence_enum_appendable_topic_handler;
 
 static const topic_handler_t* handlers[] = {
     &boolean_topic_handler,
@@ -164,6 +166,8 @@ static const topic_handler_t* handlers[] = {
     &union_bool_disc_topic_handler,
     &union_enum_disc_topic_handler,
     &union_short_disc_topic_handler,
+    &sequence_union_appendable_topic_handler,
+    &sequence_enum_appendable_topic_handler,
     NULL
 };
 

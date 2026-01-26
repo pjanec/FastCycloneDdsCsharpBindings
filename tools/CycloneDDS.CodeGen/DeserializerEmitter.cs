@@ -15,7 +15,7 @@ namespace CycloneDDS.CodeGen
         {
             _registry = registry;
             var sb = new StringBuilder();
-            sb.AppendLine("// CodeGen Version: FixApplied");
+            sb.AppendLine("// CodeGen Version: DEBUG-CHECK-1");
             
             if (generateUsings)
             {
@@ -56,6 +56,7 @@ namespace CycloneDDS.CodeGen
             sb.AppendLine($"        public static {type.Name} Deserialize(ref CdrReader reader)");
             sb.AppendLine("        {");
             sb.AppendLine($"            var view = new {type.Name}();");
+            sb.AppendLine($"            System.Console.WriteLine(\"[Type={type.Name}] Pos=\" + reader.Position + \" Enc=\" + reader.Encoding + \" IsApp={IsAppendable(type)}\");");
             
             if (IsAppendable(type))
             {
@@ -66,7 +67,14 @@ namespace CycloneDDS.CodeGen
                 sb.AppendLine("                reader.Align(4);");
                 sb.AppendLine("                uint dheader = reader.ReadUInt32();");
                 sb.AppendLine("                endPos = reader.Position + (int)dheader;");
-
+                
+                // NATIVE BEHAVIOR: 
+                // XCDR2 spec says "Padding to reach alignment of the type". 
+                int typeAlign = GetAlignment(type);
+                if (typeAlign > 4)
+                {
+                     sb.AppendLine($"                reader.Align({typeAlign});");
+                }
 
                 sb.AppendLine("            }");
             }
@@ -372,7 +380,7 @@ namespace CycloneDDS.CodeGen
         private string GetReadCall(TypeInfo type, FieldInfo field)
         {
             int align = GetAlignment(field.TypeName);
-            string alignA = align == 8 ? "reader.IsXcdr2 ? 4 : 8" : align.ToString();
+            string alignA = align.ToString();
             string alignCall = align > 1 ? $"reader.Align({alignA}); " : "";
             
             // ToPascalCase added to all field access below
@@ -426,7 +434,7 @@ namespace CycloneDDS.CodeGen
             if (TypeMapper.IsBlittable(elementType))
             {
                  int align = GetAlignment(elementType);
-                 string alignA = align == 8 ? "reader.IsXcdr2 ? 4 : 8" : align.ToString();
+                 string alignA = align.ToString();
                  return $@"{lengthRead}
             if (length{field.Name} > 0)
             {{
@@ -450,7 +458,7 @@ namespace CycloneDDS.CodeGen
             {fieldAccess} = new {elementType}[length{field.Name}];
             for (int i = 0; i < length{field.Name}; i++)
             {{
-                reader.Align({(GetAlignment(elementType) == 8 ? "reader.IsXcdr2 ? 4 : 8" : GetAlignment(elementType).ToString())});
+                reader.Align({GetAlignment(elementType)});
                 {fieldAccess}[i] = reader.{readMethod}();
             }}";
              }
@@ -496,7 +504,7 @@ namespace CycloneDDS.CodeGen
             
             if (elem == "string" || elem == "String" || elem == "System.String")
             {
-                return $@"reader.Align(4);
+                return $@"reader.Align({GetAlignment(field.TypeName)});
             uint {field.Name}_len = reader.ReadUInt32();
             {boundsCheck}
             var list = new System.Collections.Generic.List<string>((int){field.Name}_len);
@@ -511,10 +519,10 @@ namespace CycloneDDS.CodeGen
             if (TypeMapper.IsBlittable(elem))
             {
                 int elemSize = GetSize(elem);
-                return $@"reader.Align(4);
+                return $@"reader.Align({GetAlignment(field.TypeName)});
             uint {field.Name}_len = reader.ReadUInt32();
             {boundsCheck}
-            reader.Align({(GetAlignment(elem) == 8 ? "reader.IsXcdr2 ? 4 : 8" : GetAlignment(elem).ToString())});
+            reader.Align({GetAlignment(elem)});
             {{
                 var span = MemoryMarshal.Cast<byte, {elem}>(reader.ReadFixedBytes((int){field.Name}_len * {elemSize}));
                 {fieldAccess} = new BoundedSeq<{elem}>(new System.Collections.Generic.List<{elem}>(span.ToArray()));
@@ -524,7 +532,9 @@ namespace CycloneDDS.CodeGen
             string itemType = elem; 
             string deserializerCall = $"{elem}.Deserialize(ref reader).ToOwned()";
             
-            return $@"reader.Align(4);
+            int seqAlign = GetAlignment(field.TypeName);
+            return $@"// FieldType: {field.TypeName} SeqAlign: {seqAlign} [SequenceReader.Complex]
+            reader.Align({seqAlign});
             uint {field.Name}_len = reader.ReadUInt32();
             {boundsCheck}
             var list = new System.Collections.Generic.List<{itemType}>((int){field.Name}_len);
@@ -608,32 +618,50 @@ namespace CycloneDDS.CodeGen
 
         private int GetAlignment(string typeName)
         {
-            if (typeName == "string") return 4;
-            if (typeName.EndsWith("[]")) return 4;
-            if (typeName.StartsWith("BoundedSeq") || typeName.Contains("BoundedSeq<")) return 4;
-            if (typeName.StartsWith("List") || typeName.StartsWith("System.Collections.Generic.List")) return 4;
-            if (typeName.Contains("FixedString")) return 1;
-
+            // Primitives
             string t = typeName;
             if (t.StartsWith("System.")) t = t.Substring(7);
             t = t.ToLowerInvariant();
-
-            return t switch
+            
+            switch(t)
             {
-                "byte" or "uint8" or "sbyte" or "int8" or "bool" or "boolean" => 1,
-                "short" or "int16" or "ushort" or "uint16" => 2,
-                "int" or "int32" or "uint" or "uint32" or "float" or "single" => 4,
-                "vector2" or "numerics.vector2" => 4,
-                "vector3" or "numerics.vector3" => 4,
-                "vector4" or "numerics.vector4" => 4,
-                "quaternion" or "numerics.quaternion" => 4,
-                "matrix4x4" or "numerics.matrix4x4" => 4,
-                "long" or "int64" or "ulong" or "uint64" or "double" => 8,
-                "datetime" or "timespan" or "datetimeoffset" => 8,
-                "guid" => 1,
-                _ => 1
-            };
+                case "byte": case "uint8": case "sbyte": case "int8": case "bool": case "boolean": return 1;
+                case "short": case "int16": case "ushort": case "uint16": return 2;
+                case "int": case "int32": case "uint": case "uint32": case "float": case "single": return 4;
+                case "vector2": case "numerics.vector2": return 4;
+                case "vector3": case "numerics.vector3": return 4;
+                case "vector4": case "numerics.vector4": return 4;
+                case "quaternion": case "numerics.quaternion": return 4;
+                case "matrix4x4": case "numerics.matrix4x4": return 4;
+                case "long": case "int64": case "ulong": case "uint64": case "double": return 8;
+                case "datetime": case "timespan": case "datetimeoffset": return 8;
+                case "guid": return 1;
+            }
+            
+            if (typeName == "string") return 4;
+            if (typeName.Contains("FixedString")) return 1;
+
+            // Arrays / Sequences
+            if (typeName.EndsWith("[]") || typeName.StartsWith("List") || typeName.StartsWith("System.Collections.Generic.List") || typeName.StartsWith("BoundedSeq"))
+            {
+                // NATIVE BEHAVIOR: Propagate alignment
+                string elemType = ExtractSequenceElementType(typeName);
+                return GetAlignment(elemType);
+            }
+
+            // Registry Lookup
+            if (_registry != null)
+            {
+                 if (_registry.TryGetDefinition(typeName, out var def) && def.TypeInfo != null)
+                     return GetAlignment(def.TypeInfo);
+                     
+                 if (_registry.TryGetDefinition(typeName.Replace(".", "::"), out var def2) && def2.TypeInfo != null)
+                     return GetAlignment(def2.TypeInfo);
+            }
+
+            return 1;
         }
+
         
         private int GetSize(string typeName)
         {
@@ -665,14 +693,15 @@ namespace CycloneDDS.CodeGen
         {
             string elementType = ExtractGenericType(field.TypeName);
             string fieldAccess = $"view.{ToPascalCase(field.Name)}"; // ToPascalCase added
+            int seqAlign = GetAlignment(field.TypeName);
 
             if (IsPrimitive(elementType))
             {
                 int elemSize = GetSize(elementType);
                 int align = GetAlignment(elementType);
-                string alignA = align == 8 ? "reader.IsXcdr2 ? 4 : 8" : align.ToString();
-                
-                return $@"reader.Align(4);
+                string alignA = align.ToString();
+
+                return $@"reader.Align({seqAlign});
             uint {field.Name}_len = reader.ReadUInt32();
             {fieldAccess} = new List<{elementType}>((int){field.Name}_len);
             System.Runtime.InteropServices.CollectionsMarshal.SetCount({fieldAccess}, (int){field.Name}_len);
@@ -697,7 +726,7 @@ namespace CycloneDDS.CodeGen
             if (readMethod != null)
             {
                  int align = GetAlignment(elementType);
-                 string alignA = align == 8 ? "reader.IsXcdr2 ? 4 : 8" : align.ToString();
+                 string alignA = align.ToString();
                  addStatement = $"reader.Align({alignA}); {fieldAccess}.Add(reader.{readMethod}());";
             }
             else if (elementType == "string" || elementType == "System.String")
@@ -713,7 +742,8 @@ namespace CycloneDDS.CodeGen
                  addStatement = $"{fieldAccess}.Add({elementType}.Deserialize(ref reader).ToOwned());";
             }
 
-            return $@"reader.Align(4);
+            return $@"// FieldType: {field.TypeName} SeqAlign: {seqAlign}
+            reader.Align({seqAlign});
             uint {field.Name}_len = reader.ReadUInt32();
             {fieldAccess} = new List<{elementType}>((int){field.Name}_len);
             for(int i=0; i<{field.Name}_len; i++)
@@ -764,6 +794,92 @@ namespace CycloneDDS.CodeGen
         {
             if (string.IsNullOrEmpty(name)) return name;
             return char.ToUpper(name[0]) + name.Substring(1);
+        }
+
+        private int GetAlignment(TypeInfo type)
+        {
+            // Recursive protection could be added but assuming DAG for now
+            int maxAlign = 1;
+
+            if (type.IsUnion) 
+            {
+                 // Unions have at least the discriminator alignment (usually 4)
+                 maxAlign = 4;
+            }
+
+            foreach(var field in type.Fields)
+            {
+                int fa = GetFieldAlignment(field);
+                if (fa > maxAlign) maxAlign = fa;
+            }
+            return maxAlign;
+        }
+
+        private int GetFieldAlignment(FieldInfo field)
+        {
+            if (field.Type != null) return GetAlignment(field.Type);
+
+            if (_registry != null && _registry.TryGetDefinition(field.TypeName, out var def) && def.TypeInfo != null)
+            {
+                return GetAlignment(def.TypeInfo);
+            }
+            
+            return GetPrimitiveAlignment(field.TypeName);
+        }
+
+        private int GetPrimitiveAlignment(string name)
+        {
+             switch (name)
+             {
+                 case "double":
+                 case "long": // C# long is 64-bit
+                 case "ulong":
+                 case "Int64":
+                 case "UInt64":
+                 case "System.Double":
+                 case "System.Int64":
+                 case "System.UInt64":
+                    return 8;
+                 case "int":
+                 case "uint":
+                 case "float":
+                 case "Int32":
+                 case "UInt32":
+                 case "System.Int32":
+                 case "System.UInt32":
+                 case "System.Single":
+                 case "Single":
+                    return 4;
+                 case "short":
+                 case "ushort":
+                 case "Int16":
+                 case "UInt16":
+                 case "char":
+                 case "Char":
+                 case "System.Int16":
+                 case "System.UInt16":
+                 case "System.Char":
+                    return 2;
+                 case "bool":
+                 case "Boolean":
+                 case "byte":
+                 case "sbyte":
+                 case "Byte":
+                 case "SByte":
+                 case "octet":
+                 case "System.Boolean":
+                 case "System.Byte":
+                 case "System.SByte":
+                    return 1;
+                 case "string":
+                 case "String":
+                 case "System.String":
+                    return 4;
+                 default:
+                    if (name.StartsWith("List<") || name.Contains("[]")) return 4;
+                    if (name.StartsWith("System.Collections.Generic.List")) return 4;
+                    return 1;
+             }
         }
     }
 }
