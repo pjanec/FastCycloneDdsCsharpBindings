@@ -1,5 +1,6 @@
 #include "type_registry.h"
 #include "roundtrip_test.h"
+#include "atomic_tests.h"
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -372,3 +373,96 @@ bool compare_SequenceTopic(const void* a, const void* b) {
     
     return true;
 }
+
+
+// ============================================================================
+// UnionBoolDiscTopic Handler
+// ============================================================================
+
+void* alloc_UnionBoolDiscTopic() {
+    return dds_alloc(sizeof(AtomicTests_UnionBoolDiscTopic));
+}
+
+void free_UnionBoolDiscTopic(void* sample) {
+    dds_sample_free(sample, &AtomicTests_UnionBoolDiscTopic_desc, DDS_FREE_ALL);
+}
+
+const dds_topic_descriptor_t* descriptor_UnionBoolDiscTopic() {
+    return &AtomicTests_UnionBoolDiscTopic_desc;
+}
+
+void fill_UnionBoolDiscTopic(void* sample, int seed) {
+    AtomicTests_UnionBoolDiscTopic* s = (AtomicTests_UnionBoolDiscTopic*)sample;
+    
+    // DataGenerator: bool -> (seed % 2) == 0
+    bool disc = (seed % 2) == 0;
+    
+    s->data._d = disc;
+    if (disc) { // True
+         // DataGenerator: int32 -> seed
+         s->data._u.true_val = seed;
+    } else { // False
+         // DataGenerator: double -> seed + 0.25
+         s->data._u.false_val = (double)seed + 0.25;
+    }
+}
+
+bool compare_UnionBoolDiscTopic(const void* a, const void* b) {
+    const AtomicTests_UnionBoolDiscTopic* x = (const AtomicTests_UnionBoolDiscTopic*)a;
+    const AtomicTests_UnionBoolDiscTopic* y = (const AtomicTests_UnionBoolDiscTopic*)b;
+    
+    if (x->data._d != y->data._d) return false;
+    
+    if (x->data._d) {
+        if (x->data._u.true_val != y->data._u.true_val) return false;
+    } else {
+        if (fabs(x->data._u.false_val - y->data._u.false_val) > 1e-5) return false;
+    }
+    return true;
+}
+
+// ============================================================================
+// UnionLongDiscTopic Handler
+// ============================================================================
+
+void* alloc_UnionLongDiscTopic() {
+    return dds_alloc(sizeof(AtomicTests_UnionLongDiscTopic));
+}
+
+void free_UnionLongDiscTopic(void* sample) {
+    dds_sample_free(sample, &AtomicTests_UnionLongDiscTopic_desc, DDS_FREE_ALL);
+}
+
+const dds_topic_descriptor_t* descriptor_UnionLongDiscTopic() {
+    return &AtomicTests_UnionLongDiscTopic_desc;
+}
+
+void fill_UnionLongDiscTopic(void* sample, int seed) {
+    AtomicTests_UnionLongDiscTopic* s = (AtomicTests_UnionLongDiscTopic*)sample;
+    
+    // DataGenerator: int -> seed
+    int32_t disc = seed;
+    s->data._d = disc;
+    
+    if (disc == 1) {
+        s->data._u.int_value = seed;
+    } else if (disc == 2) {
+        s->data._u.double_value = (double)seed + 0.25;
+    }
+    // Case 3 (String) not tested yet
+}
+
+bool compare_UnionLongDiscTopic(const void* a, const void* b) {
+    const AtomicTests_UnionLongDiscTopic* x = (const AtomicTests_UnionLongDiscTopic*)a;
+    const AtomicTests_UnionLongDiscTopic* y = (const AtomicTests_UnionLongDiscTopic*)b;
+    
+    if (x->data._d != y->data._d) return false;
+    
+    if (x->data._d == 1) {
+            if (x->data._u.int_value != y->data._u.int_value) return false;
+    } else if (x->data._d == 2) {
+            if (fabs(x->data._u.double_value - y->data._u.double_value) > 1e-5) return false;
+    }
+    return true;
+}
+

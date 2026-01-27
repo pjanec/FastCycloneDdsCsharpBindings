@@ -824,8 +824,13 @@ namespace CycloneDDS.CodeGen
 
             if (type.IsUnion) 
             {
-                 // Unions have at least the discriminator alignment (usually 4)
-                 maxAlign = 4;
+                // For Unions, the alignment requirement is determined by the Discriminator
+                // which is the first thing serialized. The max alignment of members does NOT matters for the start.
+                var discriminator = type.Fields.FirstOrDefault(f => f.HasAttribute("DdsDiscriminator"));
+                if (discriminator != null)
+                    return GetFieldAlignment(discriminator);
+                
+                return 4;
             }
 
             foreach(var field in type.Fields)

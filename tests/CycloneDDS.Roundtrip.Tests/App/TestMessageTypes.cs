@@ -76,6 +76,7 @@ namespace RoundtripTests
 
     [DdsTopic("CompositeKey")]
     [DdsManaged]
+    [DdsExtensibility(DdsExtensibilityKind.Final)]
     public partial struct CompositeKey
     {
         [DdsKey]

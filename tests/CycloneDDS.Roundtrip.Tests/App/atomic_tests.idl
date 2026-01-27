@@ -198,6 +198,7 @@ module AtomicTests {
     // ========================================================================
     
     // Union with long discriminator
+    @final
     union SimpleUnion switch(long) {
         case 1: long int_value;
         case 2: double double_value;
@@ -205,18 +206,21 @@ module AtomicTests {
     };
     
     @topic
+    @final
     struct UnionLongDiscTopic {
         @key long id;
         SimpleUnion data;
     };
     
     // Union with boolean discriminator
+    @final
     union BoolUnion switch(boolean) {
         case TRUE: long true_val;
         case FALSE: double false_val;
     };
     
     @topic
+    @final
     struct UnionBoolDiscTopic {
         @key long id;
         BoolUnion data;
@@ -369,18 +373,21 @@ module AtomicTests {
     // ========================================================================
     
     @topic
+    @final
     struct ArrayInt32Topic {
         @key long id;
         long values[5];
     };
     
     @topic
+    @final
     struct ArrayFloat64Topic {
         @key long id;
         double values[5];
     };
     
     @topic
+    @final
     struct ArrayStringTopic {
         @key long id;
         string<16> names[3];

@@ -54,106 +54,105 @@ namespace CsharpToC.Roundtrip.Tests
                 Console.WriteLine("[INFO] Initializing DDS Participant...");
                 _participant = new DdsParticipant();
 
-                // Run Tests
-                //await TestBoolean();
-                //await TestArrayInt32();
-                //await TestArrayFloat64();
-                //await TestChar();
-                //await TestOctet();
-                //await TestInt16();
-                //await TestUInt16();
-                //await TestInt32();
-                //await TestUInt32();
-                //await TestInt64();
-                //await TestUInt64();
-                //await TestFloat32();
-                //await TestFloat64();
+				// Run Tests
+				//await TestBoolean();
+				//await TestChar();
+				//await TestOctet();
+				//await TestInt16();
+				//await TestUInt16();
+				//await TestInt32();
+				//await TestUInt32();
+				//await TestInt64();
+				//await TestUInt64();
+				//await TestFloat32();
+				//await TestFloat64(); // OK
 
-                //await TestStringUnbounded();
-                //await TestStringBounded256();
+				//await TestStringUnbounded();
+				//await TestStringBounded256();
 
-                //await TestStringBounded32();
-                //await TestArrayInt32();
-                //await TestArrayFloat64();
-                //await TestArrayString();
-                await TestSequenceInt32();
-                //await TestUnionLongDisc();
+				//await TestStringBounded32();
+				//await TestArrayInt32();
+				//await TestArrayFloat64(); // OK
+				//await TestArrayString();
+				//await TestSequenceInt32(); // OK
+				//await TestUnionLongDisc();
 
-                // Appendable Tests
-                //await TestBooleanAppendable();
-                //await TestCharAppendable();
-                //await TestOctetAppendable();
-                //await TestInt16Appendable();
-                //await TestUInt16Appendable();
-                //await TestInt32Appendable();
-                //await TestUInt32Appendable();
-                //await TestInt64Appendable();
-                //await TestUInt64Appendable();
-                //await TestFloat32Appendable();
-                //await TestFloat64Appendable();
+				// Appendable Tests
+				//await TestBooleanAppendable(); // OK
+				//await TestCharAppendable();
+				//await TestOctetAppendable(); // OK
+				//await TestInt16Appendable();
+				// await TestUInt16Appendable(); // OK
+				//await TestInt32Appendable();
+				//await TestUInt32Appendable(); // OK
+				//await TestInt64Appendable();
+				//await TestUInt64Appendable(); // FAIL
+				//await TestFloat32Appendable(); // OK
+				//await TestFloat64Appendable(); // FAIL
 
-                //await TestStringUnboundedAppendable();
-                //await TestStringBounded256Appendable();
+				//await TestStringUnboundedAppendable(); // OK
+				//await TestStringBounded256Appendable(); // OK
 
-                //await TestEnum();
-                //await TestColorEnum();
-                //await TestEnumAppendable();
-                //await TestColorEnumAppendable();
+				//await TestEnum();
+				//await TestColorEnum();
+				//await TestEnumAppendable(); // OK
+				//await TestColorEnumAppendable(); // OK
 
-                //await TestStringBounded32Appendable();
-                //await TestArrayInt32Appendable();
-                //await TestArray2DInt32();
-                //await TestArray3DInt32();
-                //await TestArrayStruct();
+				//await TestStringBounded32Appendable(); // OK
+				//await TestArrayInt32Appendable(); // OK
+				//await TestArray2DInt32();
+				//await TestArray3DInt32();
+				//await TestArrayStruct(); // OK
 
-                // await TestArrayFloat64Appendable(); // THROWS EXCEPTION
-                // await TestArrayStringAppendable(); // DOES NOT FINISH
+				//await TestArrayFloat64Appendable(); // OK
+				//await TestArrayStringAppendable(); // THROWS
 
-                await TestSequenceUnionAppendable();
-                //await TestSequenceEnumAppendable();
+				//await TestSequenceUnionAppendable(); // OK
+				//await TestSequenceEnumAppendable(); // OK
 
-                // Nested Struct Tests
-                // await TestNestedStruct();
-                //await TestNested3D();
-                //await TestDoublyNested();
-                //await TestComplexNested();
+				// Nested Struct Tests
+				// await TestNestedStruct(); // OK
+				//await TestNested3D();
+				//await TestDoublyNested();
+				//await TestComplexNested();
 
-                // Composite Keys
-                //await TestTwoKeyInt32();
-                //await TestTwoKeyString();
-                //await TestThreeKey();
-                //await TestFourKey();
+				// Composite Keys
+				//await TestTwoKeyInt32();
+				//await TestTwoKeyString();
+				//await TestThreeKey();
+				//await TestFourKey();
 
-                // Nested Keys
-                //await TestNestedKey();
-                //await TestNestedKeyGeo();
-                //await TestNestedTripleKey();
+				// Nested Keys
+				//await TestNestedKey(); // OK
+				//await TestNestedKeyGeo();
+				//await TestNestedTripleKey();
 
-                //await TestColorEnum();
-                //await TestColorEnumAppendable();
+				//await TestColorEnum();
+				//await TestColorEnumAppendable(); // OK
 
-                //await TestUnionBoolDisc();
-                //await TestUnionBoolDisc();
-                //await TestUnionLongDisc();
-                //await TestSequenceUnion();
+				//await TestUnionBoolDisc(); // OK
+				//await TestUnionEnumDisc(); OK
+				//await TestUnionShortDisc(); // OK
 
-                //await TestUnionEnumDisc();
-                //await TestUnionShortDisc();
-                //await TestUnionLongDiscAppendable();
+				//await TestFloat64(); // OK
+				//await TestUnionLongDisc(); // OK
+				//await TestSequenceUnion(); // OK
 
-                //await TestBoundedSequenceInt32();
-                //await TestSequenceInt64();
-                //await TestSequenceFloat32();
-                //await TestSequenceFloat64();
-                //await TestSequenceBoolean();
-                //await TestSequenceOctet();
-                //await TestSequenceString();
-                //await TestSequenceEnum();
-                //await TestSequenceStruct();
+				//await TestUnionLongDiscAppendable(); // OK
 
-                //await TestSequenceInt32Appendable();
+				//await TestBoundedSequenceInt32(); // OK
+				//await TestSequenceInt64(); // FAILS
+				//await TestSequenceFloat32(); // OK
+				//await TestSequenceFloat64(); // FAILS
+				//await TestSequenceBoolean(); // OK
+				//await TestSequenceOctet(); // OK
+				//await TestSequenceString(); // OK
+				//await TestSequenceEnum(); // OK
+				//await TestSequenceStruct(); // FAILS
 
-                Console.WriteLine("==================================================");
+				//await TestSequenceInt32Appendable(); // FAILS
+
+				Console.WriteLine("==================================================");
                 Console.WriteLine("ALL TESTS PASSED");
                 Console.WriteLine("==================================================");
             }
@@ -269,6 +268,10 @@ namespace CsharpToC.Roundtrip.Tests
                     
                     // Wait for native reader to listen
                     await Task.Delay(1000);
+
+                    if (topicName.Contains("UnionBoolDisc")) {
+                        DebugDumpUnionBool(msg);
+                    }
                     
                     writer.Write(msg);
                     
@@ -292,6 +295,27 @@ namespace CsharpToC.Roundtrip.Tests
                 Console.WriteLine();
                 throw;
             }
+        }
+
+
+        private static void DebugDumpUnionBool(object msg)
+        {
+             if (msg is AtomicTests.UnionBoolDiscTopic bt) {
+                 try {
+                     Console.WriteLine("[DEBUG C#] Dumping UnionBoolDiscTopic bytes...");
+                     var tempBuff = new byte[64];
+                     // Simulate header offset
+                     var tempWriter = new CycloneDDS.Core.CdrWriter(new Span<byte>(tempBuff), CycloneDDS.Core.CdrEncoding.Xcdr1);
+                     tempWriter.WriteInt32(0); // Dummy header to push position to 4
+                     
+                     bt.Serialize(ref tempWriter);
+                     int len = tempWriter.Position;
+                     Console.WriteLine($"[DEBUG C#] Total Length: {len}");
+                     Console.WriteLine($"[DEBUG C#] Bytes: {BitConverter.ToString(tempBuff, 0, len)}");
+                 } catch (Exception ex) {
+                     Console.WriteLine($"[DEBUG C#] Dump failed: {ex.Message}");
+                 }
+             }
         }
 
         private static async Task<(T, byte[])> ReadOneAsync<T>(DdsReader<T, T> reader) where T : struct

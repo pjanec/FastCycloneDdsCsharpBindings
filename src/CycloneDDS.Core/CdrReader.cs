@@ -10,14 +10,16 @@ namespace CycloneDDS.Core
         private ReadOnlySpan<byte> _data;
         private int _position;
         private readonly CdrEncoding _encoding;
+        private readonly int _origin;
 
         public CdrEncoding Encoding => _encoding;
         public bool IsXcdr2 => _encoding == CdrEncoding.Xcdr2;
 
-        public CdrReader(ReadOnlySpan<byte> data, CdrEncoding? encoding = null)
+        public CdrReader(ReadOnlySpan<byte> data, CdrEncoding? encoding = null, int origin = 0)
         {
             _data = data;
             _position = 0;
+            _origin = origin;
             // Console.WriteLine($"[CdrReader] Init. Len={data.Length}"); // Debug
             
             if (encoding.HasValue)
@@ -51,10 +53,10 @@ namespace CycloneDDS.Core
 
         public void Align(int alignment)
         {
-            int currentPos = _position;
+            int currentPos = _position - _origin;
             int mask = alignment - 1;
             int padding = (alignment - (currentPos & mask)) & mask;
-            Console.WriteLine($"[CdrReader] Align({alignment}) @ {_position}. Pad={padding}. NewPos={_position+padding}");
+            Console.WriteLine($"[CdrReader] Align({alignment}) @ {_position}. Origin={_origin}. Pad={padding}. NewPos={_position+padding}");
             if (padding > 0)
             {
                 if (_position + padding > _data.Length)
@@ -114,8 +116,10 @@ namespace CycloneDDS.Core
             if (_position + sizeof(float) > _data.Length)
                 throw new IndexOutOfRangeException();
             int val = BinaryPrimitives.ReadInt32LittleEndian(_data.Slice(_position));
+            float fval = BitConverter.Int32BitsToSingle(val);
+            Console.WriteLine($"[CdrReader] ReadFloat @ {_position} = {fval}");
             _position += sizeof(float);
-            return BitConverter.Int32BitsToSingle(val);
+            return fval;
         }
 
         public double ReadDouble()
@@ -123,8 +127,10 @@ namespace CycloneDDS.Core
             if (_position + sizeof(double) > _data.Length)
                 throw new IndexOutOfRangeException();
             long val = BinaryPrimitives.ReadInt64LittleEndian(_data.Slice(_position));
+            double dval = BitConverter.Int64BitsToDouble(val);
+            Console.WriteLine($"[CdrReader] ReadDouble @ {_position} = {dval}");
             _position += sizeof(double);
-            return BitConverter.Int64BitsToDouble(val);
+            return dval;
         }
 
         public byte ReadByte()

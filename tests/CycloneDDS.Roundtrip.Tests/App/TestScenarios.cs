@@ -51,6 +51,22 @@ internal class TestScenarios
                 Enabled = false
             },
 
+            // Union Tests
+            new TestScenario
+            {
+                TopicName = "UnionBoolDiscTopic",
+                Description = "Union with boolean discriminator",
+                Seeds = new[] { 0, 1 }, 
+                Enabled = true
+            },
+            new TestScenario
+            {
+                TopicName = "UnionLongDiscTopic",
+                Description = "Union with long discriminator",
+                Seeds = new[] { 1, 2 }, 
+                Enabled = true
+            },
+
             // New Array Tests
             new TestScenario
             {

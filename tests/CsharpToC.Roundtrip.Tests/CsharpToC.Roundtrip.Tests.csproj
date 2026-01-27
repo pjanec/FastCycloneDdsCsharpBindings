@@ -39,6 +39,7 @@
 
   <ItemGroup>
     <CycloneDdsIdl Include="idl\atomic_tests.idl" Link="atomic_tests.idl" />
+    <Compile Include="obj\Generated\**\*.cs" />
   </ItemGroup>
 
   <Import Project="..\..\tools\CycloneDDS.CodeGen\CycloneDDS.targets" />

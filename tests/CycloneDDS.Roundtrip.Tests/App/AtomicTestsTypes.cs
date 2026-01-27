@@ -217,6 +217,7 @@ namespace AtomicTests
     }
 
     [DdsUnion]
+    [DdsExtensibility(DdsExtensibilityKind.Final)]
     public partial struct SimpleUnion
     {
         [DdsDiscriminator]
@@ -231,6 +232,7 @@ namespace AtomicTests
     }
 
     [DdsTopic("UnionLongDiscTopic")]
+    [DdsExtensibility(DdsExtensibilityKind.Final)]
     public partial struct UnionLongDiscTopic
     {
         [DdsKey]
@@ -240,6 +242,7 @@ namespace AtomicTests
     }
 
     [DdsUnion]
+    [DdsExtensibility(DdsExtensibilityKind.Final)]
     public partial struct BoolUnion
     {
         [DdsDiscriminator]
@@ -251,6 +254,7 @@ namespace AtomicTests
     }
 
     [DdsTopic("UnionBoolDiscTopic")]
+    [DdsExtensibility(DdsExtensibilityKind.Final)]
     public partial struct UnionBoolDiscTopic
     {
         [DdsKey]
@@ -469,6 +473,7 @@ namespace AtomicTests
     }
 
     [DdsTopic("ArrayInt32Topic")]
+    [DdsExtensibility(DdsExtensibilityKind.Final)]
     public partial struct ArrayInt32Topic
     {
         [DdsKey]
@@ -479,6 +484,7 @@ namespace AtomicTests
     }
 
     [DdsTopic("ArrayFloat64Topic")]
+    [DdsExtensibility(DdsExtensibilityKind.Final)]
     public partial struct ArrayFloat64Topic
     {
         [DdsKey]
@@ -489,11 +495,12 @@ namespace AtomicTests
     }
 
     [DdsTopic("ArrayStringTopic")]
+    [DdsExtensibility(DdsExtensibilityKind.Final)]
     public partial struct ArrayStringTopic
     {
         [DdsKey]
         public int Id;
-        [ArrayLength(5)]
+        [ArrayLength(3)]
         [DdsManaged]
         [MaxLength(16)]
         public string[] Names;

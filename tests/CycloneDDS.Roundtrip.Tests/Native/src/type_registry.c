@@ -55,6 +55,20 @@ extern const dds_topic_descriptor_t* descriptor_ArrayStringTopic();
 extern void fill_ArrayStringTopic(void* sample, int seed);
 extern bool compare_ArrayStringTopic(const void* a, const void* b);
 
+// UnionBoolDiscTopic
+extern void* alloc_UnionBoolDiscTopic();
+extern void free_UnionBoolDiscTopic(void* sample);
+extern const dds_topic_descriptor_t* descriptor_UnionBoolDiscTopic();
+extern void fill_UnionBoolDiscTopic(void* sample, int seed);
+extern bool compare_UnionBoolDiscTopic(const void* a, const void* b);
+
+// UnionLongDiscTopic
+extern void* alloc_UnionLongDiscTopic();
+extern void free_UnionLongDiscTopic(void* sample);
+extern const dds_topic_descriptor_t* descriptor_UnionLongDiscTopic();
+extern void fill_UnionLongDiscTopic(void* sample, int seed);
+extern bool compare_UnionLongDiscTopic(const void* a, const void* b);
+
 // Add more as implemented...
 
 // ============================================================================
@@ -117,6 +131,22 @@ static const type_handler_t registry[] = {
         .descriptor_fn = descriptor_ArrayStringTopic,
         .fill_fn = fill_ArrayStringTopic,
         .compare_fn = compare_ArrayStringTopic
+    },
+    {
+        .topic_name = "UnionBoolDiscTopic",
+        .alloc_fn = alloc_UnionBoolDiscTopic,
+        .free_fn = free_UnionBoolDiscTopic,
+        .descriptor_fn = descriptor_UnionBoolDiscTopic,
+        .fill_fn = fill_UnionBoolDiscTopic,
+        .compare_fn = compare_UnionBoolDiscTopic
+    },
+    {
+        .topic_name = "UnionLongDiscTopic",
+        .alloc_fn = alloc_UnionLongDiscTopic,
+        .free_fn = free_UnionLongDiscTopic,
+        .descriptor_fn = descriptor_UnionLongDiscTopic,
+        .fill_fn = fill_UnionLongDiscTopic,
+        .compare_fn = compare_UnionLongDiscTopic
     },
     
     // Sentinel (end of table)

@@ -122,7 +122,6 @@ namespace CycloneDDS.CodeGen
             var discriminator = type.Fields.FirstOrDefault(f => f.HasAttribute("DdsDiscriminator"));
             if (discriminator == null) throw new Exception($"Union {type.Name} missing [DdsDiscriminator] field");
 
-            // Write Discriminator
             string discSizer = GetSizerCall(discriminator, isXcdr2);
             sb.AppendLine($"            {discSizer}; // Discriminator {discriminator.Name}");
             
@@ -176,6 +175,9 @@ namespace CycloneDDS.CodeGen
         
         private void EmitSerialize(StringBuilder sb, TypeInfo type)
         {
+            // DEBUG: Check extensibility
+            Console.WriteLine($"[CodeGen] Generating Serialize for {type.Name}, Extensibility: {type.Extensibility}, IsAppendable: {IsAppendable(type)}");
+
             sb.AppendLine("        public void Serialize(ref CdrWriter writer)");
             sb.AppendLine("        {");
             
@@ -240,7 +242,6 @@ namespace CycloneDDS.CodeGen
             var discriminator = type.Fields.FirstOrDefault(f => f.HasAttribute("DdsDiscriminator"));
             if (discriminator == null) throw new Exception($"Union {type.Name} missing [DdsDiscriminator] field");
 
-            // Write Discriminator
             string discWriter = GetWriterCall(discriminator, isXcdr2);
             sb.AppendLine($"            {discWriter}; // Discriminator {discriminator.Name}");
             
@@ -470,12 +471,16 @@ namespace CycloneDDS.CodeGen
 
         private int GetTypeAlignment(TypeInfo type)
         {
-            int maxAlign = 1;
-
             if (type.IsUnion) 
             {
-                 maxAlign = 4; // Discriminator
+                 // XCDR Standard: The alignment of the union is the alignment of its discriminator.
+                 var discriminator = type.Fields.FirstOrDefault(f => f.HasAttribute("DdsDiscriminator"));
+                 if (discriminator != null)
+                     return GetAlignment(discriminator.TypeName);
+                 return 1;
             }
+
+            int maxAlign = 1;
 
             // Simple recursion protection by name check? 
             // We assume DAG for now as we don't pass visited list.
@@ -547,7 +552,8 @@ namespace CycloneDDS.CodeGen
             {
                 // Nested struct
                 // Use actual instance for variable sizing logic
-                return $"sizer.Skip(this.{ToPascalCase(field.Name)}.GetSerializedSize(sizer.Position, encoding))"; // Pass encoding
+                int align = GetAlignment(field.TypeName);
+                return $"sizer.Align({align}); sizer.Skip(this.{ToPascalCase(field.Name)}.GetSerializedSize(sizer.Position, encoding))"; // Pass encoding
             }
         }
         
@@ -600,7 +606,9 @@ namespace CycloneDDS.CodeGen
             
             else
             {
-                return $"{fieldAccess}.Serialize(ref writer)";
+                int align = GetAlignment(field.TypeName);
+                string alignA = align == 8 ? "8" : align.ToString();
+                return $"writer.Align(writer.IsXcdr2 ? 1 : {alignA}); {fieldAccess}.Serialize(ref writer)";
             }
         }
 
@@ -608,7 +616,7 @@ namespace CycloneDDS.CodeGen
         {
             string fieldAccess = $"this.{ToPascalCase(field.Name)}";
             string elementType = field.TypeName.Substring(0, field.TypeName.Length - 2);
-            bool isFixed = field.HasAttribute("ArrayLength");
+            bool isFixed = field.HasAttribute("ArrayLength") || field.HasAttribute("ArrayLengthAttribute");
             string lengthWrite = isFixed ? "" : "sizer.Align(4); sizer.WriteUInt32(0); // Length";
 
             if (TypeMapper.IsBlittable(elementType))
@@ -663,7 +671,7 @@ namespace CycloneDDS.CodeGen
         {
             string fieldAccess = $"this.{ToPascalCase(field.Name)}";
             string elementType = field.TypeName.Substring(0, field.TypeName.Length - 2);
-            bool isFixed = field.HasAttribute("ArrayLength");
+            bool isFixed = field.HasAttribute("ArrayLength") || field.HasAttribute("ArrayLengthAttribute");
             string lengthWrite = isFixed ? "" : $@"writer.Align(4);
             writer.WriteUInt32((uint){fieldAccess}.Length);";
 

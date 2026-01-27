@@ -60,6 +60,18 @@ internal static class DataGenerator
             obj = (T)(object)FillArrayStringTopic(seed);
             return;
         }
+        if (typeof(T) == typeof(AtomicTests.UnionBoolDiscTopic))
+        {
+            Console.WriteLine("[DataGenerator] Dispatching to FillUnionBoolDiscTopic");
+            obj = (T)(object)FillUnionBoolDiscTopic(seed);
+            return;
+        }
+        if (typeof(T) == typeof(AtomicTests.UnionLongDiscTopic))
+        {
+            Console.WriteLine("[DataGenerator] Dispatching to FillUnionLongDiscTopic");
+            obj = (T)(object)FillUnionLongDiscTopic(seed);
+            return;
+        }
 
         if (obj == null) 
             throw new ArgumentNullException(nameof(obj));
@@ -497,6 +509,31 @@ internal static class DataGenerator
         msg.Id = seed;
         msg.Names = new string[3];
         for(int i=0; i<3; i++) msg.Names[i] = $"S_{seed}_{i}";
+        return msg;
+    }
+
+    private static AtomicTests.UnionBoolDiscTopic FillUnionBoolDiscTopic(int seed)
+    {
+        var msg = new AtomicTests.UnionBoolDiscTopic();
+        msg.Id = seed;
+        msg.Data = new AtomicTests.BoolUnion();
+        bool disc = (seed % 2) == 0;
+        msg.Data._d = disc;
+        if (disc) msg.Data.True_val = seed;
+        else msg.Data.False_val = (double)seed + 0.25;
+        return msg;
+    }
+
+    private static AtomicTests.UnionLongDiscTopic FillUnionLongDiscTopic(int seed)
+    {
+        var msg = new AtomicTests.UnionLongDiscTopic();
+        msg.Id = seed;
+        msg.Data = new AtomicTests.SimpleUnion();
+        int mode = seed; 
+        msg.Data._d = mode; 
+        if (mode == 1) msg.Data.Int_value = seed;
+        else if (mode == 2) msg.Data.Double_value = (double)seed + 0.25;
+        else if (mode == 3) msg.Data.String_value = $"Str_{seed}";
         return msg;
     }
 }

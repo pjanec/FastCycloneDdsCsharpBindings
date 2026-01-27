@@ -118,6 +118,8 @@ internal class Program
             "CompositeKey" => RunTypedScenario<CompositeKey>(scenario),
             "NestedKeyTopic" => RunTypedScenario<AtomicTests.NestedKeyTopic>(scenario),
             "SequenceTopic" => RunTypedScenario<SequenceTopic>(scenario),
+            "UnionBoolDiscTopic" => RunTypedScenario<UnionBoolDiscTopic>(scenario),
+            "UnionLongDiscTopic" => RunTypedScenario<UnionLongDiscTopic>(scenario),
             "ArrayInt32Topic" => RunTypedScenario<ArrayInt32Topic>(scenario),
             "ArrayFloat64Topic" => RunTypedScenario<ArrayFloat64Topic>(scenario),
             "ArrayStringTopic" => RunTypedScenario<ArrayStringTopic>(scenario),

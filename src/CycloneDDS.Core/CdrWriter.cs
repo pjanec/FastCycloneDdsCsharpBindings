@@ -12,28 +12,31 @@ namespace CycloneDDS.Core
         private int _buffered;
         private int _totalWritten;
         private readonly CdrEncoding _encoding;
+        private readonly int _origin;
 
         public CdrEncoding Encoding => _encoding;
         public bool IsXcdr2 => _encoding == CdrEncoding.Xcdr2;
 
         // NEW: Zero-Alloc Constructor for Fixed Buffers
-        public CdrWriter(Span<byte> buffer, CdrEncoding encoding = CdrEncoding.Xcdr1)
+        public CdrWriter(Span<byte> buffer, CdrEncoding encoding = CdrEncoding.Xcdr1, int origin = 0)
         {
             _output = null;  // Fixed buffer mode - no IBufferWriter
             _span = buffer;
             _buffered = 0;
             _totalWritten = 0;
             _encoding = encoding;
+            _origin = origin;
         }
 
         // EXISTING: Keep this for dynamic buffers
-        public CdrWriter(IBufferWriter<byte> output, CdrEncoding encoding = CdrEncoding.Xcdr1)
+        public CdrWriter(IBufferWriter<byte> output, CdrEncoding encoding = CdrEncoding.Xcdr1, int origin = 0)
         {
             _output = output;
             _span = output.GetSpan();
             _buffered = 0;
             _totalWritten = 0;
             _encoding = encoding;
+            _origin = origin;
         }
 
         public int Position => _totalWritten + _buffered;
@@ -47,7 +50,7 @@ namespace CycloneDDS.Core
 
         public void Align(int alignment)
         {
-            int currentPos = Position;
+            int currentPos = Position - _origin;
             int mask = alignment - 1;
             int padding = (alignment - (currentPos & mask)) & mask;
             if (padding > 0)

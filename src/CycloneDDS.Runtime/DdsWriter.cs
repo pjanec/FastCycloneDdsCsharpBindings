@@ -176,8 +176,8 @@ namespace CycloneDDS.Runtime
             if (!_topicHandle.IsValid) throw new ObjectDisposedException(nameof(DdsWriter<T>));
 
             // 1. Get Size (no alloc)
-            // Start at offset 4 because we will prepend 4-byte CDR header
-            int payloadSize = _sizer!(sample, 4, _encoding); 
+            // Start at offset 0 because we will prepend 4-byte CDR header but align relative to payload
+            int payloadSize = _sizer!(sample, 0, _encoding); 
             int totalSize = payloadSize + 4;
 
             // 2. Rent Buffer (no alloc - pooled)
@@ -188,7 +188,9 @@ namespace CycloneDDS.Runtime
                 // 3. Serialize (ZERO ALLOC via new Span overload)
                 var span = buffer.AsSpan(0, totalSize);
                 // Enable correct encoding
-                var cdr = new CdrWriter(span, _encoding); 
+                // FIX: XCDR1 alignment is relative to stream start (0), not payload start.
+                // Using origin: 0 ensures Align(8) at Abs 8 adds no padding.
+                var cdr = new CdrWriter(span, _encoding, origin: 4); 
                 
                 // Write CDR Header
                 if (_encoding == CdrEncoding.Xcdr2)
@@ -236,6 +238,9 @@ namespace CycloneDDS.Runtime
                 cdr.Complete();
                 
                 int actualSize = cdr.Position;
+                
+                if (_topicName.Contains("UnionBoolDisc"))
+                    Console.WriteLine($"[DdsWriter] Sent {actualSize} bytes: {BitConverter.ToString(buffer, 0, actualSize)}");
 
                 // 4. Write to DDS via Serdata
                 unsafe

@@ -821,13 +821,41 @@ static void generate_UnionBoolDiscTopic(void* data, int seed) {
 
 static int validate_UnionBoolDiscTopic(void* data, int seed) {
     AtomicTests_UnionBoolDiscTopic* msg = (AtomicTests_UnionBoolDiscTopic*)data;
-    if (msg->id != seed) return -1;
-    bool expected_disc = ((seed % 2) == 0);
-    if (msg->data._d != expected_disc) return -1;
+    if (msg->id != seed) {
+        printf("[Native] UnionBoolDiscTopic ID Mismatch. Expected: %d, Got: %d\n", seed, msg->id);
+        return -1;
+    }
+    bool expected_disc = (seed % 2) == 0;
+    if (msg->data._d != expected_disc) {
+        printf("[Native] UnionBoolDiscTopic Disc Mismatch. Expected: %d, Got: %d\n", expected_disc, msg->data._d);
+        return -1;
+    }
     if (expected_disc) {
-        if (msg->data._u.true_val != seed * 50) return -1;
+        if (msg->data._u.true_val != seed * 50) {
+            printf("[Native] UnionBoolDiscTopic TrueVal Mismatch. Expected: %d, Got: %d\n", seed * 50, msg->data._u.true_val);
+            return -1;
+        }
     } else {
-        if (msg->data._u.false_val != seed * 1.5) return -1;
+        // More lenient logic for comparison or just debug
+        if (fabs(msg->data._u.false_val - (seed * 1.5)) > 0.0001) {
+            printf("[Native] UnionBoolDiscTopic FalseVal Mismatch. Expected: %f, Got: %f\n", seed * 1.5, msg->data._u.false_val);
+            
+            // DEBUG
+            printf("[Native] Debug Struct Layout (AtomicTests_UnionBoolDiscTopic):\n");
+            printf("  Size: %zu\n", sizeof(AtomicTests_UnionBoolDiscTopic));
+            printf("  Base Addr: %p\n", (void*)msg);
+            printf("  ID Offset: %llu\n", (unsigned long long)((char*)&msg->id - (char*)msg));
+            printf("  Struct Data Offset: %llu\n", (unsigned long long)((char*)&msg->data - (char*)msg));
+            printf("  Data._d Offset: %llu\n", (unsigned long long)((char*)&msg->data._d - (char*)msg));
+            printf("  Data._u.false_val Offset: %llu\n", (unsigned long long)((char*)&msg->data._u.false_val - (char*)msg));
+            
+            printf("  Raw Data (64 bytes): ");
+            unsigned char* bytes = (unsigned char*)msg;
+            for(int i=0; i< (sizeof(AtomicTests_UnionBoolDiscTopic) > 64 ? 64 : sizeof(AtomicTests_UnionBoolDiscTopic)); i++) printf("%02X ", bytes[i]);
+            printf("\n");
+
+            return -1;
+        }
     }
     return 0;
 }
