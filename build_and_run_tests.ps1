@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 
 Write-Host "1. Building CodeGen (Debug) - Crucial for applying SerializerEmitter changes..." -ForegroundColor Cyan
-dotnet build tools\CycloneDDS.CodeGen\CycloneDDS.CodeGen.csproj -c Debug
+dotnet build tools\CycloneDDS.CodeGen\CycloneDDS.CodeGen.csproj -c Release
 if ($LASTEXITCODE -ne 0) { Write-Error "CodeGen build failed"; exit 1 }
 
 Write-Host "2. Cleaning Test Project..." -ForegroundColor Cyan

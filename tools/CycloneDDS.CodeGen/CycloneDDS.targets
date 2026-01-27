@@ -14,7 +14,8 @@
 
   <Target Name="CycloneDDSCodeGen" BeforeTargets="CoreCompile">
     <PropertyGroup>
-        <CodeGenToolPath>$(MSBuildThisFileDirectory)bin\Debug\net8.0\CycloneDDS.CodeGen.exe</CodeGenToolPath>
+      <CodeGenToolPath Condition="'$(Configuration)' == 'Release'">$(MSBuildThisFileDirectory)bin\Release\net8.0\CycloneDDS.CodeGen.exe</CodeGenToolPath>
+      <CodeGenToolPath Condition="'$(Configuration)' != 'Release'">$(MSBuildThisFileDirectory)bin\Debug\net8.0\CycloneDDS.CodeGen.exe</CodeGenToolPath>
       
       <SourcePath>$(MSBuildProjectDirectory)</SourcePath>
       <OutputPath>$(MSBuildProjectDirectory)\obj\Generated</OutputPath>

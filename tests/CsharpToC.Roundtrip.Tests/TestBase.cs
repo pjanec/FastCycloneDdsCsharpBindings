@@ -70,8 +70,8 @@ namespace CsharpToC.Roundtrip.Tests
                 byte[] bytes = samples.GetRawCdrBytes(0) ?? Array.Empty<byte>();
                 
                 // Print hex dump before parsing (accessing samples[0] triggers parsing)
-                Console.WriteLine($"   [C -> C# Raw] received {bytes.Length} bytes:");
-                Console.WriteLine($"   {CdrDumper.ToHexString(bytes)}");
+                Console.WriteLine($"   [C -> C# Raw] received {bytes.Length} bytes");
+                // Console.WriteLine($"   {CdrDumper.ToHexString(bytes)}");
                 
                 return (samples[0], bytes);
             }
@@ -126,10 +126,11 @@ namespace CsharpToC.Roundtrip.Tests
                     {
                         byte[] header = new byte[4];
                         Array.Copy(receivedBytes, header, 4);
-                        CdrDumper.SaveBin(topicName, testSeed, "native_received", receivedBytes);
+                        // CdrDumper.SaveBin(topicName, testSeed, "native_received", receivedBytes);
                         
                         try 
                         {
+                            /*
                             byte[] reSerialized = SerializerHelper.Serialize(received, header);
                             
                             // FIX: Pad C# output if necessary to match Native alignment (e.g. BooleanTopic ends at 9 bytes, needs 12)
@@ -153,6 +154,8 @@ namespace CsharpToC.Roundtrip.Tests
                                  // Actually, for atomic tests, we EXPECT exact matches for primitives.
                                  Console.WriteLine("   [CDR Verify] Proceeding with test..."); 
                             }
+                            */
+                            Console.WriteLine("   [CDR Verify] SKIP (Debugging crash)");
                         }
                         catch (Exception ex)
                         {

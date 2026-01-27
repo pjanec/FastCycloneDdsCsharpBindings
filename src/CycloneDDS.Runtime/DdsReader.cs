@@ -814,7 +814,7 @@ namespace CycloneDDS.Runtime
                                 // System.Console.WriteLine($"[DdsReader] Byte1={p[1]} Encoding={encoding}");
                             }
 
-                            var reader = new CdrReader(span, encoding, origin: 4);
+                            var reader = new CdrReader(span, encoding, origin: 0);
                             
                             // Cyclone DDS provides the 4-byte encapsulation header in the serdata.
                             // We must skip it so that CdrReader is aligned to the start of the payload
@@ -825,8 +825,16 @@ namespace CycloneDDS.Runtime
                                 reader.ReadInt32(); // Advance 4 bytes
                             }
                             
-                            _deserializer!(ref reader, out TView view);
-                            return view;
+                            try 
+                            {
+                                _deserializer!(ref reader, out TView view);
+                                return view;
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"[DdsReader] Deserialization Exception: {ex}");
+                                throw;
+                            }
                         }
                     }
                 }

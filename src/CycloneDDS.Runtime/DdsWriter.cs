@@ -176,8 +176,8 @@ namespace CycloneDDS.Runtime
             if (!_topicHandle.IsValid) throw new ObjectDisposedException(nameof(DdsWriter<T>));
 
             // 1. Get Size (no alloc)
-            // Start at offset 0 because we will prepend 4-byte CDR header but align relative to payload
-            int payloadSize = _sizer!(sample, 0, _encoding); 
+            // Start at offset 4 because we prepend a 4-byte CDR header and alignment is relative to stream start
+            int payloadSize = _sizer!(sample, 4, _encoding); 
             int totalSize = payloadSize + 4;
 
             // 2. Rent Buffer (no alloc - pooled)
@@ -188,9 +188,9 @@ namespace CycloneDDS.Runtime
                 // 3. Serialize (ZERO ALLOC via new Span overload)
                 var span = buffer.AsSpan(0, totalSize);
                 // Enable correct encoding
-                // FIX: XCDR1 alignment is relative to stream start (0), not payload start.
-                // Using origin: 0 ensures Align(8) at Abs 8 adds no padding.
-                var cdr = new CdrWriter(span, _encoding, origin: 4); 
+                // FIX: XCDR1/XCDR2 alignment is relative to stream start (0).
+                // Using origin: 0 ensures Align(8) works relative to the start of the buffer.
+                var cdr = new CdrWriter(span, _encoding, origin: 0); 
                 
                 // Write CDR Header
                 if (_encoding == CdrEncoding.Xcdr2)
