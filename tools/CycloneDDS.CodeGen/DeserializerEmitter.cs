@@ -56,7 +56,7 @@ namespace CycloneDDS.CodeGen
             sb.AppendLine($"        public static {type.Name} Deserialize(ref CdrReader reader)");
             sb.AppendLine("        {");
             sb.AppendLine($"            var view = new {type.Name}();");
-            sb.AppendLine($"            System.Console.WriteLine(\"[Type={type.Name}] Pos=\" + reader.Position + \" Enc=\" + reader.Encoding + \" IsApp={IsAppendable(type)}\");");
+            // sb.AppendLine($"            System.Console.WriteLine(\"[Type={type.Name}] Pos=\" + reader.Position + \" Enc=\" + reader.Encoding + \" IsApp={IsAppendable(type)}\");");
             
             if (IsAppendable(type))
             {
@@ -450,22 +450,7 @@ namespace CycloneDDS.CodeGen
             }}";
             }
 
-            string? writerMethod = TypeMapper.GetWriterMethod(elementType);
-            string? readMethod = writerMethod?.Replace("Write", "Read");
-            if (readMethod == "ReadBool") readMethod = "ReadBoolean";
-            
-             if (readMethod != null)
-             {
-                 return $@"{lengthRead}
-            {fieldAccess} = new {elementType}[length{field.Name}];
-            for (int i = 0; i < length{field.Name}; i++)
-            {{
-                reader.Align(reader.Encoding == CdrEncoding.Xcdr2 ? 1 : {GetAlignment(elementType)});
-                {fieldAccess}[i] = reader.{readMethod}();
-            }}";
-             }
-             
-             if (elementType == "string" || elementType == "String" || elementType == "System.String")
+            if (elementType == "string" || elementType == "String" || elementType == "System.String")
              {
                  string headerRead = "";
                  if (IsAppendable(parentType))
@@ -479,6 +464,21 @@ namespace CycloneDDS.CodeGen
             {{
                 reader.Align(4);
                 {fieldAccess}[i] = reader.ReadString();
+            }}";
+             }
+
+            string? writerMethod = TypeMapper.GetWriterMethod(elementType);
+            string? readMethod = writerMethod?.Replace("Write", "Read");
+            if (readMethod == "ReadBool") readMethod = "ReadBoolean";
+            
+             if (readMethod != null)
+             {
+                 return $@"{lengthRead}
+            {fieldAccess} = new {elementType}[length{field.Name}];
+            for (int i = 0; i < length{field.Name}; i++)
+            {{
+                reader.Align(reader.Encoding == CdrEncoding.Xcdr2 ? 1 : {GetAlignment(elementType)});
+                {fieldAccess}[i] = reader.{readMethod}();
             }}";
              }
 
@@ -505,10 +505,11 @@ namespace CycloneDDS.CodeGen
             string elem = ExtractSequenceElementType(field.TypeName);
             
             string headerRead = "";
-            if (IsAppendable(parentType))
+            /*if (IsAppendable(parentType))
             {
                  headerRead = "if (reader.Encoding == CdrEncoding.Xcdr2) { reader.ReadUInt32(); } // XCDR2 Sequence Header\r\n            ";
-            }
+            }*/
+
             
             if (elem == "string" || elem == "String" || elem == "System.String")
             {
@@ -709,10 +710,11 @@ namespace CycloneDDS.CodeGen
             int seqAlign = GetAlignment(field.TypeName);
 
             string headerRead = "";
-            if (IsAppendable(parentType))
+            /*if (IsAppendable(parentType))
             {
                  headerRead = "if (reader.Encoding == CdrEncoding.Xcdr2) { reader.ReadUInt32(); } // XCDR2 Sequence Header\r\n            ";
-            }
+            }*/
+
 
             if (IsPrimitive(elementType))
             {
@@ -720,7 +722,7 @@ namespace CycloneDDS.CodeGen
                 int align = GetAlignment(elementType);
                 string alignA = align.ToString();
 
-                return $@"reader.Align(reader.Encoding == CdrEncoding.Xcdr2 ? 1 : {seqAlign});
+                return $@"reader.Align(reader.Encoding == CdrEncoding.Xcdr2 ? 1 : 4);
             {headerRead}uint {field.Name}_len = reader.ReadUInt32();
             {fieldAccess} = new List<{elementType}>((int){field.Name}_len);
             System.Runtime.InteropServices.CollectionsMarshal.SetCount({fieldAccess}, (int){field.Name}_len);

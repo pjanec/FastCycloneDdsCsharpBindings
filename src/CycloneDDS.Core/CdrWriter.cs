@@ -48,6 +48,7 @@ namespace CycloneDDS.Core
             _buffered += data.Length;
         }
 
+
         public void Align(int alignment)
         {
             int currentPos = Position - _origin;
@@ -76,6 +77,11 @@ namespace CycloneDDS.Core
             if (_output == null)
             {
                 // Fixed buffer mode
+                if (offset < 0 || offset + 4 > _span.Length)
+                {
+                    // System.Console.WriteLine($"[CdrWriter] CRASH INFO: WriteUInt32At offset={offset} SpanLen={_span.Length} Val={value}");
+                    throw new IndexOutOfRangeException($"WriteUInt32At offset={offset} SpanLen={_span.Length}");
+                }
                 BinaryPrimitives.WriteUInt32LittleEndian(_span.Slice(offset), value);
             }
             else
@@ -174,7 +180,7 @@ namespace CycloneDDS.Core
         {
             int utf8Length = System.Text.Encoding.UTF8.GetByteCount(value);
             bool useXcdr2 = isXcdr2 ?? (_encoding == CdrEncoding.Xcdr2);
-            Console.WriteLine($"[CdrWriter] WriteString Str='{value.ToString()}' Utf8Len={utf8Length} UseXcdr2={useXcdr2} @ {_buffered}");
+            // Console.WriteLine($"[CdrWriter] WriteString Str='{value.ToString()}' Utf8Len={utf8Length} UseXcdr2={useXcdr2} @ {_buffered}");
             
             // EXPERIMENTAL FIX: CycloneDDS native seems to expect NUL-terminated strings even in XCDR2
             // causing "normalize_string: NUL check failed"

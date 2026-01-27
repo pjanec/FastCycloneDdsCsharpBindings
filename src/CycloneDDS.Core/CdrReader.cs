@@ -56,7 +56,7 @@ namespace CycloneDDS.Core
             int currentPos = _position - _origin;
             int mask = alignment - 1;
             int padding = (alignment - (currentPos & mask)) & mask;
-            Console.WriteLine($"[CdrReader] Align({alignment}) @ {_position}. Origin={_origin}. Pad={padding}. NewPos={_position+padding}");
+            // Console.WriteLine($"[CdrReader] Align({alignment}) @ {_position}. Origin={_origin}. Pad={padding}. NewPos={_position+padding}");
             if (padding > 0)
             {
                 if (_position + padding > _data.Length)
@@ -69,12 +69,12 @@ namespace CycloneDDS.Core
         {
             if (_position + sizeof(int) > _data.Length)
             {
-                Console.WriteLine($"[CdrReader] ReadInt32 FAIL @ {_position}. Len={_data.Length}");
+                // Console.WriteLine($"[CdrReader] ReadInt32 FAIL @ {_position}. Len={_data.Length}");
                 throw new IndexOutOfRangeException();
             }
             
             int value = BinaryPrimitives.ReadInt32LittleEndian(_data.Slice(_position));
-            Console.WriteLine($"[CdrReader] ReadInt32 @ {_position} = {value}");
+            // Console.WriteLine($"[CdrReader] ReadInt32 @ {_position} = {value}");
             _position += sizeof(int);
             return value;
         }
@@ -83,12 +83,12 @@ namespace CycloneDDS.Core
         {
             if (_position + sizeof(uint) > _data.Length)
             {
-               Console.WriteLine($"[CdrReader] ReadUInt32 FAIL @ {_position}. Len={_data.Length}");
+               // Console.WriteLine($"[CdrReader] ReadUInt32 FAIL @ {_position}. Len={_data.Length}");
                throw new IndexOutOfRangeException();
             }
             
             uint value = BinaryPrimitives.ReadUInt32LittleEndian(_data.Slice(_position));
-            Console.WriteLine($"[CdrReader] ReadUInt32 @ {_position} = {value}");
+            // Console.WriteLine($"[CdrReader] ReadUInt32 @ {_position} = {value}");
             _position += sizeof(uint);
             return value;
         }
@@ -117,7 +117,7 @@ namespace CycloneDDS.Core
                 throw new IndexOutOfRangeException();
             int val = BinaryPrimitives.ReadInt32LittleEndian(_data.Slice(_position));
             float fval = BitConverter.Int32BitsToSingle(val);
-            Console.WriteLine($"[CdrReader] ReadFloat @ {_position} = {fval}");
+            // Console.WriteLine($"[CdrReader] ReadFloat @ {_position} = {fval}");
             _position += sizeof(float);
             return fval;
         }
@@ -128,7 +128,7 @@ namespace CycloneDDS.Core
                 throw new IndexOutOfRangeException();
             long val = BinaryPrimitives.ReadInt64LittleEndian(_data.Slice(_position));
             double dval = BitConverter.Int64BitsToDouble(val);
-            Console.WriteLine($"[CdrReader] ReadDouble @ {_position} = {dval}");
+            // Console.WriteLine($"[CdrReader] ReadDouble @ {_position} = {dval}");
             _position += sizeof(double);
             return dval;
         }

@@ -811,7 +811,7 @@ namespace CycloneDDS.Runtime
                             if (size >= 2)
                             {
                                 if (p[1] >= 6) encoding = CdrEncoding.Xcdr2;
-                                System.Console.WriteLine($"[DdsReader] Byte1={p[1]} Encoding={encoding}");
+                                // System.Console.WriteLine($"[DdsReader] Byte1={p[1]} Encoding={encoding}");
                             }
 
                             var reader = new CdrReader(span, encoding, origin: 4);

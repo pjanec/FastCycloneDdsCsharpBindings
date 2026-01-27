@@ -111,6 +111,11 @@ namespace CycloneDDS.CodeGen
                 }
             }
             
+            if (isAppendable)
+            {
+                sb.AppendLine("            if (isXcdr2) sizer.Align(4);");
+            }
+            
             sb.AppendLine();
             sb.AppendLine("            return sizer.GetSizeDelta(currentOffset);");
             sb.AppendLine("        }");
@@ -231,6 +236,7 @@ namespace CycloneDDS.CodeGen
                 sb.AppendLine("            {");
                 sb.AppendLine("                int bodyLen = writer.Position - bodyStart;");
                 sb.AppendLine("                writer.WriteUInt32At(dheaderPos, (uint)bodyLen);");
+                sb.AppendLine("                writer.Align(4);");
                 sb.AppendLine("            }");
             }
 
@@ -719,7 +725,7 @@ namespace CycloneDDS.CodeGen
                 int arrayBodyEnd{field.Name} = writer.Position;
                 writer.WriteUInt32At(arrayHeaderPos{field.Name}, (uint)(arrayBodyEnd{field.Name} - arrayBodyStart{field.Name}));
 
-            }}"; 
+            }}";
                 }
             }
             else if (writerMethod != null)
@@ -955,15 +961,15 @@ namespace CycloneDDS.CodeGen
 
 
              string alignA = align == 8 ? "8" : align.ToString();
-             string lengthAlign = align > 4 ? align.ToString() : "4";
+             string lengthAlign = "4";
              
              string dheaderStart = "";
              string dheaderEnd = "";
 
              if (isAppendableStruct && isXcdr2)
              {
-                 dheaderStart = $"int listDheaderPos{ToPascalCase(field.Name)} = writer.Position; writer.WriteUInt32(0); int listStart{ToPascalCase(field.Name)} = writer.Position; ";
-                 dheaderEnd = $" writer.WriteUInt32At(listDheaderPos{ToPascalCase(field.Name)}, (uint)(writer.Position - listStart{ToPascalCase(field.Name)}));";
+                 // dheaderStart = $"int listDheaderPos{ToPascalCase(field.Name)} = writer.Position; writer.WriteUInt32(0); int listStart{ToPascalCase(field.Name)} = writer.Position; ";
+                 // dheaderEnd = $" writer.WriteUInt32At(listDheaderPos{ToPascalCase(field.Name)}, (uint)(writer.Position - listStart{ToPascalCase(field.Name)}));";
              }
 
              
@@ -1018,12 +1024,12 @@ namespace CycloneDDS.CodeGen
             // So we should respect natural alignment.
 
 
-            string lengthAlign = align > 4 ? align.ToString() : "4";
+            string lengthAlign = "4";
             
             string dheader = "";
             if (isAppendableStruct && isXcdr2)
             {
-               dheader = "sizer.Align(4); sizer.WriteUInt32(0); ";
+               // dheader = "sizer.Align(4); sizer.WriteUInt32(0); ";
             }
 
 
