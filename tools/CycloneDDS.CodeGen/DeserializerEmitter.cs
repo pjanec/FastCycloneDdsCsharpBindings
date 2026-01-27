@@ -70,12 +70,14 @@ namespace CycloneDDS.CodeGen
                 
                 // NATIVE BEHAVIOR: 
                 // XCDR2 spec says "Padding to reach alignment of the type". 
-                int typeAlign = GetAlignment(type);
-                if (typeAlign > 4)
-                {
-                     sb.AppendLine($"                reader.Align({typeAlign});");
-                }
-
+                // BUT implementation observation shows Body is NOT aligned to type alignment immediately after DHEADER.
+                // It respects Member alignment. 
+                // So we comment it out
+                //int typeAlign = GetAlignment(type);
+                //if (typeAlign > 4)
+                //{
+                //     sb.AppendLine($"                reader.Align({typeAlign});");
+                //}
                 sb.AppendLine("            }");
             }
             else

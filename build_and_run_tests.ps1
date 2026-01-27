@@ -18,5 +18,5 @@ Write-Host "4. Rebuilding Native Lib (via bat script but only the native part if
 if ($LASTEXITCODE -ne 0) { Write-Error "Bat script failed"; exit 1 }
 
 Write-Host "5. Running CsharpToC Tests..." -ForegroundColor Cyan
-$testExe = "tests\CsharpToC.Roundtrip.Tests\bin\Release\net8.0\CsharpToC.Roundtrip.Tests.exe"
-& $testExe
+dotnet test tests\CsharpToC.Roundtrip.Tests\CsharpToC.Roundtrip.Tests.csproj -c Release --logger "console;verbosity=normal"
+
