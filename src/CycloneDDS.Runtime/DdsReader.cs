@@ -814,14 +814,21 @@ namespace CycloneDDS.Runtime
                                 // System.Console.WriteLine($"[DdsReader] Byte1={p[1]} Encoding={encoding}");
                             }
 
-                            var reader = new CdrReader(span, encoding, origin: 0);
+                            // FIX: XCDR2 = relative to Stream (0). XCDR1 = relative to Body (4).
+                            int origin = encoding == CdrEncoding.Xcdr2 ? 0 : 4;
+                            var reader = new CdrReader(span, encoding, origin: origin);
                             
                             // Cyclone DDS provides the 4-byte encapsulation header in the serdata.
                             // We must skip it so that CdrReader is aligned to the start of the payload
                             // and reads the correct data.
                             if (reader.Remaining >= 4)
                             {
-                                // TODO: Verify header if needed.
+                                // FIX: For XCDR1, alignment is relative to Stream Start (0). 
+                                // Skipping 4 bytes here keeps Position=4. 
+                                // Since Origin=0, Position=4 is 4-byte aligned (relative to stream).
+                                // If next item is double (align 8), Position 4 is NOT 8-byte aligned. Padding will be added to 8.
+                                // This is CORRECT for XCDR1.
+                                // CdrReader should consume these 4 bytes.
                                 reader.ReadInt32(); // Advance 4 bytes
                             }
                             
