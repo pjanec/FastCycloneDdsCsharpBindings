@@ -342,6 +342,10 @@ namespace CycloneDDS.CodeGen
             // FLAGSET
             sb.AppendLine();
             sb.AppendLine($"        public static uint GetDescriptorFlagset() => {descriptor.FlagSet};");
+            
+            // SIZE & ALIGNMENT (Critical for Arrays/Sequences)
+            sb.AppendLine($"        public static uint GetDescriptorSize() => {descriptor.Size};");
+            sb.AppendLine($"        public static uint GetDescriptorAlign() => {descriptor.Align};");
 
             sb.AppendLine("    }");
             

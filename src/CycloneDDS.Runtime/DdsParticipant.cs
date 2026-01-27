@@ -275,6 +275,15 @@ namespace CycloneDDS.Runtime
 
         private static uint GetAlignment(Type type)
         {
+            // Try to get generated alignment first
+            try {
+                var alignMethod = type.GetMethod("GetDescriptorAlign", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+                if (alignMethod != null)
+                {
+                    return (uint)alignMethod.Invoke(null, null);
+                }
+            } catch {}
+
             if (type.StructLayoutAttribute != null && type.StructLayoutAttribute.Pack != 0)
                 return (uint)type.StructLayoutAttribute.Pack;
             
@@ -328,33 +337,45 @@ namespace CycloneDDS.Runtime
             
             // Create descriptor struct
             uint flagset = 0;
+            uint sampleSize = 0;
+            uint align = 0;
+
             try {
                 var flagsMethod = typeof(T).GetMethod("GetDescriptorFlagset", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-                if (flagsMethod != null)
-                {
-                    var result = flagsMethod.Invoke(null, null);
-                    if (result is uint f) flagset = f;
-                }
+                if (flagsMethod != null) flagset = (uint)flagsMethod.Invoke(null, null);
+
+                var sizeMethod = typeof(T).GetMethod("GetDescriptorSize", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+                if (sizeMethod != null) sampleSize = (uint)sizeMethod.Invoke(null, null);
+
+                var alignMethod = typeof(T).GetMethod("GetDescriptorAlign", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+                if (alignMethod != null) align = (uint)alignMethod.Invoke(null, null);
             } catch {}
 
-            uint sampleSize = 0;
-            try
-            {
-                sampleSize = (uint)Marshal.SizeOf<T>();
+            // Fallback for Size if not generated (for backward compat)
+            if (sampleSize == 0) {
+                try {
+                    // WARNING: This is dangerous for types with arrays/strings!
+                    // Prefer 0 (let middleware guess) or a safe large default if strict size unknown?
+                    // CycloneDDS treats 0 as "unknown/let me handle it" for some types, 
+                    // but for @final types it might need it.
+                    // Using Marshal.SizeOf is better than nothing for simple structs, 
+                    // but terrible for arrays. 
+                    // Ideally, we always regenerate code.
+                    sampleSize = (uint)Marshal.SizeOf<T>();
+                } catch {
+                    sampleSize = 4096; // Fallback to avoid 0 size error
+                }
             }
-            catch
-            {
-                // T might be a managed type (e.g. containing List<T>) that validly works with
-                // custom serializers but isn't a marshalable struct.
-                // We default to 0 (or a small non-zero) if marshal fails.
-                // Some DDS implementations need non-zero size.
-                sampleSize = 128; // Increased from 4 just in case
+
+            // Fallback for Align
+            if (align == 0) {
+                align = GetAlignment(typeof(T));
             }
 
             var desc = new DdsTopicDescriptor
             {
                 m_size = sampleSize, 
-                m_align = GetAlignment(typeof(T)), 
+                m_align = align, 
                 m_flagset = flagset, 
                 m_nkeys = nkeys,
                 m_typename = typeNamePtr,
