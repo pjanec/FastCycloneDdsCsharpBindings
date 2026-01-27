@@ -44,14 +44,14 @@ namespace CsharpToC.Roundtrip.Tests
              }
         }
 
-        private async Task<(T, byte[])> ReadOneAsync<T>(DdsReader<T, T> reader) where T : struct
+        private async Task<(T, byte[])> ReadOneAsync<T>(DdsReader<T, T> reader, string topicName) where T : struct
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10)); 
             try 
             {
                 while (!cts.Token.IsCancellationRequested)
                 {
-                    var result = TryReadOne(reader);
+                    var result = TryReadOne(reader, topicName);
                     if (result.HasValue) return result.Value;
                     
                     await Task.Delay(50, cts.Token);
@@ -62,12 +62,17 @@ namespace CsharpToC.Roundtrip.Tests
             throw new TimeoutException("Did not receive data from DDS");
         }
 
-        private (T, byte[])? TryReadOne<T>(DdsReader<T, T> reader) where T : struct
+        private (T, byte[])? TryReadOne<T>(DdsReader<T, T> reader, string topicName) where T : struct
         {
             using var samples = reader.Read(1);
             if (samples.Count > 0)
             {
                 byte[] bytes = samples.GetRawCdrBytes(0) ?? Array.Empty<byte>();
+                
+                // Print hex dump before parsing (accessing samples[0] triggers parsing)
+                Console.WriteLine($"   [C -> C# Raw] received {bytes.Length} bytes:");
+                Console.WriteLine($"   {CdrDumper.ToHexString(bytes)}");
+                
                 return (samples[0], bytes);
             }
             return null;
@@ -95,7 +100,7 @@ namespace CsharpToC.Roundtrip.Tests
                     int testSeed = seed;
                     
                     // Start listening
-                    var receiveTask = ReadOneAsync(reader);
+                    var receiveTask = ReadOneAsync(reader, topicName);
                     
                     // Wait for discovery
                     await Task.Delay(1500);
