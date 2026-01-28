@@ -96,6 +96,48 @@ extern const topic_handler_t union_short_disc_topic_handler;
 extern const topic_handler_t sequence_union_appendable_topic_handler;
 extern const topic_handler_t sequence_enum_appendable_topic_handler;
 
+// --- Part 2 New Handlers ---
+extern const topic_handler_t bounded_sequence_int32_topic_appendable_handler;
+extern const topic_handler_t sequence_int64_topic_appendable_handler;
+extern const topic_handler_t sequence_float32_topic_appendable_handler;
+extern const topic_handler_t sequence_float64_topic_appendable_handler;
+extern const topic_handler_t sequence_boolean_topic_appendable_handler;
+extern const topic_handler_t sequence_octet_topic_appendable_handler;
+extern const topic_handler_t sequence_string_topic_appendable_handler;
+extern const topic_handler_t sequence_struct_topic_appendable_handler;
+extern const topic_handler_t nested_struct_topic_appendable_handler;
+extern const topic_handler_t nested_3d_topic_appendable_handler;
+extern const topic_handler_t doubly_nested_topic_appendable_handler;
+extern const topic_handler_t complex_nested_topic_appendable_handler;
+extern const topic_handler_t union_bool_disc_topic_appendable_handler;
+extern const topic_handler_t union_enum_disc_topic_appendable_handler;
+extern const topic_handler_t union_short_disc_topic_appendable_handler;
+extern const topic_handler_t optional_int32_topic_appendable_handler;
+extern const topic_handler_t optional_float64_topic_appendable_handler;
+extern const topic_handler_t optional_string_topic_appendable_handler;
+extern const topic_handler_t optional_struct_topic_appendable_handler;
+extern const topic_handler_t optional_enum_topic_appendable_handler;
+extern const topic_handler_t multi_optional_topic_appendable_handler;
+extern const topic_handler_t two_key_int32_topic_appendable_handler;
+extern const topic_handler_t two_key_string_topic_appendable_handler;
+extern const topic_handler_t three_key_topic_appendable_handler;
+extern const topic_handler_t four_key_topic_appendable_handler;
+extern const topic_handler_t nested_key_topic_appendable_handler;
+extern const topic_handler_t nested_key_geo_topic_appendable_handler;
+extern const topic_handler_t nested_triple_key_topic_appendable_handler;
+extern const topic_handler_t empty_sequence_topic_appendable_handler;
+extern const topic_handler_t unbounded_string_topic_appendable_handler;
+extern const topic_handler_t all_primitives_atomic_topic_appendable_handler;
+extern const topic_handler_t max_size_string_topic_handler;
+extern const topic_handler_t max_size_string_topic_appendable_handler;
+extern const topic_handler_t max_length_sequence_topic_handler;
+extern const topic_handler_t max_length_sequence_topic_appendable_handler;
+extern const topic_handler_t deep_nested_struct_topic_handler;
+extern const topic_handler_t deep_nested_struct_topic_appendable_handler;
+extern const topic_handler_t union_with_optional_topic_handler;
+extern const topic_handler_t union_with_optional_topic_appendable_handler;
+
+
 static const topic_handler_t* handlers[] = {
     &boolean_topic_handler,
     &int32_topic_handler,
@@ -168,6 +210,46 @@ static const topic_handler_t* handlers[] = {
     &union_short_disc_topic_handler,
     &sequence_union_appendable_topic_handler,
     &sequence_enum_appendable_topic_handler,
+    // Part 2
+    &bounded_sequence_int32_topic_appendable_handler,
+    &sequence_int64_topic_appendable_handler,
+    &sequence_float32_topic_appendable_handler,
+    &sequence_float64_topic_appendable_handler,
+    &sequence_boolean_topic_appendable_handler,
+    &sequence_octet_topic_appendable_handler,
+    &sequence_string_topic_appendable_handler,
+    &sequence_struct_topic_appendable_handler,
+    &nested_struct_topic_appendable_handler,
+    &nested_3d_topic_appendable_handler,
+    &doubly_nested_topic_appendable_handler,
+    &complex_nested_topic_appendable_handler,
+    &union_bool_disc_topic_appendable_handler,
+    &union_enum_disc_topic_appendable_handler,
+    &union_short_disc_topic_appendable_handler,
+    &optional_int32_topic_appendable_handler,
+    &optional_float64_topic_appendable_handler,
+    &optional_string_topic_appendable_handler,
+    &optional_struct_topic_appendable_handler,
+    &optional_enum_topic_appendable_handler,
+    &multi_optional_topic_appendable_handler,
+    &two_key_int32_topic_appendable_handler,
+    &two_key_string_topic_appendable_handler,
+    &three_key_topic_appendable_handler,
+    &four_key_topic_appendable_handler,
+    &nested_key_topic_appendable_handler,
+    &nested_key_geo_topic_appendable_handler,
+    &nested_triple_key_topic_appendable_handler,
+    &empty_sequence_topic_appendable_handler,
+    &unbounded_string_topic_appendable_handler,
+    &all_primitives_atomic_topic_appendable_handler,
+    &max_size_string_topic_handler,
+    &max_size_string_topic_appendable_handler,
+    &max_length_sequence_topic_handler,
+    &max_length_sequence_topic_appendable_handler,
+    &deep_nested_struct_topic_handler,
+    &deep_nested_struct_topic_appendable_handler,
+    &union_with_optional_topic_handler,
+    &union_with_optional_topic_appendable_handler,
     NULL
 };
 
@@ -194,18 +276,24 @@ EXPORT const char* Native_GetLastError() {
 EXPORT void Native_Init(uint32_t domain_id) {
     if (participant != 0) return;
     
+    // Create participant
     participant = dds_create_participant(domain_id, NULL, NULL);
     if (participant < 0) {
         snprintf(last_error, sizeof(last_error), "dds_create_participant failed: %d", participant);
         return;
     }
     
+    // Create Publisher
+    // In Cyclone, publisher/subscriber are often implicit or created from participant
+    // But we can create explicit ones if needed. 
+    // dds_create_publisher(participant, qos, listener)
     publisher = dds_create_publisher(participant, NULL, NULL);
     if (publisher < 0) {
         set_error("dds_create_publisher failed");
         return;
     }
     
+    // Create Subscriber
     subscriber = dds_create_subscriber(participant, NULL, NULL);
     if (subscriber < 0) {
         set_error("dds_create_subscriber failed");
@@ -232,18 +320,14 @@ EXPORT int Native_SendWithSeed(const char* topic_name, int seed) {
     }
     
     // Create topic
-    printf("[Native] Creating topic %s...\n", topic_name);
     dds_entity_t topic = dds_create_topic(participant, handler->descriptor, handler->name, NULL, NULL);
     if (topic < 0) {
         snprintf(last_error, sizeof(last_error), "dds_create_topic failed: %d", topic);
         return -1;
     }
-    printf("[Native] Topic created. Handle: %d\n", topic);
     
     // Create writer
-    printf("[Native] Creating writer for topic %s...\n", topic_name);
     dds_entity_t writer = dds_create_writer(publisher, topic, NULL, NULL);
-    printf("[Native] Writer created. Handle: %d\n", writer);
 
     if (writer < 0) {
         snprintf(last_error, sizeof(last_error), "dds_create_writer failed: %d", writer);
@@ -253,36 +337,22 @@ EXPORT int Native_SendWithSeed(const char* topic_name, int seed) {
     
     // Generate data
     // Allocate memory matching struct size
-    // Note: This relies on handler->size being correct
-    // For simplicity, we use a large buffer or malloc
-    printf("[Native] Allocating %llu bytes for topic %s\n", (unsigned long long)handler->size, topic_name);
     void* data = malloc(handler->size);
     memset(data, 0, handler->size);
-    printf("[Native] Generating data...\n");
     handler->generate(data, seed);
     
-    printf("[Native] Calling dds_write...\n");
     // Write
     int rc = dds_write(writer, data);
-    printf("[Native] dds_write returned %d\n", rc);
     if (rc < 0) {
         snprintf(last_error, sizeof(last_error), "dds_write failed: %d", rc);
     }
     
-    // Cleanup
-    // Free dynamic memory used by data if any? 
-    // Handlers should probably provide a cleanup function for data
-    // For now, we assume simple structs or specific cleanup logic
-    // Implementation of free is tricky without generated code support for free
-    // CycloneDDS generated code usually provides Type_free(data, DDS_FREE_CONTENTS)
-    // We might need to add that to handler
+    // Cleanup generated data (simple free of container, leaking pointers inside if any? 
+    // Yes, leaking for now unless we implement free handler or use dds_alloc'd pointers and manage them)
+    // In a test environment, small leaks per test might be acceptable for now given no generic free.
     
-    // dds_write copies data, so we can free our local copy
-    // But if generate allocated pointers (sequences/strings), we need to free them.
-    // Hack: Leaking memory for now in test, or we need free func.
-    
-    // Increase sleep to ensure data is pushed?
-    dds_sleepfor(DDS_MSECS(1000)); 
+    // Give time to flush?
+    dds_sleepfor(DDS_MSECS(50)); 
     
     free(data);
     dds_delete(writer);
@@ -311,14 +381,6 @@ EXPORT int Native_ExpectWithSeed(const char* topic_name, int seed, int timeout_m
     // Poll for data
     void* samples[1];
     dds_sample_info_t infos[1];
-    
-    // Allocate sample buffer (pointers to data)
-    // dds_take expects an array of pointers
-    // and it will allocate the data if pointers are NULL? No.
-    // If we pass NULL, it allocates.
-    // If we pass allocated struct, it fills.
-    
-    // Let's let Cyclone allocate
     samples[0] = NULL;
     
     int received = 0;
@@ -328,7 +390,6 @@ EXPORT int Native_ExpectWithSeed(const char* topic_name, int seed, int timeout_m
     while (waited < timeout_ms) {
         int rc = dds_take(reader, samples, infos, 1, 1);
         if (rc > 0) {
-            printf("[Native] dds_take rc=%d, valid_data=%d, samples[0]=%p\n", rc, infos[0].valid_data, samples[0]);
             if (infos[0].valid_data) {
                 // Validate
                 if (handler->validate(samples[0], seed) == 0) {
@@ -336,16 +397,7 @@ EXPORT int Native_ExpectWithSeed(const char* topic_name, int seed, int timeout_m
                 } else {
                     result = -2; // Data mismatch
                 }
-                
-                // Free sample using dds_return_loan if it was loaned, but we passed NULL so it was allocated?
-                // Wait, dds_take with NULL ptrs usually implies dds_return_loan needed?
-                // Actually dds_take takes void** samples.
-                // If samples[0] was NULL, implementation allocates.
-                // We should check doc. Usually explicit allocation or loan.
-                // Let's use dds_return_loan if we don't own memory
             }
-            // Return loan (Cyclone allocates/manages)
-            // But wait, if we passed NULL to take, did we get a loan? Yes.
             dds_return_loan(reader, samples, rc);
             received = 1;
             break;

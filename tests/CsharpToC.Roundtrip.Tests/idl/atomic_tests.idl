@@ -1322,7 +1322,7 @@ module AtomicTests {
     @final
     union UnionWithOptional switch(long) {
         case 1: long int_val;
-        case 2: @optional string<64> opt_str_val;
+        case 2: string<64> opt_str_val;
         case 3: double double_val;
     };
 
@@ -1336,7 +1336,7 @@ module AtomicTests {
     @appendable
     union UnionWithOptionalAppendable switch(long) {
         case 1: long int_val;
-        case 2: @optional string<64> opt_str_val;
+        case 2: string<64> opt_str_val;
         case 3: double double_val;
     };
 

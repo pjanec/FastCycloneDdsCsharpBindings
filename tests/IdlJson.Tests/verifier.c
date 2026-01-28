@@ -112,6 +112,19 @@ int verify_descriptor(const char* type_name, const dds_topic_descriptor_t* desc,
         } \
     } while(0)
 
+// Macro to verify AtomicTests topics
+#define VERIFY_ATOMIC_TOPIC(TYPE_NAME, C_TYPE) \
+    do { \
+        cJSON* jNode = find_type(json, "AtomicTests::" TYPE_NAME); \
+        if (jNode) { \
+            ASSERT_EQ("sizeof(AtomicTests::" TYPE_NAME ")", sizeof(AtomicTests_##C_TYPE), \
+                      cJSON_GetObjectItem(jNode, "Size")->valueint); \
+            verify_descriptor("AtomicTests::" TYPE_NAME, &AtomicTests_##C_TYPE##_desc, jNode, &errors); \
+        } else { \
+            printf("[SKIP] Type AtomicTests::%s not found in JSON\n", TYPE_NAME); \
+        } \
+    } while(0)
+
 // Macro to verify struct/union size only
 #define VERIFY_SIZE(TYPE_NAME, C_TYPE) \
     do { \
@@ -171,19 +184,6 @@ int main(int argc, char** argv) {
     VERIFY_ROUNDTRIP_TOPIC("AllPrimitives", AllPrimitives);
     VERIFY_ROUNDTRIP_TOPIC("CompositeKey", CompositeKey);
     VERIFY_ROUNDTRIP_TOPIC("NestedKeyTopic", NestedKeyTopic);
-
-    // Macro for AtomicTests
-    #define VERIFY_ATOMIC_TOPIC(TYPE_NAME, C_TYPE) \
-    do { \
-        cJSON* jNode = find_type(json, "AtomicTests::" TYPE_NAME); \
-        if (jNode) { \
-            ASSERT_EQ("sizeof(AtomicTests::" TYPE_NAME ")", sizeof(AtomicTests_##C_TYPE), \
-                      cJSON_GetObjectItem(jNode, "Size")->valueint); \
-            verify_descriptor("AtomicTests::" TYPE_NAME, &AtomicTests_##C_TYPE##_desc, jNode, &errors); \
-        } else { \
-            printf("[SKIP] Type AtomicTests::%s not found in JSON\n", TYPE_NAME); \
-        } \
-    } while(0)
 
     // Verify AtomicTests (Batch 1: Basic Primitives)
     VERIFY_ATOMIC_TOPIC("BooleanTopic", BooleanTopic);
@@ -297,8 +297,62 @@ int main(int argc, char** argv) {
     VERIFY_ATOMIC_TOPIC("Array2DInt32TopicAppendable", Array2DInt32TopicAppendable);
     VERIFY_ATOMIC_TOPIC("Array3DInt32TopicAppendable", Array3DInt32TopicAppendable);
     VERIFY_ATOMIC_TOPIC("ArrayStructTopicAppendable", ArrayStructTopicAppendable);
+    VERIFY_ATOMIC_TOPIC("SequenceUnionAppendableTopic", SequenceUnionAppendableTopic);
+    VERIFY_ATOMIC_TOPIC("SequenceEnumAppendableTopic", SequenceEnumAppendableTopic);
 
+    // New Appendables (Sequences)
+    VERIFY_ATOMIC_TOPIC("BoundedSequenceInt32TopicAppendable", BoundedSequenceInt32TopicAppendable);
+    VERIFY_ATOMIC_TOPIC("SequenceInt64TopicAppendable", SequenceInt64TopicAppendable);
+    VERIFY_ATOMIC_TOPIC("SequenceFloat32TopicAppendable", SequenceFloat32TopicAppendable);
+    VERIFY_ATOMIC_TOPIC("SequenceFloat64TopicAppendable", SequenceFloat64TopicAppendable);
+    VERIFY_ATOMIC_TOPIC("SequenceBooleanTopicAppendable", SequenceBooleanTopicAppendable);
+    VERIFY_ATOMIC_TOPIC("SequenceOctetTopicAppendable", SequenceOctetTopicAppendable);
+    VERIFY_ATOMIC_TOPIC("SequenceStringTopicAppendable", SequenceStringTopicAppendable);
+    VERIFY_ATOMIC_TOPIC("SequenceStructTopicAppendable", SequenceStructTopicAppendable);
 
+    // New Appendables (Nested)
+    VERIFY_ATOMIC_TOPIC("NestedStructTopicAppendable", NestedStructTopicAppendable);
+    VERIFY_ATOMIC_TOPIC("Nested3DTopicAppendable", Nested3DTopicAppendable);
+    VERIFY_ATOMIC_TOPIC("DoublyNestedTopicAppendable", DoublyNestedTopicAppendable);
+    VERIFY_ATOMIC_TOPIC("ComplexNestedTopicAppendable", ComplexNestedTopicAppendable);
+
+    // New Appendables (Unions)
+    VERIFY_ATOMIC_TOPIC("UnionBoolDiscTopicAppendable", UnionBoolDiscTopicAppendable);
+    VERIFY_ATOMIC_TOPIC("UnionEnumDiscTopicAppendable", UnionEnumDiscTopicAppendable);
+    VERIFY_ATOMIC_TOPIC("UnionShortDiscTopicAppendable", UnionShortDiscTopicAppendable);
+
+    // New Appendables (Optionals)
+    VERIFY_ATOMIC_TOPIC("OptionalInt32TopicAppendable", OptionalInt32TopicAppendable);
+    VERIFY_ATOMIC_TOPIC("OptionalFloat64TopicAppendable", OptionalFloat64TopicAppendable);
+    VERIFY_ATOMIC_TOPIC("OptionalStringTopicAppendable", OptionalStringTopicAppendable);
+    VERIFY_ATOMIC_TOPIC("OptionalStructTopicAppendable", OptionalStructTopicAppendable);
+    VERIFY_ATOMIC_TOPIC("OptionalEnumTopicAppendable", OptionalEnumTopicAppendable);
+    VERIFY_ATOMIC_TOPIC("MultiOptionalTopicAppendable", MultiOptionalTopicAppendable);
+
+    // New Appendables (Keys)
+    VERIFY_ATOMIC_TOPIC("TwoKeyInt32TopicAppendable", TwoKeyInt32TopicAppendable);
+    VERIFY_ATOMIC_TOPIC("TwoKeyStringTopicAppendable", TwoKeyStringTopicAppendable);
+    VERIFY_ATOMIC_TOPIC("ThreeKeyTopicAppendable", ThreeKeyTopicAppendable);
+    VERIFY_ATOMIC_TOPIC("FourKeyTopicAppendable", FourKeyTopicAppendable);
+    VERIFY_ATOMIC_TOPIC("NestedKeyTopicAppendable", NestedKeyTopicAppendable);
+    VERIFY_ATOMIC_TOPIC("NestedKeyGeoTopicAppendable", NestedKeyGeoTopicAppendable);
+    VERIFY_ATOMIC_TOPIC("NestedTripleKeyTopicAppendable", NestedTripleKeyTopicAppendable);
+
+    // New Appendables (Edge Cases)
+    VERIFY_ATOMIC_TOPIC("EmptySequenceTopicAppendable", EmptySequenceTopicAppendable);
+    VERIFY_ATOMIC_TOPIC("UnboundedStringTopicAppendable", UnboundedStringTopicAppendable);
+    VERIFY_ATOMIC_TOPIC("AllPrimitivesAtomicTopicAppendable", AllPrimitivesAtomicTopicAppendable);
+
+    // More Edge Cases
+    VERIFY_ATOMIC_TOPIC("MaxSizeStringTopic", MaxSizeStringTopic);
+    VERIFY_ATOMIC_TOPIC("MaxSizeStringTopicAppendable", MaxSizeStringTopicAppendable);
+    VERIFY_ATOMIC_TOPIC("MaxLengthSequenceTopic", MaxLengthSequenceTopic);
+    VERIFY_ATOMIC_TOPIC("MaxLengthSequenceTopicAppendable", MaxLengthSequenceTopicAppendable);
+    VERIFY_ATOMIC_TOPIC("DeepNestedStructTopic", DeepNestedStructTopic);
+    VERIFY_ATOMIC_TOPIC("DeepNestedStructTopicAppendable", DeepNestedStructTopicAppendable);
+    VERIFY_ATOMIC_TOPIC("UnionWithOptionalTopic", UnionWithOptionalTopic);
+    VERIFY_ATOMIC_TOPIC("UnionWithOptionalTopicAppendable", UnionWithOptionalTopicAppendable);
+    
     printf("\n==================================================\n");
     if (errors == 0) printf("RESULT: PASSED (All topics verified)\n");
     else printf("RESULT: FAILED (%d errors)\n", errors);
