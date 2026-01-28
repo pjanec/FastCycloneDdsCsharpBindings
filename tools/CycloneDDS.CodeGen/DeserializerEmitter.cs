@@ -384,7 +384,16 @@ namespace CycloneDDS.CodeGen
         {
             int align = GetAlignment(field.TypeName);
             string alignA = align.ToString();
-            string alignCall = align > 1 ? $"reader.Align({alignA}); " : "";
+            string alignCall;
+            if (align > 4)
+            {
+                 // XCDR2 aligns 8-byte primitives to 4 bytes
+                 alignCall = $"if (reader.IsXcdr2) reader.Align(4); else reader.Align({alignA}); ";
+            }
+            else
+            {
+                 alignCall = align > 1 ? $"reader.Align({alignA}); " : "";
+            }
             
             // ToPascalCase added to all field access below
             if (field.TypeName == "string")
@@ -503,10 +512,10 @@ namespace CycloneDDS.CodeGen
             string elem = ExtractSequenceElementType(field.TypeName);
             
             string headerRead = "";
-            /*if (IsAppendable(parentType))
+            if (IsAppendable(parentType))
             {
-                 headerRead = "if (reader.Encoding == CdrEncoding.Xcdr2) { reader.ReadUInt32(); } // XCDR2 Sequence Header\r\n            ";
-            }*/
+                 headerRead = "if (reader.IsXcdr2) { reader.ReadUInt32(); } // XCDR2 Sequence Header\r\n            ";
+            }
 
             
             if (elem == "string" || elem == "String" || elem == "System.String")
@@ -528,7 +537,7 @@ namespace CycloneDDS.CodeGen
                 int elemSize = GetSize(elem);
                 // Align 4 for Header
                 return $@"reader.Align(4);
-            {headerRead}uint {field.Name}_len = reader.ReadUInt32();
+            uint {field.Name}_len = reader.ReadUInt32();
             {boundsCheck}
             if ({field.Name}_len > 0)
             {{
@@ -708,10 +717,10 @@ namespace CycloneDDS.CodeGen
             int seqAlign = GetAlignment(field.TypeName);
 
             string headerRead = "";
-            /*if (IsAppendable(parentType))
+            if (IsAppendable(parentType))
             {
-                 headerRead = "if (reader.Encoding == CdrEncoding.Xcdr2) { reader.ReadUInt32(); } // XCDR2 Sequence Header\r\n            ";
-            }*/
+                 headerRead = "if (reader.IsXcdr2) { reader.ReadUInt32(); } // XCDR2 List Header\r\n            ";
+            }
 
 
             if (IsPrimitive(elementType))
@@ -721,7 +730,7 @@ namespace CycloneDDS.CodeGen
                 string alignA = align.ToString();
 
                 return $@"reader.Align(4);
-            {headerRead}uint {field.Name}_len = reader.ReadUInt32();
+            uint {field.Name}_len = reader.ReadUInt32();
             {fieldAccess} = new List<{elementType}>((int){field.Name}_len);
             System.Runtime.InteropServices.CollectionsMarshal.SetCount({fieldAccess}, (int){field.Name}_len);
             var targetSpan = System.Runtime.InteropServices.CollectionsMarshal.AsSpan({fieldAccess});
