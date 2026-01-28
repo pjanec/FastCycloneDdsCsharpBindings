@@ -880,4 +880,471 @@ module AtomicTests {
         sequence<ColorEnum> colors;
     };
 
+    // ========================================================================
+    // APPENDABLE VARIANTS FOR SEQUENCES (RT-S02 through RT-S11)
+    // ========================================================================
+
+    @appendable
+    @topic
+    struct BoundedSequenceInt32TopicAppendable {
+        @key long id;
+        sequence<long, 10> values;
+    };
+
+    @appendable
+    @topic
+    struct SequenceInt64TopicAppendable {
+        @key long id;
+        sequence<long long> values;
+    };
+
+    @appendable
+    @topic
+    struct SequenceFloat32TopicAppendable {
+        @key long id;
+        sequence<float> values;
+    };
+
+    @appendable
+    @topic
+    struct SequenceFloat64TopicAppendable {
+        @key long id;
+        sequence<double> values;
+    };
+
+    @appendable
+    @topic
+    struct SequenceBooleanTopicAppendable {
+        @key long id;
+        sequence<boolean> values;
+    };
+
+    @appendable
+    @topic
+    struct SequenceOctetTopicAppendable {
+        @key long id;
+        sequence<octet> bytes;
+    };
+
+    @appendable
+    @topic
+    struct SequenceStringTopicAppendable {
+        @key long id;
+        sequence<String32> values;
+    };
+
+    @appendable
+    @topic
+    struct SequenceStructTopicAppendable {
+        @key long id;
+        sequence<Point2D> points;
+    };
+
+    // ========================================================================
+    // APPENDABLE VARIANTS FOR NESTED STRUCTURES (RT-N01 through RT-N04)
+    // ========================================================================
+
+    @appendable
+    struct Point2DAppendable {
+        double x;
+        double y;
+    };
+
+    @appendable
+    @topic
+    struct NestedStructTopicAppendable {
+        @key long id;
+        Point2DAppendable point;
+    };
+
+    @appendable
+    struct Point3DAppendable {
+        double x;
+        double y;
+        double z;
+    };
+
+    @appendable
+    @topic
+    struct Nested3DTopicAppendable {
+        @key long id;
+        Point3DAppendable point;
+    };
+
+    @appendable
+    struct BoxAppendable {
+        Point2DAppendable topLeft;
+        Point2DAppendable bottomRight;
+    };
+
+    @appendable
+    @topic
+    struct DoublyNestedTopicAppendable {
+        @key long id;
+        BoxAppendable box;
+    };
+
+    @appendable
+    struct ContainerAppendable {
+        long count;
+        Point3DAppendable center;
+        double radius;
+    };
+
+    @appendable
+    @topic
+    struct ComplexNestedTopicAppendable {
+        @key long id;
+        ContainerAppendable container;
+    };
+
+    // ========================================================================
+    // APPENDABLE VARIANTS FOR UNIONS (RT-U02 through RT-U04)
+    // ========================================================================
+
+    @appendable
+    union BoolUnionAppendable switch(boolean) {
+        case TRUE: long true_val;
+        case FALSE: double false_val;
+    };
+
+    @appendable
+    @topic
+    struct UnionBoolDiscTopicAppendable {
+        @key long id;
+        BoolUnionAppendable data;
+    };
+
+    @appendable
+    union ColorUnionAppendable switch(ColorEnum) {
+        case RED: long red_data;
+        case GREEN: double green_data;
+        case BLUE: string<32> blue_data;
+        case YELLOW: Point2DAppendable yellow_point;
+    };
+
+    @appendable
+    @topic
+    struct UnionEnumDiscTopicAppendable {
+        @key long id;
+        ColorUnionAppendable data;
+    };
+
+    @appendable
+    union ShortUnionAppendable switch(short) {
+        case 1: octet byte_val;
+        case 2: short short_val;
+        case 3: long long_val;
+        case 4: float float_val;
+    };
+
+    @appendable
+    @topic
+    struct UnionShortDiscTopicAppendable {
+        @key long id;
+        ShortUnionAppendable data;
+    };
+
+    // ========================================================================
+    // APPENDABLE VARIANTS FOR OPTIONAL FIELDS (RT-O01 through RT-O06)
+    // ========================================================================
+
+    @appendable
+    @topic
+    struct OptionalInt32TopicAppendable {
+        @key long id;
+        @optional long opt_value;
+    };
+
+    @appendable
+    @topic
+    struct OptionalFloat64TopicAppendable {
+        @key long id;
+        @optional double opt_value;
+    };
+
+    @appendable
+    @topic
+    struct OptionalStringTopicAppendable {
+        @key long id;
+        @optional string<64> opt_string;
+    };
+
+    @appendable
+    @topic
+    struct OptionalStructTopicAppendable {
+        @key long id;
+        @optional Point2DAppendable opt_point;
+    };
+
+    @appendable
+    @topic
+    struct OptionalEnumTopicAppendable {
+        @key long id;
+        @optional SimpleEnum opt_enum;
+    };
+
+    @appendable
+    @topic
+    struct MultiOptionalTopicAppendable {
+        @key long id;
+        @optional long opt_int;
+        @optional double opt_double;
+        @optional string<32> opt_string;
+    };
+
+    // ========================================================================
+    // APPENDABLE VARIANTS FOR COMPOSITE KEYS (RT-K01 through RT-K04)
+    // ========================================================================
+
+    @appendable
+    @topic
+    struct TwoKeyInt32TopicAppendable {
+        @key long key1;
+        @key long key2;
+        double value;
+    };
+
+    @appendable
+    @topic
+    struct TwoKeyStringTopicAppendable {
+        @key string<32> key1;
+        @key string<32> key2;
+        double value;
+    };
+
+    @appendable
+    @topic
+    struct ThreeKeyTopicAppendable {
+        @key long key1;
+        @key string<32> key2;
+        @key short key3;
+        double value;
+    };
+
+    @appendable
+    @topic
+    struct FourKeyTopicAppendable {
+        @key long key1;
+        @key long key2;
+        @key long key3;
+        @key long key4;
+        string<64> description;
+    };
+
+    // ========================================================================
+    // APPENDABLE VARIANTS FOR NESTED KEYS (RT-NK01 through RT-NK03)
+    // ========================================================================
+
+    @appendable
+    struct LocationAppendable {
+        @key long building;
+        @key short floor;
+    };
+
+    @appendable
+    @topic
+    struct NestedKeyTopicAppendable {
+        @key LocationAppendable loc;
+        double temperature;
+    };
+
+    @appendable
+    struct CoordinatesAppendable {
+        @key double latitude;
+        @key double longitude;
+    };
+
+    @appendable
+    @topic
+    struct NestedKeyGeoTopicAppendable {
+        @key CoordinatesAppendable coords;
+        string<128> location_name;
+    };
+
+    @appendable
+    struct TripleKeyAppendable {
+        @key long id1;
+        @key long id2;
+        @key long id3;
+    };
+
+    @appendable
+    @topic
+    struct NestedTripleKeyTopicAppendable {
+        @key TripleKeyAppendable keys;
+        string<64> data;
+    };
+
+    // ========================================================================
+    // APPENDABLE VARIANTS FOR EDGE CASES (RT-EC01, RT-EC04, RT-EC05)
+    // ========================================================================
+
+    @appendable
+    @topic
+    struct EmptySequenceTopicAppendable {
+        @key long id;
+        sequence<long> empty_seq;
+    };
+
+    @appendable
+    @topic
+    struct UnboundedStringTopicAppendable {
+        @key long id;
+        string unbounded;
+    };
+
+    @appendable
+    @topic
+    struct AllPrimitivesAtomicTopicAppendable {
+        @key long id;
+        boolean bool_val;
+        char char_val;
+        octet octet_val;
+        short short_val;
+        unsigned short ushort_val;
+        long long_val;
+        unsigned long ulong_val;
+        long long llong_val;
+        unsigned long long ullong_val;
+        float float_val;
+        double double_val;
+    };
+
+    // ========================================================================
+    // EDGE CASE TOPICS FOR UNCOVERED SCENARIOS
+    // ========================================================================
+
+    // RT-EC06: Maximum bounded string size
+    @final
+    @topic
+    struct MaxSizeStringTopic {
+        @key long id;
+        string<8192> max_string;  // Test large bounded string
+    };
+
+    @appendable
+    @topic
+    struct MaxSizeStringTopicAppendable {
+        @key long id;
+        string<8192> max_string;
+    };
+
+    // RT-EC07: Maximum bounded sequence length
+    @final
+    @topic
+    struct MaxLengthSequenceTopic {
+        @key long id;
+        sequence<long, 10000> max_seq;  // Test large bounded sequence
+    };
+
+    @appendable
+    @topic
+    struct MaxLengthSequenceTopicAppendable {
+        @key long id;
+        sequence<long, 10000> max_seq;
+    };
+
+    // RT-EC08: Deeply nested structures (5 levels)
+    @final
+    struct Level5 {
+        long value5;
+    };
+
+    @final
+    struct Level4 {
+        long value4;
+        Level5 nested5;
+    };
+
+    @final
+    struct Level3 {
+        long value3;
+        Level4 nested4;
+    };
+
+    @final
+    struct Level2 {
+        long value2;
+        Level3 nested3;
+    };
+
+    @final
+    struct Level1 {
+        long value1;
+        Level2 nested2;
+    };
+
+    @final
+    @topic
+    struct DeepNestedStructTopic {
+        @key long id;
+        Level1 nested1;
+    };
+
+    @appendable
+    struct Level5Appendable {
+        long value5;
+    };
+
+    @appendable
+    struct Level4Appendable {
+        long value4;
+        Level5Appendable nested5;
+    };
+
+    @appendable
+    struct Level3Appendable {
+        long value3;
+        Level4Appendable nested4;
+    };
+
+    @appendable
+    struct Level2Appendable {
+        long value2;
+        Level3Appendable nested3;
+    };
+
+    @appendable
+    struct Level1Appendable {
+        long value1;
+        Level2Appendable nested2;
+    };
+
+    @appendable
+    @topic
+    struct DeepNestedStructTopicAppendable {
+        @key long id;
+        Level1Appendable nested1;
+    };
+
+    // RT-EC09: Union with optional field member
+    @final
+    union UnionWithOptional switch(long) {
+        case 1: long int_val;
+        case 2: @optional string<64> opt_str_val;
+        case 3: double double_val;
+    };
+
+    @final
+    @topic
+    struct UnionWithOptionalTopic {
+        @key long id;
+        UnionWithOptional data;
+    };
+
+    @appendable
+    union UnionWithOptionalAppendable switch(long) {
+        case 1: long int_val;
+        case 2: @optional string<64> opt_str_val;
+        case 3: double double_val;
+    };
+
+    @appendable
+    @topic
+    struct UnionWithOptionalTopicAppendable {
+        @key long id;
+        UnionWithOptionalAppendable data;
+    };
+
 };
