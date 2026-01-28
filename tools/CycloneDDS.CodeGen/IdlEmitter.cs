@@ -190,7 +190,7 @@ namespace CycloneDDS.CodeGen
             var recursionStack = new HashSet<IdlTypeDefinition>();
 
             // Map TypeName -> Definition for fast lookup
-            var lookUp = typeList.Where(t => t.TypeInfo != null).ToDictionary(t => t.TypeInfo.Name, t => t);
+            var lookUp = typeList.Where(t => t.TypeInfo != null).ToDictionary(t => t.TypeInfo!.Name, t => t);
 
             foreach (var type in typeList)
             {
@@ -383,10 +383,10 @@ namespace CycloneDDS.CodeGen
                 {
                      foreach(var val in caseAttr.CaseValues)
                      {
-                        string label = val.ToString();
+                        string label = val!.ToString()!;
                         if (enumDef != null && val is int iVal)
                         {
-                            if (iVal >= 0 && iVal < enumDef.TypeInfo.EnumMembers.Count)
+                            if (iVal >= 0 && iVal < enumDef.TypeInfo!.EnumMembers.Count)
                                 label = enumDef.TypeInfo.EnumMembers[iVal];
                         }
                         sb.AppendLine($"{fieldIndent}case {label}:");

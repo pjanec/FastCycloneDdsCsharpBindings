@@ -185,6 +185,7 @@ namespace CycloneDDS.Core
             // EXPERIMENTAL FIX: CycloneDDS native seems to expect NUL-terminated strings even in XCDR2
             // causing "normalize_string: NUL check failed"
             // So we use XCDR1 style encoding (Len+1, NUL) for everything.
+#pragma warning disable CS0162 // Unreachable code detected
             if (false) // Disabled XCDR2 optimization
             {
                 // XCDR2: Length is byte count. NO NUL terminator.
@@ -193,6 +194,7 @@ namespace CycloneDDS.Core
                 int written = System.Text.Encoding.UTF8.GetBytes(value, _span.Slice(_buffered));
                 _buffered += written;
             }
+#pragma warning restore CS0162 // Unreachable code detected
             else
             {
                 // XCDR1 (Legacy) OR Patched XCDR2: Length is byte count + 1 (NUL). Includes NUL byte.

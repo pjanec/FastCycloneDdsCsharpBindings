@@ -172,11 +172,13 @@ namespace CycloneDDS.Core
             int bytesToReturn;
             // EXPERIMENTAL FIX: Match CdrWriter.cs patch where we force XCDR1 style (Null Terminated) even for XCDR2
             // because native code expects it.
+#pragma warning disable CS0162 // Unreachable code detected
             if (false) // useXcdr2
             {
                 // XCDR2: Length is exactly the number of bytes
                 bytesToReturn = length;
             }
+#pragma warning restore CS0162 // Unreachable code detected
             else
             {
                 // XCDR1: Length includes NUL terminator
