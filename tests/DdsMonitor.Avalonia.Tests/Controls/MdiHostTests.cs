@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.VisualTree;
 using DdsMonitor.Avalonia.Controls;
 using Xunit;
 
@@ -147,7 +148,11 @@ public sealed class MdiHostTests
             host.TryGet("m", out var child);
             Assert.False(child.IsVisible, "Child should be invisible after Minimise.");
             Assert.True(child.IsMinimised, "Child.IsMinimised should be true after Minimise.");
-        }
+            var strip = host.GetVisualDescendants()
+                            .OfType<ItemsControl>()
+                            .FirstOrDefault(c => c.Name == "PART_MinimisedStrip");
+            Assert.NotNull(strip);
+            Assert.Equal(1, strip!.Items.Count);        }
         finally { window.Close(); }
     }
 
@@ -166,6 +171,12 @@ public sealed class MdiHostTests
             host.TryGet("r", out var child);
             Assert.True(child.IsVisible,   "Child should be visible after Restore.");
             Assert.False(child.IsMinimised, "Child.IsMinimised should be false after Restore.");
+
+            var strip = host.GetVisualDescendants()
+                            .OfType<ItemsControl>()
+                            .FirstOrDefault(c => c.Name == "PART_MinimisedStrip");
+            Assert.NotNull(strip);
+            Assert.Equal(0, strip!.Items.Count);
         }
         finally { window.Close(); }
     }
@@ -178,19 +189,27 @@ public sealed class MdiHostTests
         var (window, host) = CreateWindow();
         try
         {
-            host.Add(MakeChild("f1", "F1"), 10,  10, 300, 200);
-            host.Add(MakeChild("f2", "F2"), 50,  10, 300, 200);
+            host.Add(MakeChild("f1", "F1"),  10, 10, 300, 200);
+            host.Add(MakeChild("f2", "F2"),  50, 10, 300, 200);
             host.Add(MakeChild("f3", "F3"), 100, 10, 300, 200);
 
-            // Just verify FocusNext doesn't throw; wrapping is verified by no exception.
-            var ex = Record.Exception(() =>
-            {
-                host.FocusNext(false); // forward
-                host.FocusNext(false); // forward
-                host.FocusNext(false); // should wrap back to first
-                host.FocusNext(true);  // backward
-            });
-            Assert.Null(ex);
+            host.TryGet("f1", out var c1);
+            host.TryGet("f2", out var c2);
+            host.TryGet("f3", out var c3);
+
+            // Returns the id of whichever child currently has the highest ZIndex (= at front).
+            string FrontId() =>
+                c1.ZIndex >= c2.ZIndex && c1.ZIndex >= c3.ZIndex ? "f1" :
+                c2.ZIndex >= c1.ZIndex && c2.ZIndex >= c3.ZIndex ? "f2" :
+                "f3";
+
+            var frontBefore = FrontId(); // f3 was added last, so it starts at front
+
+            // One forward step must bring a different child to the front.
+            host.FocusNext(false);
+            var frontAfter = FrontId();
+
+            Assert.NotEqual(frontBefore, frontAfter);
         }
         finally { window.Close(); }
     }

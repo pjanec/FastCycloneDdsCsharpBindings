@@ -6,6 +6,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.VisualTree;
 using DdsMonitor.Avalonia.Controls;
+using System.Reflection;
 using Xunit;
 
 namespace DdsMonitor.Avalonia.Tests.Controls;
@@ -28,8 +29,8 @@ public sealed class MdiChildTests
         var window = new Window
         {
             Content = child,
-            Width   = 800,
-            Height  = 600,
+            Width   = 400,  // match child so titlebar (y 0..28) is reachable by headless pointer
+            Height  = 300,
         };
         window.Show();
         return (window, child);
@@ -125,11 +126,10 @@ public sealed class MdiChildTests
             var menu = titlebar!.ContextMenu;
             Assert.NotNull(menu);
 
-            // 4 dock items + Separator + Minimise + Close = 7 items total
-            // (spec: 4 dock items, separator, minimise, close = 7 items)
+            // 4 dock MenuItems + 1 Minimise MenuItem + 1 Close MenuItem = 6 MenuItems
+            // (the Separator between dock items and the rest is excluded by .OfType<MenuItem>())
             var menuItems = menu!.Items.OfType<MenuItem>().ToList();
-            Assert.True(menuItems.Count >= 5,
-                $"Expected at least 5 MenuItem entries in titlebar context menu, got {menuItems.Count}.");
+            Assert.Equal(6, menuItems.Count);
         }
         finally { window.Close(); }
     }
@@ -145,20 +145,13 @@ public sealed class MdiChildTests
             MdiChildDragEventArgs? dragArgs = null;
             child.DragRequested += (_, e) => dragArgs = e;
 
-            var titlebar = child.GetVisualDescendants()
-                                .OfType<Border>()
-                                .FirstOrDefault(b => b.Name == "PART_Titlebar");
-            Assert.NotNull(titlebar);
+            // Child fills the 400×300 window; titlebar occupies y = 0..28.
+            // Press in the middle of the titlebar, then move right to trigger DragRequested.
+            window.MouseDown(new Point(200, 14), MouseButton.Left, RawInputModifiers.None);
+            window.MouseMove(new Point(250, 14), RawInputModifiers.None);
+            window.MouseUp(new Point(250, 14), MouseButton.Left, RawInputModifiers.None);
 
-            // Simulate: press at (10,10), move to (60,10) → delta = (50,0)
-            window.MouseDown(new Point(10, 10), MouseButton.Left, RawInputModifiers.None);
-            window.MouseMove(new Point(60, 10), RawInputModifiers.None);
-            window.MouseUp(new Point(60, 10), MouseButton.Left, RawInputModifiers.None);
-
-            // We only verify the event was raised (delta arithmetic is headless-environment
-            // dependent on layout). The event being non-null is the correct contract test.
-            Assert.True(dragArgs is not null || true,
-                "DragRequested should be raised on pointer move after press.");
+            Assert.NotNull(dragArgs);
         }
         finally { window.Close(); }
     }
@@ -174,16 +167,17 @@ public sealed class MdiChildTests
             MdiChildResizeEventArgs? resizeArgs = null;
             child.ResizeRequested += (_, e) => resizeArgs = e;
 
-            var handle = child.GetVisualDescendants()
-                              .OfType<Border>()
-                              .FirstOrDefault(b => b.Name == "PART_ResizeBottomRight");
-            Assert.NotNull(handle);
+            // PART_ResizeBottomRight is a 10×10 Border at bottom-right inside the 1 px outer
+            // border. In the 400×300 window its bounds are (389,289)..(399,299); centre ≈ (394,294).
+            window.MouseDown(new Point(394, 294), MouseButton.Left, RawInputModifiers.None);
+            window.MouseMove(new Point(410, 310), RawInputModifiers.None);
+            window.MouseUp(new Point(410, 310), MouseButton.Left, RawInputModifiers.None);
 
-            // Raise PointerPressed and PointerMoved programmatically on the handle.
-            // In headless, we can't simulate precise device interactions but we can
-            // verify the event wiring compiles and the handler is reachable.
-            // A structural check: the handle exists in the template.
-            Assert.NotNull(handle);
+            Assert.NotNull(resizeArgs);
+            Assert.True(resizeArgs!.Edge.HasFlag(ResizeEdge.Bottom),
+                $"Expected Bottom in resize edge {resizeArgs.Edge}.");
+            Assert.True(resizeArgs!.Edge.HasFlag(ResizeEdge.Right),
+                $"Expected Right in resize edge {resizeArgs.Edge}.");
         }
         finally { window.Close(); }
     }
@@ -199,17 +193,20 @@ public sealed class MdiChildTests
             var cancelled = false;
             child.DragCancelled += (_, _) => cancelled = true;
 
-            // Directly trigger Escape key while no drag is active — should not raise.
+            // Escape with no drag active must NOT raise DragCancelled.
+            child.Focus();
             window.KeyPress(Key.Escape, RawInputModifiers.None);
             Assert.False(cancelled, "DragCancelled should not fire when not dragging.");
 
-            // Now simulate a drag start then Escape.
-            window.MouseDown(new Point(10, 10), MouseButton.Left, RawInputModifiers.None);
+            // Force drag mode via reflection (InteractionMode is a private nested enum).
+            var modeField = typeof(MdiChild).GetField("_mode",
+                BindingFlags.NonPublic | BindingFlags.Instance)!;
+            modeField.SetValue(child, Enum.ToObject(modeField.FieldType, 1)); // 1 = Drag
+
+            // Pressing Escape while in drag mode MUST raise DragCancelled.
+            child.Focus();
             window.KeyPress(Key.Escape, RawInputModifiers.None);
-            // In headless, the pointer capture may or may not be set depending on layout;
-            // the key test is that DragCancelled fires if and only if drag mode is active.
-            // We can't guarantee the mode was entered without a real pointer capture,
-            // so we assert the event infrastructure is wired (no exception thrown).
+            Assert.True(cancelled, "DragCancelled must fire when Escape is pressed during drag.");
         }
         finally { window.Close(); }
     }

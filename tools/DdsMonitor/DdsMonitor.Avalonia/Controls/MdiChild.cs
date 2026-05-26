@@ -254,6 +254,7 @@ public sealed class MdiChild : ContentControl
     static MdiChild()
     {
         IsActiveProperty.Changed.AddClassHandler<MdiChild>((child, _) => child.UpdateActiveClass());
+        FocusableProperty.OverrideDefaultValue<MdiChild>(true);
     }
 
     // ── Public methods ────────────────────────────────────────────────────────
