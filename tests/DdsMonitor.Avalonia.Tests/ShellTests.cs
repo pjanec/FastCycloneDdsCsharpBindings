@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Controls.Shapes;
 using Avalonia.Headless.XUnit;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
@@ -97,10 +98,25 @@ internal static class ShellTestFactory
     public static (ShellWindow window, StubDdsBridge bridge, StubMenuRegistry menu, ToolbarRegistry toolbar)
         CreateShell()
     {
-        var menu = new StubMenuRegistry();
-        var toolbar = new ToolbarRegistry();
-        var bridge = new StubDdsBridge();
-        var window = new ShellWindow(menu, toolbar, bridge);
+        var menu     = new StubMenuRegistry();
+        var toolbar  = new ToolbarRegistry();
+        var bridge   = new StubDdsBridge();
+        var viewReg  = new AvaloniaViewRegistry();
+        var broker   = new StubEventBroker();
+
+        var services = new ServiceCollection()
+            .AddSingleton<IMenuRegistry>(menu)
+            .AddSingleton<IToolbarRegistry>(toolbar)
+            .AddSingleton<IDdsBridge>(bridge)
+            .AddSingleton<IAvaloniaViewRegistry>(viewReg)
+            .AddSingleton<IEventBroker>(broker)
+            .AddSingleton<IAvaloniaWindowManager>(sp =>
+                new AvaloniaWindowManager(viewReg, sp, broker))
+            .AddSingleton<IWindowManager>(sp =>
+                (IWindowManager)sp.GetRequiredService<IAvaloniaWindowManager>())
+            .BuildServiceProvider();
+
+        var window = new ShellWindow(services);
         return (window, bridge, menu, toolbar);
     }
 }
@@ -120,11 +136,12 @@ public sealed class ShellWindowTests
     public void ShellWindow_HasFileMenuItem_AfterInitialization()
     {
         var (window, _, _, _) = ShellTestFactory.CreateShell();
-        var menu = window.FindControl<Menu>("TopMenu");
+        var menu = window.FindControl<Menu>("MainMenu");
         Assert.NotNull(menu);
         Assert.True(menu!.Items.Count >= 1, "Expected at least one menu item (File)");
 
-        var fileItem = menu.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "File");
+        var fileItem = menu.Items.OfType<MenuItem>()
+            .FirstOrDefault(m => m.Header?.ToString()?.Contains("File") == true);
         Assert.NotNull(fileItem);
     }
 
@@ -132,9 +149,11 @@ public sealed class ShellWindowTests
     public void ShellWindow_FileMenu_HasExitItem()
     {
         var (window, _, _, _) = ShellTestFactory.CreateShell();
-        var menu = window.FindControl<Menu>("TopMenu");
-        var fileMenu = menu!.Items.OfType<MenuItem>().First(m => m.Header?.ToString() == "File");
-        var exitItem = fileMenu.Items.OfType<MenuItem>().FirstOrDefault(m => m.Header?.ToString() == "Exit");
+        var menu = window.FindControl<Menu>("MainMenu");
+        var fileMenu = menu!.Items.OfType<MenuItem>()
+            .First(m => m.Header?.ToString()?.Contains("File") == true);
+        var exitItem = fileMenu.Items.OfType<MenuItem>()
+            .FirstOrDefault(m => m.Header?.ToString()?.Contains("xit") == true);
         Assert.NotNull(exitItem);
     }
 
@@ -144,7 +163,7 @@ public sealed class ShellWindowTests
         var (window, _, _, _) = ShellTestFactory.CreateShell();
         var playBtn = window.FindControl<Button>("PlayButton");
         Assert.NotNull(playBtn);
-        Assert.Contains("Play", playBtn!.Content?.ToString() ?? string.Empty);
+        Assert.Equal("▶", playBtn!.Content?.ToString());
     }
 
     [AvaloniaFact]
@@ -153,7 +172,7 @@ public sealed class ShellWindowTests
         var (window, _, _, _) = ShellTestFactory.CreateShell();
         var pauseBtn = window.FindControl<Button>("PauseButton");
         Assert.NotNull(pauseBtn);
-        Assert.Contains("Pause", pauseBtn!.Content?.ToString() ?? string.Empty);
+        Assert.Equal("⏸", pauseBtn!.Content?.ToString());
     }
 
     [AvaloniaFact]
@@ -162,7 +181,7 @@ public sealed class ShellWindowTests
         var (window, _, _, _) = ShellTestFactory.CreateShell();
         var resetBtn = window.FindControl<Button>("ResetButton");
         Assert.NotNull(resetBtn);
-        Assert.Contains("Reset", resetBtn!.Content?.ToString() ?? string.Empty);
+        Assert.Equal("⏹", resetBtn!.Content?.ToString());
     }
 
     [AvaloniaFact]
@@ -206,27 +225,23 @@ public sealed class ShellWindowTests
     public void ShellWindow_MenuReacts_ToMenuRegistryChanged()
     {
         var (window, _, menuRegistry, _) = ShellTestFactory.CreateShell();
-        var menu = window.FindControl<Menu>("TopMenu")!;
-        int countBefore = menu.Items.Count;
+        var pluginsMenu = window.FindControl<MenuItem>("PluginsMenu")!;
+        int countBefore = pluginsMenu.Items.Count;
 
-        // Add a new top-level menu item via the registry
-        menuRegistry.AddTopLevel(new MenuNode("Plugins"));
+        // Add a top-level menu item via the registry
+        menuRegistry.AddTopLevel(new MenuNode("My Plugin"));
         Dispatcher.UIThread.RunJobs();
 
-        Assert.True(menu.Items.Count > countBefore, "Menu should have grown after registry change");
+        Assert.True(pluginsMenu.Items.Count > countBefore,
+            "Plugins menu should have grown after registry change");
     }
 
     [AvaloniaFact]
-    public void ShellWindow_ToolbarReacts_ToToolbarRegistryChanged()
+    public void ShellWindow_StatusDot_ExistsInTemplate()
     {
-        var (window, _, _, toolbarRegistry) = ShellTestFactory.CreateShell();
-        var toolbar = window.FindControl<StackPanel>("Toolbar")!;
-        int countBefore = toolbar.Children.Count;
-
-        toolbarRegistry.Register("tool1", () => { }, tooltip: "My Tool");
-        Dispatcher.UIThread.RunJobs();
-
-        Assert.True(toolbar.Children.Count > countBefore, "Toolbar should have grown after registration");
+        var (window, _, _, _) = ShellTestFactory.CreateShell();
+        var statusDot = window.FindControl<Ellipse>("StatusDot");
+        Assert.NotNull(statusDot);
     }
 }
 

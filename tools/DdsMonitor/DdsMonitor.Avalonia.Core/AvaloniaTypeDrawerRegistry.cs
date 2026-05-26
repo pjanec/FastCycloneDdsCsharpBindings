@@ -79,8 +79,8 @@ public sealed class AvaloniaTypeDrawerRegistry : IAvaloniaTypeDrawerRegistry
                 {
                     var converted = Convert.ChangeType(box.Text, capturedProp.PropertyType);
                     // We can't mutate ctx.Value's property here without a setter, but we
-                    // propagate OnChange with the new string for display purposes.
-                    ctx.OnChange(box.Text);
+                    // propagate OnChange with the converted value.
+                    ctx.OnChange(converted);
                 }
                 catch { /* leave current value */ }
             };

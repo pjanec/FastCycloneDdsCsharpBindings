@@ -159,4 +159,105 @@ public sealed class AvaloniaWindowManagerDockTests
             window.Close();
         }
     }
+
+    // ── Stub: records all published events ────────────────────────────────────
+
+    private sealed class RecordingEventBroker : IEventBroker
+    {
+        private readonly List<object> _events;
+        public RecordingEventBroker(List<object> events) => _events = events;
+
+        public void Publish<TEvent>(TEvent eventData)
+        {
+            if (eventData is not null) _events.Add(eventData!);
+        }
+
+        public IDisposable Subscribe<TEvent>(Action<TEvent> handler) => NullDisposable.Instance;
+
+        private sealed class NullDisposable : IDisposable
+        {
+            public static readonly NullDisposable Instance = new();
+            public void Dispose() { }
+        }
+    }
+
+    // ── 7. LoadWorkspaceFromJson: Blazor-format JSON defaults to MDI ──────────
+
+    [AvaloniaFact]
+    public void LoadWorkspaceFromJson_BlazorFormat_AllMdi()
+    {
+        var (manager, mdiHost) = CreateManager();
+        var window = new Window { Content = mdiHost, Width = 800, Height = 600 };
+        window.Show();
+        try
+        {
+            // Blazor-format JSON — no LayoutKind, no DockLayout
+            var json = """
+                {
+                    "Panels": [
+                        { "PanelId": "p1", "Title": "P1", "ComponentTypeName": "Unknown1", "ComponentState": {} },
+                        { "PanelId": "p2", "Title": "P2", "ComponentTypeName": "Unknown2", "ComponentState": {} }
+                    ],
+                    "ExcludedTopics": []
+                }
+                """;
+
+            manager.LoadWorkspaceFromJson(json);
+
+            // Both panels should be spawned as MDI (default)
+            Assert.Equal(2, manager.ActivePanels.Count);
+            Assert.Equal(2, mdiHost.Children.Count);
+        }
+        finally { window.Close(); }
+    }
+
+    // ── 8. ClosePanel publishes WorkspaceSaveRequestedEvent ───────────────────
+
+    [AvaloniaFact]
+    public void ClosePanel_PublishesWorkspaceSaveRequestedEvent()
+    {
+        var published = new List<object>();
+        var broker = new RecordingEventBroker(published);
+        var mdiHost = new MdiHost { Width = 800, Height = 600 };
+        var manager = new AvaloniaWindowManager(new StubViewRegistry(), new StubServiceProvider(), broker);
+        manager.SetMdiHost(mdiHost);
+
+        var window = new Window { Content = mdiHost, Width = 800, Height = 600 };
+        window.Show();
+        try
+        {
+            manager.SpawnPanel("Panel1");
+            Assert.Equal(1, manager.ActivePanels.Count);
+
+            manager.ClosePanel("Panel1");
+
+            Assert.Contains(published, e => e is WorkspaceSaveRequestedEvent);
+        }
+        finally { window.Close(); }
+    }
+
+    // ── 9. SaveWorkspaceToJson / LoadWorkspaceFromJson round-trips LayoutKind ─
+
+    [AvaloniaFact]
+    public void SaveAndLoad_RoundTrips_LayoutKind()
+    {
+        var (manager, mdiHost) = CreateManager();
+        var stub = new StubDockManager();
+        manager.SetDockManager(stub);
+
+        var window = new Window { Content = mdiHost, Width = 800, Height = 600 };
+        window.Show();
+        try
+        {
+            manager.SpawnPanel("PanelA", LayoutKind.Mdi);
+            manager.SpawnPanel("PanelB", LayoutKind.DockDocument);
+
+            var json = manager.SaveWorkspaceToJson();
+
+            Assert.Contains("\"LayoutKind\"", json);
+            Assert.Contains("\"Mdi\"", json);
+            Assert.Contains("\"DockDocument\"", json);
+        }
+        finally { window.Close(); }
+    }
 }

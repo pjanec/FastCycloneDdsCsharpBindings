@@ -167,12 +167,13 @@ public sealed class TopicExplorerPluginTests
     }
 
     [Fact]
-    public void TopicExplorerPlugin_Initialize_SpawnsTopicExplorerPanel()
+    public void TopicExplorerPlugin_Initialize_DoesNotAutoSpawnPanel()
     {
         var (ctx, _, _, win) = BuildContext();
         new TopicExplorerPlugin().Initialize(ctx);
 
-        Assert.Contains(win.SpawnCalls, c => c.TypeName == nameof(TopicExplorerViewModel));
+        // Auto-spawn was removed (bug fix §13.6) — panel must NOT be spawned automatically
+        Assert.DoesNotContain(win.SpawnCalls, c => c.TypeName == nameof(TopicExplorerViewModel));
     }
 
     [Fact]

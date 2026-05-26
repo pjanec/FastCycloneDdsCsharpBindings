@@ -37,9 +37,6 @@ public sealed class TopicExplorerPlugin : IMonitorPlugin
                     onClick: () => windowManager.SpawnPanel(nameof(TopicExplorerViewModel), null),
                     tooltip: "Topic Explorer");
             }
-
-            // Auto-open the Topic Explorer at startup
-            windowManager.SpawnPanel(nameof(TopicExplorerViewModel), null);
         }
 
         if (viewRegistry is not null)

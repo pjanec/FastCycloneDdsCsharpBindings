@@ -53,8 +53,6 @@ public sealed class TopicExplorerViewModel : IStatefulViewModel, IDisposable
         // Subscribe to EventBroker events on the UI thread — tokens stored for disposal
         _brokerSubscriptions.Add(
             _eventBroker.SubscribeOnUiThread<SpawnPanelEvent>(OnSpawnPanelEvent));
-
-        RefreshTopics();
     }
 
     public void Initialize(IDictionary<string, object> componentState)

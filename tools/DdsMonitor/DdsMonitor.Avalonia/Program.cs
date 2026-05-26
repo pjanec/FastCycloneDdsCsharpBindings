@@ -1,7 +1,11 @@
 using System;
 using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Logging;
 using DdsMonitor.Avalonia.Core;
+using DdsMonitor.Avalonia.Docking;
+using DdsMonitor.Avalonia.Services;
 using DdsMonitor.Engine;
 using DdsMonitor.Engine.Hosting;
 using DdsMonitor.Engine.Plugins;
@@ -39,8 +43,29 @@ internal sealed class Program
         builder.Services.AddSingleton<IAvaloniaViewRegistry, AvaloniaViewRegistry>();
         builder.Services.AddSingleton<IAvaloniaTypeDrawerRegistry, AvaloniaTypeDrawerRegistry>();
 
-        // Override the scoped IWindowManager registered by the engine with an Avalonia singleton
-        builder.Services.AddSingleton<IWindowManager, AvaloniaWindowManager>();
+        // New Avalonia services (M1-T9)
+        builder.Services.AddSingleton<IUiThreadInvoker, AvaloniaUiThreadInvoker>();
+        builder.Services.AddSingleton<IContextMenuPresenter, ContextMenuPresenter>();
+        builder.Services.AddSingleton<IFileDialogService>(sp =>
+            new FileDialogService(() =>
+                Application.Current?.ApplicationLifetime
+                    is IClassicDesktopStyleApplicationLifetime lt
+                    ? lt.MainWindow as Visual
+                    : null));
+        builder.Services.AddSingleton<IKeyboardShortcutService, KeyboardShortcutService>();
+        builder.Services.AddSingleton<IThemeService, ThemeService>();
+        builder.Services.AddSingleton<IClipboardService>(sp =>
+            new ClipboardService(() =>
+                Application.Current?.ApplicationLifetime
+                    is IClassicDesktopStyleApplicationLifetime lt2
+                    ? TopLevel.GetTopLevel(lt2.MainWindow)
+                    : null));
+        builder.Services.AddSingleton<IDockManager, DockManager>();
+        builder.Services.AddSingleton<IAvaloniaWindowManager, AvaloniaWindowManager>();
+
+        // IWindowManager delegates to the same IAvaloniaWindowManager singleton
+        builder.Services.AddSingleton<IWindowManager>(sp =>
+            (IWindowManager)sp.GetRequiredService<IAvaloniaWindowManager>());
 
         // Persistence: debounce workspace saves triggered by WorkspaceSaveRequestedEvent
         builder.Services.AddHostedService<AvaloniaWorkspacePersistenceService>();
@@ -61,7 +86,7 @@ internal sealed class Program
 
             // 1. Build and initialize Avalonia platform subsystems FIRST (injects Win32)
             var appBuilder = BuildAvaloniaApp(host.Services)
-                .LogToTrace( global::Avalonia.Logging.LogEventLevel.Verbose); // <-- Crank to Verbose
+                .LogToTrace(global::Avalonia.Logging.LogEventLevel.Verbose);
 
             // 2. NOW it is safe to start the Generic Host.
             // When AvaloniaWorkspacePersistenceService resolves AvaloniaWindowManager 
@@ -73,7 +98,8 @@ internal sealed class Program
             var monitorContext = host.Services.GetRequiredService<IMonitorContext>();
             pluginLoader.InitializePlugins(monitorContext);
 
-            BuildAvaloniaApp(host.Services).StartWithClassicDesktopLifetime(args);
+            // Use the already-built appBuilder — do NOT call BuildAvaloniaApp a second time
+            appBuilder.StartWithClassicDesktopLifetime(args);
         }
     }
 
@@ -83,3 +109,4 @@ internal sealed class Program
             .WithInterFont()
             .LogToTrace();
 }
+

@@ -1,55 +1,93 @@
+using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Interactivity;
+using Avalonia.Input;
+using Avalonia.Media;
+using Avalonia.Threading;
+using DdsMonitor.Avalonia.Controls;
 using DdsMonitor.Avalonia.Core;
+using DdsMonitor.Avalonia.Docking;
 using DdsMonitor.Engine;
 using DdsMonitor.Engine.Plugins;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace DdsMonitor.Avalonia;
 
 public sealed partial class ShellWindow : Window
 {
-    private readonly IMenuRegistry _menuRegistry;
-    private readonly IToolbarRegistry _toolbarRegistry;
-    private readonly IDdsBridge _ddsBridge;
+    private readonly IDdsBridge? _ddsBridge;
+    private readonly IMenuRegistry? _menuRegistry;
+    private readonly IThemeService? _themeService;
 
-    public ShellWindow(
-        IMenuRegistry menuRegistry,
-        IToolbarRegistry toolbarRegistry,
-        IDdsBridge ddsBridge)
+    public ShellWindow(IServiceProvider services)
     {
-        _menuRegistry = menuRegistry;
-        _toolbarRegistry = toolbarRegistry;
-        _ddsBridge = ddsBridge;
-
         InitializeComponent();
 
-        // Build menu now and subscribe for future changes
-        RebuildMenu();
-        _menuRegistry.Changed += RebuildMenu;
+        // 1. Create the MDI host that lives inside the central DockControl document
+        var mdiHost = new MdiHost { Width = 800, Height = 600 };
 
-        // Build toolbar now and subscribe for future changes
-        RebuildToolbar();
-        _toolbarRegistry.Changed += RebuildToolbar;
+        // 2. Resolve IDockManager → wire it to the DockControl and MDI host
+        var dockManager = services.GetService<IDockManager>();
+        dockManager?.Initialise(MainDock, mdiHost);
+
+        // 3. Resolve IAvaloniaWindowManager → give it the MDI host and dock manager
+        var windowManager = services.GetService<IAvaloniaWindowManager>();
+        if (windowManager is not null)
+        {
+            windowManager.SetMdiHost(mdiHost);
+            if (dockManager is not null)
+                windowManager.SetDockManager(dockManager);
+        }
+
+        // 4. Rebuild the Plugins menu from IMenuRegistry; re-build on change
+        _menuRegistry = services.GetService<IMenuRegistry>();
+        if (_menuRegistry is not null)
+        {
+            RebuildPluginsMenu();
+            _menuRegistry.Changed += RebuildPluginsMenu;
+        }
+
+        // 5. Wire the transport buttons to IDdsBridge
+        _ddsBridge = services.GetService<IDdsBridge>();
+        PlayButton.Click  += (_, _) => { if (_ddsBridge is not null) _ddsBridge.IsPaused = false; };
+        PauseButton.Click += (_, _) => { if (_ddsBridge is not null) _ddsBridge.IsPaused = true; };
+        ResetButton.Click += (_, _) => _ddsBridge?.ResetAll();
+
+        // Wire Exit menu item
+        ExitItem.Click += (_, _) => Close();
+
+        // 6. Wire Theme submenu
+        _themeService = services.GetService<IThemeService>();
+        ThemeSystemItem.Click += (_, _) => _themeService?.SetMode(ThemeMode.System);
+        ThemeLightItem.Click  += (_, _) => _themeService?.SetMode(ThemeMode.Light);
+        ThemeDarkItem.Click   += (_, _) => _themeService?.SetMode(ThemeMode.Dark);
+
+        // 7. Register keyboard shortcuts via IKeyboardShortcutService
+        var shortcutService = services.GetService<IKeyboardShortcutService>();
+        if (shortcutService is not null)
+        {
+            shortcutService.Register(
+                new KeyGesture(Key.Space), "Play/Pause",
+                () => { if (_ddsBridge is not null) _ddsBridge.IsPaused = !_ddsBridge.IsPaused; });
+            shortcutService.Register(
+                new KeyGesture(Key.F5), "Reset",
+                () => _ddsBridge?.ResetAll());
+        }
+
+        // 8. Start 1 Hz DispatcherTimer for status-area updates
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        timer.Tick += OnStatusTick;
+        timer.Start();
     }
 
-    // ── Menu ─────────────────────────────────────────────────────────────────
+    // ── Plugins menu ──────────────────────────────────────────────────────────
 
-    private void RebuildMenu()
+    private void RebuildPluginsMenu()
     {
-        TopMenu.Items.Clear();
+        PluginsMenu.Items.Clear();
+        if (_menuRegistry is null) return;
 
-        // Built-in File menu
-        var fileMenu = new MenuItem { Header = "File" };
-        var exitItem = new MenuItem { Header = "Exit" };
-        exitItem.Click += (_, _) => Close();
-        fileMenu.Items.Add(exitItem);
-        TopMenu.Items.Add(fileMenu);
-
-        // Plugin-contributed menus
         foreach (var node in _menuRegistry.GetTopLevelMenus())
-        {
-            TopMenu.Items.Add(BuildMenuItem(node));
-        }
+            PluginsMenu.Items.Add(BuildMenuItem(node));
     }
 
     private static MenuItem BuildMenuItem(MenuNode node)
@@ -61,58 +99,42 @@ public sealed partial class ShellWindow : Window
             item.Click += (_, _) =>
             {
                 if (node.OnClickAsync is not null)
-                {
                     _ = node.OnClickAsync();
-                }
                 else
-                {
                     node.OnClick?.Invoke();
-                }
             };
         }
         else
         {
             foreach (var child in node.Children)
-            {
                 item.Items.Add(BuildMenuItem(child));
-            }
         }
 
         return item;
     }
 
-    // ── Toolbar ───────────────────────────────────────────────────────────────
+    // ── Status ticker ─────────────────────────────────────────────────────────
 
-    private void RebuildToolbar()
+    private void OnStatusTick(object? sender, EventArgs e)
     {
-        Toolbar.Children.Clear();
+        if (_ddsBridge is null) return;
 
-        foreach (var entry in _toolbarRegistry.Entries)
-        {
-            var btn = new Button
-            {
-                Content = entry.Tooltip,
-                Tag = entry.Id,
-            };
-            btn.Click += (_, _) => entry.Action();
-            Toolbar.Children.Add(btn);
-        }
+        StatusText.Text = _ddsBridge.IsPaused ? "Paused" : "Running";
+        StatusDot.Fill  = _ddsBridge.IsPaused
+            ? Brushes.Orange
+            : Brushes.Green;
+
+        // Bandwidth summary — detailed stats deferred to M2
+        BandwidthText.Text = FormatBandwidth(0);
     }
 
-    // ── Transport controls ────────────────────────────────────────────────────
+    // ── Bandwidth formatter ───────────────────────────────────────────────────
 
-    private void OnPlayClick(object? sender, RoutedEventArgs e)
+    internal static string FormatBandwidth(long bps)
     {
-        _ddsBridge.IsPaused = false;
-    }
-
-    private void OnPauseClick(object? sender, RoutedEventArgs e)
-    {
-        _ddsBridge.IsPaused = true;
-    }
-
-    private void OnResetClick(object? sender, RoutedEventArgs e)
-    {
-        _ddsBridge.ResetAll();
+        if (bps <= 0) return "0 B/s";
+        if (bps < 1024) return $"{bps} B/s";
+        if (bps < 1_048_576) return $"{(bps / 1024.0).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)} KB/s";
+        return $"{(bps / 1_048_576.0).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)} MB/s";
     }
 }

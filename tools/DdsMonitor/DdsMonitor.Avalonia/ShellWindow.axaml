@@ -1,52 +1,87 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:dock="using:Dock.Avalonia.Controls"
         x:Class="DdsMonitor.Avalonia.ShellWindow"
         Title="DDS Monitor"
-        Width="1200"
-        Height="800"
-        MinWidth="600"
-        MinHeight="400">
+        Width="1280"
+        Height="820"
+        MinWidth="800"
+        MinHeight="500">
 
     <DockPanel>
 
-        <!-- Top menu bar -->
-        <Menu x:Name="TopMenu" DockPanel.Dock="Top" />
+        <!-- Top bar: Menu | Transport buttons | Status indicator -->
+        <Grid DockPanel.Dock="Top">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
 
-        <!-- Toolbar -->
-        <StackPanel x:Name="Toolbar"
-                    DockPanel.Dock="Top"
-                    Orientation="Horizontal"
-                    Spacing="4"
-                    Margin="4,2" />
+            <!-- Col 0: Main menu (4 fixed top-level items) -->
+            <Menu x:Name="MainMenu" Grid.Column="0">
+                <MenuItem Header="_File">
+                    <MenuItem Header="_Topic Sources…"  x:Name="TopicSourcesItem" />
+                    <MenuItem Header="_Plugin Manager…" x:Name="PluginManagerItem" />
+                    <Separator />
+                    <MenuItem Header="_Reset Layout"    x:Name="ResetLayoutItem" />
+                    <MenuItem Header="_Export Layout…"  x:Name="ExportLayoutItem" />
+                    <MenuItem Header="_Import Layout…"  x:Name="ImportLayoutItem" />
+                    <Separator />
+                    <MenuItem Header="E_xit"            x:Name="ExitItem" />
+                </MenuItem>
+                <MenuItem Header="_View" x:Name="ViewMenu">
+                    <!-- Plugin-contributed view items are added dynamically in code-behind -->
+                    <MenuItem Header="_Theme">
+                        <MenuItem Header="_System" x:Name="ThemeSystemItem" />
+                        <MenuItem Header="_Light"  x:Name="ThemeLightItem"  />
+                        <MenuItem Header="_Dark"   x:Name="ThemeDarkItem"   />
+                    </MenuItem>
+                </MenuItem>
+                <MenuItem Header="_Devel">
+                    <MenuItem Header="_Enable Self-Sending" x:Name="SelfSendItem" />
+                    <MenuItem Header="Self-Send _Rate">
+                        <MenuItem Header="_1 Hz"   x:Name="Rate1HzItem"   />
+                        <MenuItem Header="_10 Hz"  x:Name="Rate10HzItem"  />
+                        <MenuItem Header="_100 Hz" x:Name="Rate100HzItem" />
+                        <MenuItem Header="1 _kHz"  x:Name="Rate1KHzItem"  />
+                        <MenuItem Header="10 k_Hz" x:Name="Rate10KHzItem" />
+                    </MenuItem>
+                    <Separator />
+                    <MenuItem Header="_Perf Stats…" x:Name="PerfStatsItem" />
+                </MenuItem>
+                <MenuItem Header="_Plugins" x:Name="PluginsMenu" />
+            </Menu>
 
-        <!-- Transport row -->
-        <StackPanel DockPanel.Dock="Top"
-                    Orientation="Horizontal"
-                    Spacing="4"
-                    Margin="4,2">
-            <Button x:Name="PlayButton"
-                    Content="▶ Play"
-                    ToolTip.Tip="Resume recording"
-                    Click="OnPlayClick" />
-            <Button x:Name="PauseButton"
-                    Content="⏸ Pause"
-                    ToolTip.Tip="Pause recording"
-                    Click="OnPauseClick" />
-            <Button x:Name="ResetButton"
-                    Content="⏹ Reset"
-                    ToolTip.Tip="Reset all data"
-                    Click="OnResetClick" />
-        </StackPanel>
+            <!-- Col 1: Transport buttons -->
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2" Margin="4,0">
+                <Button x:Name="PlayButton"  Content="▶" ToolTip.Tip="Play (Space)"  IsDefault="False" />
+                <Button x:Name="PauseButton" Content="⏸" ToolTip.Tip="Pause (Space)" />
+                <Button x:Name="ResetButton" Content="⏹" ToolTip.Tip="Reset (F5)"    />
+            </StackPanel>
 
-        <!-- Status bar -->
-        <TextBlock x:Name="StatusBar"
-                   DockPanel.Dock="Bottom"
-                   Text="Ready"
-                   Margin="4,2"
-                   VerticalAlignment="Center" />
+            <!-- Col 2: Status indicator (right-aligned) -->
+            <StackPanel Grid.Column="2"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        Spacing="4"
+                        Margin="4,0">
+                <Ellipse x:Name="StatusDot" Width="10" Height="10" Fill="Gray"
+                         VerticalAlignment="Center" />
+                <TextBlock x:Name="StatusText" Text="Running"
+                           VerticalAlignment="Center" />
+                <TextBlock x:Name="BandwidthText" Text="0 B/s"
+                           Margin="8,0,0,0" VerticalAlignment="Center" />
+            </StackPanel>
+        </Grid>
 
-        <!-- Main content area (placeholder for future panels) -->
-        <Grid x:Name="ContentArea" />
+        <!-- Bottom status bar -->
+        <Border DockPanel.Dock="Bottom" Height="24">
+            <TextBlock Text="Ready" Margin="4,0" VerticalAlignment="Center" />
+        </Border>
+
+        <!-- Main dock area — fills remaining space; MdiHost lives inside its central document -->
+        <dock:DockControl x:Name="MainDock" />
 
     </DockPanel>
 
