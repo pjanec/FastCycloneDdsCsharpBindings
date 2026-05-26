@@ -21,6 +21,8 @@
     <PackageReference Include="Avalonia.Desktop" Version="11.2.3" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.2.3" />
     <PackageReference Include="Avalonia.Fonts.Inter" Version="11.2.3" />
+    <PackageReference Include="Dock.Avalonia" Version="11.2.0" />
+    <PackageReference Include="Dock.Model.Mvvm" Version="11.2.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
   </ItemGroup>
 
@@ -33,6 +35,10 @@
     <ItemGroup>
       <!-- Build-only: ensures plugin projects build before the host runs, without linking the assembly -->
       <ProjectReference Include="..\DdsMonitor.Avalonia.StandardPlugin\DdsMonitor.Avalonia.StandardPlugin.csproj" 
+                        ReferenceOutputAssembly="false" 
+                        Private="false" 
+                        SkipGetTargetFrameworkProperties="true" />
+      <ProjectReference Include="..\DdsMonitor.Avalonia.FeatureDemoPlugin\DdsMonitor.Avalonia.FeatureDemoPlugin.csproj" 
                         ReferenceOutputAssembly="false" 
                         Private="false" 
                         SkipGetTargetFrameworkProperties="true" />

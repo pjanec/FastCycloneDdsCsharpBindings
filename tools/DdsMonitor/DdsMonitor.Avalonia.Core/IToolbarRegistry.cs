@@ -17,7 +17,8 @@ public interface IToolbarRegistry
     /// <summary>Registers a toolbar button.</summary>
     /// <param name="id">Unique identifier for the entry (used for deduplication / replacement).</param>
     /// <param name="onClick">Action invoked when the button is clicked.</param>
-    /// <param name="iconKey">Optional icon resource key.</param>
+    /// <param name="label">Display label shown on the button (may be empty).</param>
     /// <param name="tooltip">Tooltip text shown on hover.</param>
-    void Register(string id, Action onClick, string? iconKey = null, string tooltip = "");
+    /// <param name="iconKey">Optional icon resource key.</param>
+    void Register(string id, Action onClick, string label = "", string tooltip = "", string? iconKey = null);
 }

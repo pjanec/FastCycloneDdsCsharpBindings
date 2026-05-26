@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>DdsMonitor.Avalonia.FeatureDemoPlugin.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.2.3" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DdsMonitor.Engine\DdsMonitor.Engine.csproj" />
+    <ProjectReference Include="..\DdsMonitor.Avalonia.Core\DdsMonitor.Avalonia.Core.csproj" />
+  </ItemGroup>
+
+  <!-- Auto-stage the plugin DLL into the Avalonia shell's output plugins folder after every build -->
+  <Target Name="StagePlugin" AfterTargets="Build">
+    <PropertyGroup>
+      <PluginsDir>$(MSBuildThisFileDirectory)..\DdsMonitor.Avalonia\bin\$(Configuration)\$(TargetFramework)\plugins\</PluginsDir>
+    </PropertyGroup>
+    <MakeDir Directories="$(PluginsDir)" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(PluginsDir)" SkipUnchangedFiles="true" />
+    <Message Text="Staged $(TargetFileName) to $(PluginsDir)" Importance="high" />
+  </Target>
+
+</Project>

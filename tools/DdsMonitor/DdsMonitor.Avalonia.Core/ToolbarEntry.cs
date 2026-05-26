@@ -9,5 +9,6 @@ namespace DdsMonitor.Avalonia.Core;
 public sealed record ToolbarEntry(
     string Id,
     Action Action,
-    string? IconKey,
-    string Tooltip);
+    string Label,
+    string Tooltip,
+    string? IconKey);

@@ -24,7 +24,7 @@ public sealed class ToolbarRegistry : IToolbarRegistry
     public event Action? Changed;
 
     /// <inheritdoc/>
-    public void Register(string id, Action onClick, string? iconKey = null, string tooltip = "")
+    public void Register(string id, Action onClick, string label = "", string tooltip = "", string? iconKey = null)
     {
         if (id == null) throw new ArgumentNullException(nameof(id));
         if (onClick == null) throw new ArgumentNullException(nameof(onClick));
@@ -33,7 +33,7 @@ public sealed class ToolbarRegistry : IToolbarRegistry
         {
             // Replace existing entry with the same id, or append.
             var existing = _entries.FindIndex(e => e.Id == id);
-            var entry = new ToolbarEntry(id, onClick, iconKey, tooltip);
+            var entry = new ToolbarEntry(id, onClick, label, tooltip, iconKey);
             if (existing >= 0)
                 _entries[existing] = entry;
             else

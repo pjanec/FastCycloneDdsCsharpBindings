@@ -42,9 +42,9 @@ internal sealed class StubToolbarRegistry : IToolbarRegistry
 
     public IReadOnlyList<ToolbarEntry> Entries => _entries;
 
-    public void Register(string id, Action onClick, string? iconKey = null, string tooltip = "")
+    public void Register(string id, Action onClick, string label = "", string tooltip = "", string? iconKey = null)
     {
-        _entries.Add(new ToolbarEntry(id, onClick, iconKey, tooltip));
+        _entries.Add(new ToolbarEntry(id, onClick, label, tooltip, iconKey));
         Changed?.Invoke();
     }
 }

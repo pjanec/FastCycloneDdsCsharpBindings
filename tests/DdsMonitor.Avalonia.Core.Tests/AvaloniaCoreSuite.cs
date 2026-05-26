@@ -153,6 +153,19 @@ public sealed class ToolbarRegistryTests
         var registry = new ToolbarRegistry();
         Assert.Throws<ArgumentNullException>(() => registry.Register(null!, () => { }));
     }
+
+    [Fact]
+    public void ToolbarRegistry_Entries_IsSnapshot()
+    {
+        var registry = new ToolbarRegistry();
+        registry.Register("a", () => { });
+
+        var snapshot = registry.Entries;
+        registry.Register("b", () => { });
+
+        Assert.Single(snapshot);
+        Assert.Equal(2, registry.Entries.Count);
+    }
 }
 
 // ── AvaloniaViewRegistry ──────────────────────────────────────────────────────

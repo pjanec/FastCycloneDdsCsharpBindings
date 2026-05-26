@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Headless;
 
+[assembly: AvaloniaTestApplication(typeof(DdsMonitor.Avalonia.Core.Tests.TestApp))]
 
 namespace DdsMonitor.Avalonia.Core.Tests;
 

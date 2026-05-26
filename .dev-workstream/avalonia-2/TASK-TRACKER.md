@@ -14,8 +14,8 @@ Foundation work. Establishes the Dock + MDI layout, design tokens, all
 shared services, fixes existing bugs, and brings up the FeatureDemo
 plugin as an end-to-end smoke test.
 
-- [ ] **M1-T0** — Preflight: solution skeleton, shared assemblies, Dock.NET package refs, FeatureDemo project skeleton, test project skeletons. → [details](TASK-DETAILS.md#m1-t0--preflight-solution-skeleton-and-shared-assemblies)
-- [ ] **M1-T1** — Avalonia.Core abstractions: `LayoutKind`, service interfaces (`IContextMenuPresenter`, `IFileDialogService`, `IKeyboardShortcutService`, `IThemeService`, `IClipboardService`, `IUiThreadInvoker`), `ToolbarEntry` extension. → [details](TASK-DETAILS.md#m1-t1--avaloniacore-abstractions)
+- [x] **M1-T0** — Preflight: solution skeleton, shared assemblies, Dock.NET package refs, FeatureDemo project skeleton, test project skeletons. → [details](TASK-DETAILS.md#m1-t0--preflight-solution-skeleton-and-shared-assemblies)
+- [x] **M1-T1** — Avalonia.Core abstractions: `LayoutKind`, service interfaces (`IContextMenuPresenter`, `IFileDialogService`, `IKeyboardShortcutService`, `IThemeService`, `IClipboardService`, `IUiThreadInvoker`), `ToolbarEntry` extension. → [details](TASK-DETAILS.md#m1-t1--avaloniacore-abstractions)
 - [ ] **M1-T2** — Design tokens and base styles (`DesignTokens.axaml`, `BaseStyles.axaml`, `App.axaml` rewrite). → [details](TASK-DETAILS.md#m1-t2--design-tokens-and-base-styles)
 - [ ] **M1-T3** — `MdiChild` custom control: titlebar, eight resize handles, drag, z-order, focus, layout-kind context menu. → [details](TASK-DETAILS.md#m1-t3--mdichild-custom-control)
 - [ ] **M1-T4** — `MdiHost` custom control: canvas, z-order management, minimised strip, boundary clamping. → [details](TASK-DETAILS.md#m1-t4--mdihost-custom-control)
