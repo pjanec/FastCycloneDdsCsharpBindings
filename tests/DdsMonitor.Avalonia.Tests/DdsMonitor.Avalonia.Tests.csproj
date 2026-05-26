@@ -26,6 +26,7 @@
     <ProjectReference Include="..\..\tools\DdsMonitor\DdsMonitor.Engine\DdsMonitor.Engine.csproj" />
     <ProjectReference Include="..\..\tools\DdsMonitor\DdsMonitor.Avalonia.Core\DdsMonitor.Avalonia.Core.csproj" />
     <ProjectReference Include="..\..\tools\DdsMonitor\DdsMonitor.Avalonia\DdsMonitor.Avalonia.csproj" />
+    <ProjectReference Include="..\..\tools\DdsMonitor\DdsMonitor.Avalonia.FeatureDemoPlugin\DdsMonitor.Avalonia.FeatureDemoPlugin.csproj" />
   </ItemGroup>
 
 </Project>

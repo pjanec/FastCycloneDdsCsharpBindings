@@ -24,9 +24,9 @@ plugin as an end-to-end smoke test.
 - [x] **M1-T7** — `ShellWindow` rebuild: menus with mnemonics, transport buttons, bandwidth/participant indicators, status bar, dock+MDI composition, key bindings. → [details](TASK-DETAILS.md#m1-t7--shellwindow-and-app-composition)
 - [x] **M1-T8** — Service implementations: `ContextMenuPresenter`, `FileDialogService`, `KeyboardShortcutService`, `ThemeService`, `ClipboardService`. → [details](TASK-DETAILS.md#m1-t8--service-implementations)
 - [x] **M1-T9** — `Program.cs` rewrite, DI graph for all new services, fix the four DESIGN §13 bugs that aren't owned by other M1 tasks. → [details](TASK-DETAILS.md#m1-t9--programcs-di-and-bug-fixes)
-- [ ] **M1-T10** — `DdsMonitor.Avalonia.FeatureDemoPlugin`: five demo topic types, hosted publisher service, dashboard panel — the smoke-test bedrock. → [details](TASK-DETAILS.md#m1-t10--featuredemo-plugin)
-- [ ] **M1-T11** — `DdsMonitor.Avalonia.StandardPlugin` touch-ups: toolbar signature, menu mnemonics, no auto-spawn. → [details](TASK-DETAILS.md#m1-t11--standardplugin-touch-ups)
-- [ ] **M1-T12** — M1 end-to-end smoke test + manual test checklist. → [details](TASK-DETAILS.md#m1-t12--m1-end-to-end-smoke-test)
+- [x] **M1-T10** — `DdsMonitor.Avalonia.FeatureDemoPlugin`: five demo topic types, hosted publisher service, dashboard panel — the smoke-test bedrock. → [details](TASK-DETAILS.md#m1-t10--featuredemo-plugin)
+- [x] **M1-T11** — `DdsMonitor.Avalonia.StandardPlugin` touch-ups: toolbar signature, menu mnemonics, no auto-spawn. → [details](TASK-DETAILS.md#m1-t11--standardplugin-touch-ups)
+- [x] **M1-T12** — M1 end-to-end smoke test + manual test checklist. → [details](TASK-DETAILS.md#m1-t12--m1-end-to-end-smoke-test)
 
 ---
 

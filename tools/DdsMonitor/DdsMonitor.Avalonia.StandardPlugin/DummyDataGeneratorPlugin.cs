@@ -46,7 +46,7 @@ public sealed class DummyDataGeneratorPlugin : IMonitorPlugin
 
         if (menuRegistry is not null)
         {
-            menuRegistry.AddMenuItem("Tools", "Dummy Generator", () =>
+            menuRegistry.AddMenuItem("Tools", "_Dummy Generator", () =>
                 generatorService?.TogglePublishing());
         }
     }

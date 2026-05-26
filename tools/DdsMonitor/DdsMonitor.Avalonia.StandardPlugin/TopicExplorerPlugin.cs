@@ -26,7 +26,7 @@ public sealed class TopicExplorerPlugin : IMonitorPlugin
         {
             if (menuRegistry is not null)
             {
-                menuRegistry.AddMenuItem("View", "Topic Explorer", () =>
+                menuRegistry.AddMenuItem("View", "_Topic Explorer", () =>
                     windowManager.SpawnPanel(nameof(TopicExplorerViewModel), null));
             }
 
@@ -35,6 +35,7 @@ public sealed class TopicExplorerPlugin : IMonitorPlugin
                 toolbarRegistry.Register(
                     id: "TopicExplorer",
                     onClick: () => windowManager.SpawnPanel(nameof(TopicExplorerViewModel), null),
+                    label: "Explorer",
                     tooltip: "Topic Explorer");
             }
         }

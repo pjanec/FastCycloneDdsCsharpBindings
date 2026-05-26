@@ -1,0 +1,39 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:DdsMonitor.Avalonia.FeatureDemoPlugin"
+             x:Class="DdsMonitor.Avalonia.FeatureDemoPlugin.FeatureDemoDashboardView"
+             x:DataType="local:FeatureDemoDashboardViewModel">
+
+  <Grid RowDefinitions="Auto,Auto,*" Margin="8">
+
+    <!-- Row 0: Publisher toggle -->
+    <Button Grid.Row="0"
+            Command="{Binding TogglePublisherCommand}"
+            Content="{Binding PublisherStateLabel}"
+            HorizontalAlignment="Left"
+            Margin="0,0,0,8"/>
+
+    <!-- Row 1: Per-topic sample counts -->
+    <Border Grid.Row="1"
+            BorderBrush="{DynamicResource SystemControlForegroundBaseHighBrush}"
+            BorderThickness="1"
+            Margin="0,0,0,8">
+      <ItemsControl ItemsSource="{Binding TopicRows}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="local:TopicCountRow">
+            <Grid ColumnDefinitions="*,80" Margin="4,2">
+              <TextBlock Grid.Column="0" Text="{Binding Name}"/>
+              <TextBlock Grid.Column="1" Text="{Binding Count}" TextAlignment="Right"/>
+            </Grid>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </Border>
+
+    <!-- Row 2: Recent alerts -->
+    <ListBox Grid.Row="2"
+             ItemsSource="{Binding RecentAlerts}"/>
+
+  </Grid>
+
+</UserControl>

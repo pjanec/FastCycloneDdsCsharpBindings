@@ -51,7 +51,7 @@ public sealed class SendSamplePlugin : IMonitorPlugin
 
         if (menuRegistry is not null && windowManager is not null)
         {
-            menuRegistry.AddMenuItem("Tools", "Send Sample", () =>
+            menuRegistry.AddMenuItem("Tools", "_Send Sample", () =>
                 windowManager.SpawnPanel("SendSample_Blank", null));
         }
     }

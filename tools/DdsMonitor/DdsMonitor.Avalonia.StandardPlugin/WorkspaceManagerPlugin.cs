@@ -25,10 +25,10 @@ public sealed class WorkspaceManagerPlugin : IMonitorPlugin
 
         if (menuRegistry is not null && windowManager is not null)
         {
-            menuRegistry.AddMenuItem("Tools", "Schema Sources\u2026", () =>
+            menuRegistry.AddMenuItem("Tools", "Schema _Sources\u2026", () =>
                 windowManager.SpawnPanel(nameof(SchemaSourcesViewModel), null));
 
-            menuRegistry.AddMenuItem("Tools", "Network Configuration\u2026", () =>
+            menuRegistry.AddMenuItem("Tools", "_Network Configuration\u2026", () =>
                 windowManager.SpawnPanel("NetworkConfig", null));
         }
 
