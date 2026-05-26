@@ -1,0 +1,181 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:DdsMonitor.Avalonia.Controls">
+
+  <Style Selector="controls|MdiChild">
+    <Setter Property="MinWidth" Value="220"/>
+    <Setter Property="MinHeight" Value="140"/>
+    <Setter Property="Template">
+      <ControlTemplate TargetType="controls:MdiChild">
+
+        <!-- Outer border: 1 px subtle border, changes to accent when active -->
+        <Border Name="PART_OuterBorder"
+                BorderThickness="1"
+                BorderBrush="{DynamicResource Border.Subtle}"
+                Background="{DynamicResource Surface.Panel}"
+                ClipToBounds="False">
+
+          <Grid RowDefinitions="28,*">
+
+            <!-- ── Row 0: Titlebar ─────────────────────────────────────────── -->
+            <Border Name="PART_Titlebar"
+                    Grid.Row="0"
+                    Background="{DynamicResource Surface.Titlebar}"
+                    Cursor="SizeAll">
+              <DockPanel>
+
+                <!-- Right-docked: extras + buttons -->
+                <StackPanel DockPanel.Dock="Right"
+                            Orientation="Horizontal"
+                            Margin="0"
+                            IsTabStop="False">
+
+                  <!-- TitlebarExtras slot -->
+                  <ContentPresenter Content="{TemplateBinding TitlebarExtras}"
+                                    VerticalAlignment="Center"
+                                    Margin="0,0,4,0"
+                                    IsTabStop="False"/>
+
+                  <!-- Minimise button -->
+                  <Button Name="PART_MinimiseButton"
+                          Content="_"
+                          Width="28"
+                          Height="28"
+                          Padding="0"
+                          IsTabStop="False"
+                          VerticalContentAlignment="Center"
+                          HorizontalContentAlignment="Center"
+                          BorderThickness="0"
+                          Background="Transparent"
+                          ToolTip.Tip="Minimise"/>
+
+                  <!-- Close button -->
+                  <Button Name="PART_CloseButton"
+                          Content="✕"
+                          Width="28"
+                          Height="28"
+                          Padding="0"
+                          IsTabStop="False"
+                          VerticalContentAlignment="Center"
+                          HorizontalContentAlignment="Center"
+                          BorderThickness="0"
+                          Background="Transparent"
+                          ToolTip.Tip="Close"/>
+
+                </StackPanel>
+
+                <!-- Title text (fills remaining space) -->
+                <TextBlock Text="{TemplateBinding Title}"
+                           VerticalAlignment="Center"
+                           Margin="8,0"
+                           IsTabStop="False"
+                           TextTrimming="CharacterEllipsis"
+                           FontSize="{DynamicResource FontSize.Body}"
+                           Foreground="{DynamicResource Foreground.Primary}"/>
+
+              </DockPanel>
+            </Border>
+
+            <!-- ── Row 1: Content body ─────────────────────────────────────── -->
+            <ContentPresenter Name="PART_ContentPresenter"
+                              Grid.Row="1"
+                              Content="{TemplateBinding Content}"
+                              ContentTemplate="{TemplateBinding ContentTemplate}"/>
+
+            <!-- ── Resize handles (Grid.Row spans entire control) ──────────── -->
+
+            <!-- Top edge — 6 px tall, full width -->
+            <Border Name="PART_ResizeTop"
+                    Grid.Row="0" Grid.RowSpan="2"
+                    Height="6"
+                    VerticalAlignment="Top"
+                    Background="Transparent"
+                    Cursor="SizeNorthSouth"
+                    IsTabStop="False"
+                    ZIndex="10"/>
+
+            <!-- Bottom edge -->
+            <Border Name="PART_ResizeBottom"
+                    Grid.Row="0" Grid.RowSpan="2"
+                    Height="6"
+                    VerticalAlignment="Bottom"
+                    Background="Transparent"
+                    Cursor="SizeNorthSouth"
+                    IsTabStop="False"
+                    ZIndex="10"/>
+
+            <!-- Left edge — 6 px wide, full height -->
+            <Border Name="PART_ResizeLeft"
+                    Grid.Row="0" Grid.RowSpan="2"
+                    Width="6"
+                    HorizontalAlignment="Left"
+                    Background="Transparent"
+                    Cursor="SizeWestEast"
+                    IsTabStop="False"
+                    ZIndex="10"/>
+
+            <!-- Right edge -->
+            <Border Name="PART_ResizeRight"
+                    Grid.Row="0" Grid.RowSpan="2"
+                    Width="6"
+                    HorizontalAlignment="Right"
+                    Background="Transparent"
+                    Cursor="SizeWestEast"
+                    IsTabStop="False"
+                    ZIndex="10"/>
+
+            <!-- Corners: 10×10 -->
+            <Border Name="PART_ResizeTopLeft"
+                    Grid.Row="0" Grid.RowSpan="2"
+                    Width="10" Height="10"
+                    HorizontalAlignment="Left" VerticalAlignment="Top"
+                    Background="Transparent"
+                    Cursor="TopLeftCorner"
+                    IsTabStop="False"
+                    ZIndex="11"/>
+
+            <Border Name="PART_ResizeTopRight"
+                    Grid.Row="0" Grid.RowSpan="2"
+                    Width="10" Height="10"
+                    HorizontalAlignment="Right" VerticalAlignment="Top"
+                    Background="Transparent"
+                    Cursor="TopRightCorner"
+                    IsTabStop="False"
+                    ZIndex="11"/>
+
+            <Border Name="PART_ResizeBottomLeft"
+                    Grid.Row="0" Grid.RowSpan="2"
+                    Width="10" Height="10"
+                    HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                    Background="Transparent"
+                    Cursor="BottomLeftCorner"
+                    IsTabStop="False"
+                    ZIndex="11"/>
+
+            <Border Name="PART_ResizeBottomRight"
+                    Grid.Row="0" Grid.RowSpan="2"
+                    Width="10" Height="10"
+                    HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                    Background="Transparent"
+                    Cursor="BottomRightCorner"
+                    IsTabStop="False"
+                    ZIndex="11"/>
+
+          </Grid>
+        </Border>
+
+      </ControlTemplate>
+    </Setter>
+  </Style>
+
+  <!-- Active state: accent border + active titlebar background -->
+  <Style Selector="controls|MdiChild.active /template/ Border#PART_OuterBorder">
+    <Setter Property="BorderBrush" Value="{DynamicResource Border.Accent}"/>
+    <Setter Property="BorderThickness" Value="2"/>
+  </Style>
+
+  <Style Selector="controls|MdiChild.active /template/ Border#PART_Titlebar">
+    <Setter Property="Background" Value="{DynamicResource Surface.TitlebarActive}"/>
+  </Style>
+
+</Styles>

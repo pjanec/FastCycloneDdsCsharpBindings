@@ -1,0 +1,39 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:DdsMonitor.Avalonia.Controls">
+
+  <Style Selector="controls|MdiHost">
+    <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
+    <Setter Property="Template">
+      <ControlTemplate TargetType="controls:MdiHost">
+
+        <DockPanel Background="{TemplateBinding Background}">
+
+          <!-- ── Minimised strip (bottom, hidden when empty) ──────────────── -->
+          <Border DockPanel.Dock="Bottom"
+                  Height="32"
+                  Background="{DynamicResource Surface.Titlebar}"
+                  BorderBrush="{DynamicResource Border.Subtle}"
+                  BorderThickness="0,1,0,0">
+            <ItemsControl Name="PART_MinimisedStrip"
+                          IsVisible="False">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="4,0"/>
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+            </ItemsControl>
+          </Border>
+
+          <!-- ── Child canvas (fills remaining space) ─────────────────────── -->
+          <Canvas Name="PART_ChildCanvas"
+                  ClipToBounds="True"
+                  Background="Transparent"/>
+
+        </DockPanel>
+
+      </ControlTemplate>
+    </Setter>
+  </Style>
+
+</Styles>

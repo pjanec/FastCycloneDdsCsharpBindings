@@ -1,0 +1,58 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- ── Button: flat, 1 px Border.Subtle border, 2 px corner radius ─────── -->
+  <Style Selector="Button">
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="2"/>
+    <Setter Property="Padding" Value="8,4"/>
+    <Setter Property="Foreground" Value="{DynamicResource Foreground.Primary}"/>
+    <Setter Property="MinHeight" Value="28"/>
+  </Style>
+
+  <Style Selector="Button:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Surface.Titlebar}"/>
+  </Style>
+
+  <Style Selector="Button:pressed /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Border.Subtle}"/>
+  </Style>
+
+  <!-- ── TextBox: flat, 1 px border, focus uses Border.Accent ────────────── -->
+  <Style Selector="TextBox">
+    <Setter Property="Background" Value="{DynamicResource Surface.Panel}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource Border.Subtle}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="2"/>
+    <Setter Property="Padding" Value="6,3"/>
+    <Setter Property="Foreground" Value="{DynamicResource Foreground.Primary}"/>
+    <Setter Property="FontSize" Value="{DynamicResource FontSize.Body}"/>
+  </Style>
+
+  <Style Selector="TextBox:focus">
+    <Setter Property="BorderBrush" Value="{DynamicResource Border.Accent}"/>
+  </Style>
+
+  <!-- ── Menu: no icon column, smaller padding ────────────────────────────── -->
+  <Style Selector="Menu">
+    <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
+    <Setter Property="Foreground" Value="{DynamicResource Foreground.Primary}"/>
+  </Style>
+
+  <Style Selector="MenuItem">
+    <Setter Property="Padding" Value="8,3"/>
+    <Setter Property="Foreground" Value="{DynamicResource Foreground.Primary}"/>
+  </Style>
+
+  <Style Selector="MenuItem:pointerover">
+    <Setter Property="Background" Value="{DynamicResource Surface.Titlebar}"/>
+  </Style>
+
+  <!-- ── Window: uses Surface.Background ──────────────────────────────────── -->
+  <Style Selector="Window">
+    <Setter Property="Background" Value="{DynamicResource Surface.Background}"/>
+  </Style>
+
+</Styles>

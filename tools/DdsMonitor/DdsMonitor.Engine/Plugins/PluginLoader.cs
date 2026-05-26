@@ -115,19 +115,29 @@ public sealed class PluginLoader
             return 0;
         }
 
-        #if !DEBUG
         try
-        #endif
         {
             return LoadPluginFromFileCore(dllPath, services);
         }
-        #if !DEBUG
+        catch (BadImageFormatException ex)
+        {
+            // Structural DLL errors are always caught — the file is not a valid .NET assembly.
+            _logger?.LogError(ex, "PluginLoader: '{Path}' is not a valid .NET assembly. Skipping.", dllPath);
+            return 0;
+        }
+        catch (FileLoadException ex)
+        {
+            // Structural load errors are always caught — the assembly could not be loaded.
+            _logger?.LogError(ex, "PluginLoader: '{Path}' could not be loaded. Skipping.", dllPath);
+            return 0;
+        }
+#if !DEBUG
         catch (Exception ex)
         {
             _logger?.LogError(ex, "PluginLoader: failed to load '{Path}'. Skipping.", dllPath);
             return 0;
         }
-        #endif
+#endif
     }
 
     /// <summary>
@@ -143,18 +153,18 @@ public sealed class PluginLoader
 
         foreach (var plugin in _plugins)
         {
-            # if !DEBUG
-			try
-            #endif
-			{
+#if DEBUG
+            plugin.Initialize(context);
+#else
+            try
+            {
                 plugin.Initialize(context);
             }
-            #if !DEBUG
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "PluginLoader: plugin '{Name}' threw during Initialize().", plugin.Name);
             }
-            #endif
+#endif
         }
     }
 

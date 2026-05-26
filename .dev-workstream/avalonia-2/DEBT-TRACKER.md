@@ -14,12 +14,14 @@ Legend:
 
 | ID | Priority | Description | Source | Target Batch |
 |---|---|---|---|---|
-| DEBT-001 | P2 | `PluginLoader_CorruptDll_DoesNotCrash` fails in Debug. `TryLoadPluginFromFile` catches exceptions only with `#if !DEBUG`. Always catch `BadImageFormatException` + `FileLoadException` (structural DLL issues) regardless of build config. | BATCH-01 review | BATCH-02 |
 | DEBT-002 | P3 | `AvaloniaCoreSuite.cs` stub calls pass `"icon1"` to `Label` parameter (not `IconKey`) after `ToolbarEntry` positional reorder. Cosmetically wrong but tests don't assert on those fields. | BATCH-01 review | When next touching Core.Tests |
 | DEBT-003 | P3 | `AvaloniaCoreSuite.cs` is growing large; `ToolbarRegistryTests` and `AvaloniaViewRegistryTests` should be split into dedicated files. | BATCH-01 review | When next touching test infra |
+| DEBT-004 | P2 | Pre-existing failures in `DdsMonitor.Engine.Tests`: `LoadPlugins_WhenConfigFileMissing_DisablesAllDiscoveredPlugins` and `LoadPlugins_WhenConfigFileCorrupt_DisablesAllDiscoveredPlugins`. Root cause: `PluginConfigService.HadConfigFileAtInitialization` logic. Unrelated to DEBT-001. | BATCH-02 review | BATCH-04 |
 
 ---
 
 ## Resolved Items
 
-*(none yet)*
+| ID | Resolved In | Notes |
+|---|---|---|
+| DEBT-001 | BATCH-02 | `TryLoadPluginFromFile` now always catches `BadImageFormatException` + `FileLoadException`. `InitializePlugins` restructured to `#if DEBUG … #else try/catch #endif`. |
