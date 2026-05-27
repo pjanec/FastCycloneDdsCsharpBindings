@@ -30,6 +30,23 @@ plugin as an end-to-end smoke test.
 
 ---
 
+### M1 Finish-Up (added after post-M1 source audit)
+
+The first pass left functional gaps that block M1 acceptance and would
+compound through M2. These tasks close them. See task details for the
+full audit findings each task addresses.
+
+- [ ] **M1-T13** — Install keyboard shortcuts as actual `KeyBinding`s on `ShellWindow`; wire Ctrl+W, Ctrl+1..9, Ctrl+Tab, Ctrl+Shift+T, Ctrl+,, plus reopen-last-closed stack. → [details](TASK-DETAILS.md#m1-t13--install-keyboard-shortcuts-on-the-shell-window)
+- [ ] **M1-T14** — Implement `MoveToLayout` and wire `MdiChild.LayoutKindRequested`; make "Dock as tab / left / right / bottom" actually work, with Dock-tab → MDI reverse via tab context menu. → [details](TASK-DETAILS.md#m1-t14--implement-movetolayout-and-wire-the-titlebar-context-menu)
+- [ ] **M1-T15** — `FeatureDemoDashboardViewModel` `INotifyPropertyChanged`; correct `Devel → Feature Demo → Toggle Publisher` nesting; fix alert-harvest ordinal tracking. → [details](TASK-DETAILS.md#m1-t15--live-dashboard-updates-and-correct-menu-nesting)
+- [ ] **M1-T16** — Wire every shell menu item (real action or "Coming in M*n*" placeholder); fix plugin-menu routing so View/Devel items go to the correct top-level menu; theme submenu visual feedback. → [details](TASK-DETAILS.md#m1-t16--wire-up-all-shell-menu-items-and-fix-plugin-menu-routing)
+- [ ] **M1-T17** — Live bandwidth from `IDdsBridge`; status dot uses `Accent.Receiving/Paused` design-token brushes; add participant indicator button that opens NetworkConfig; event-driven pause updates. → [details](TASK-DETAILS.md#m1-t17--live-bandwidth-status-indicator-and-participant-indicator)
+- [ ] **M1-T18** — Fix MdiHost resize-from-Left/Top origin drift; fire `ChildGeometryChanged` once on PointerReleased for both drag and resize; capture X/Y on close; persist `IsMinimised`. → [details](TASK-DETAILS.md#m1-t18--mdihost-geometry-correctness)
+- [ ] **M1-T19** — Minimised-strip border auto-hides; empty Dock.NET side docks collapse to zero proportion; remove dead `BlazorTypeDrawerAdapter` if still present. → [details](TASK-DETAILS.md#m1-t19--visual-polish-tokens-strip-empty-docks)
+- [ ] **M1-T20** — Full Dock.NET layout serialisation (splitter proportions, document/tool order); content rehydration callback in `LoadWorkspaceFromJson`. → [details](TASK-DETAILS.md#m1-t20--docknet-layout-serialisation)
+
+---
+
 ## Milestone M2 — TopicExplorer Parity *(tasks TBD)*
 
 Bring `TopicExplorerPanel.razor` (755 LoC) feature parity: tri-state

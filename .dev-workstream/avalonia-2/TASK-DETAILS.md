@@ -1314,6 +1314,954 @@ test, and produce a brief manual-test checklist for the user.
 
 ---
 
+## M1 Finish-Up (M1-T13 — M1-T20)
+
+The first pass of M1 (M1-T0 through M1-T12) produced a structurally correct
+skeleton but left several functional gaps that block the M1 acceptance
+criteria and would compound through M2. These tasks close those gaps.
+
+Each finish-up task has the same structure as the original M1 tasks. They
+are sequenced so that an agent can implement them in numeric order without
+needing to revisit earlier ones, but the dependencies are explicit.
+
+> **Audit context**: the issues these tasks address were found by reviewing
+> the post-M1 source dump against `DESIGN.md`. References to "the original
+> M1 task that introduced the file" are given so the agent can locate the
+> existing code without searching.
+
+---
+
+## M1-T13 — Install Keyboard Shortcuts on the Shell Window
+
+**Goal**: Make the keyboard shortcuts registered with
+`IKeyboardShortcutService` actually fire when the user presses the key.
+Currently, `KeyboardShortcutService.Register(Space, …)` is called but no
+`KeyBinding` is ever installed on the `ShellWindow`, so the service is a
+data structure with no input pipe.
+
+**Depends on**: M1-T7 (ShellWindow), M1-T8 (KeyboardShortcutService).
+
+**Inputs to read**:
+
+- `DESIGN.md` §8 (Keyboard Navigation) — the authoritative shortcut list.
+- Current `ShellWindow.axaml.cs` registration block (the agent currently
+  registers Space and F5 only).
+- Current `KeyboardShortcutService.cs` — note `TryInvoke` already
+  dispatches via `Dispatcher.UIThread.Post`.
+
+**Deliverables**:
+
+1. **Extend** `IKeyboardShortcutService` (`DdsMonitor.Avalonia.Core/IKeyboardShortcutService.cs`):
+   - Add event `event Action<RegisteredShortcut>? Registered2`
+     (renamed if naming clashes; the existing `Registered` property must
+     keep its name). Suggested name: `event Action<RegisteredShortcut>? ShortcutAdded`.
+   - Fire `ShortcutAdded` from `Register(...)` after the entry is appended.
+   - Rationale: the shell installs key bindings dynamically as plugins
+     register new shortcuts; without an event the shell would have to poll.
+
+2. **Modify** `ShellWindow.axaml.cs`:
+   - In the constructor, after resolving `IKeyboardShortcutService`,
+     subscribe to `ShortcutAdded` and call a new private method
+     `InstallShortcut(RegisteredShortcut)`.
+   - `InstallShortcut` builds an `Avalonia.Input.KeyBinding` with the
+     gesture and a `RoutedCommand` whose handler invokes the shortcut's
+     `Action` on the UI thread, then appends to
+     `this.KeyBindings`.
+   - For shortcuts registered *before* the subscription, iterate
+     `shortcutService.Registered` once and install each.
+   - Register the full shortcut set from DESIGN.md §8 *Global shortcuts*
+     in the shell constructor (after the service is wired):
+
+     | Gesture | Description | Action |
+     |---|---|---|
+     | `Space` | Play/Pause | toggle `IDdsBridge.IsPaused` |
+     | `F5` | Reset | `IDdsBridge.ResetAll()` |
+     | `Ctrl+W` | Close focused MDI child | call `IAvaloniaWindowManager.ClosePanel(id)` for the focused MDI child id (see notes) |
+     | `Ctrl+Shift+T` | Reopen last closed panel | re-spawn from a `Stack<PanelState>` maintained in the shell (LIFO) |
+     | `Ctrl+1` through `Ctrl+9` | Focus *n*th MDI child | call `MdiHost.Children[n-1].Focus()` if it exists |
+     | `Ctrl+Tab` | Cycle MDI children forward | `MdiHost.FocusNext(reverse: false)` |
+     | `Ctrl+Shift+Tab` | Cycle MDI children backward | `MdiHost.FocusNext(reverse: true)` |
+     | `Ctrl+,` | Open Plugin Manager | placeholder dialog "Coming in M5" |
+     | `Escape` | Cancel active interaction | bubbles through normal focus chain — no global handler needed |
+
+     `Ctrl+T` ("Open new SamplesViewer for the topic selected in
+     TopicExplorer") is **deferred to M2** because it requires
+     TopicExplorer to track selection state.
+
+   - For *closed-panel restoration* (`Ctrl+Shift+T`):
+     - Subscribe to `IWindowManager.PanelClosed`.
+     - On each event, push the closed `PanelState` (and its captured
+       `LayoutKind` taken from a parallel dict in `AvaloniaWindowManager`'s
+       `_layoutKinds` cache before removal) onto a `Stack<(PanelState, LayoutKind)>`.
+     - `Ctrl+Shift+T` pops and calls `SpawnPanel(name, layout, state.ComponentState)`.
+     - The stack is capped at 16 entries (FIFO eviction at the bottom).
+     - The `LayoutKind` capture requires a small interface addition: add
+       `LayoutKind GetLayoutKind(string panelId)` to `IAvaloniaWindowManager`
+       returning `LayoutKind.Mdi` when not found. Implement it by reading
+       `_layoutKinds` under the existing lock.
+
+3. **Locate the currently focused MDI child** for `Ctrl+W`:
+   - Add `string? FocusedChildId` to `MdiHost` — a property updated when
+     a child receives keyboard focus (subscribe to each added child's
+     `GotFocus` and propagate `IsKeyboardFocusWithin` changes).
+   - `Ctrl+W` handler reads `FocusedChildId`. If null, no-op.
+
+4. **Tests** under `tests/DdsMonitor.Avalonia.Tests/`:
+   - `ShellWindowShortcutTests.cs`:
+     - Headless construction of `ShellWindow` + DI graph.
+     - Simulate `KeyDown` for Space: assert `IDdsBridge.IsPaused` flipped.
+     - Simulate `KeyDown` for F5: assert `IDdsBridge.ResetAll` invoked
+       (use a fake bridge that records calls).
+     - Register a new shortcut at runtime via the service: simulate the
+       new gesture and assert it fires (covers `ShortcutAdded` wiring).
+     - Open three MDI children, simulate `Ctrl+W` while one is focused:
+       assert that child closed.
+     - Close all three via `Ctrl+W`, then `Ctrl+Shift+T` three times:
+       assert each re-spawns in reverse-close order.
+
+**Implementation notes**:
+
+- `KeyBinding` requires an `ICommand`. Implement a simple
+  `ActionCommand : ICommand` co-located in
+  `DdsMonitor.Avalonia/Services/` if one isn't already present.
+- Avalonia's modifier matching is case-sensitive in some versions; use
+  `KeyGesture.Parse("Ctrl+W")` to construct gestures consistently.
+- `Ctrl+Tab` is normally intercepted by Avalonia's `TabControl` focus
+  navigation. Attach the binding at the `Window` level with
+  `HotKeyManager.SetHotKey` if necessary, or handle in
+  `OnKeyDown` with `e.Handled = true`.
+
+**Acceptance criteria**:
+
+- [x] `dotnet build` succeeds with zero errors.
+- [x] All `ShellWindowShortcutTests` pass.
+- [x] Manually pressing Space while the shell is focused (no textbox
+  focused) toggles the bridge's paused state — confirmable via the
+  status text updating to "Paused" / "Running" within 1 second.
+- [x] `Ctrl+Shift+T` after closing an MDI child re-spawns it at the same
+  geometry and same `LayoutKind`.
+- [x] Pressing `Ctrl+W` while focus is inside an MDI child closes that
+  child; pressing `Ctrl+W` with no MDI child focused is a no-op.
+
+**Out of scope**:
+
+- `Ctrl+T` (selection-aware, deferred to M2).
+- Quick-open palette `Ctrl+Shift+P` (M5).
+
+---
+
+## M1-T14 — Implement `MoveToLayout` and Wire the Titlebar Context Menu
+
+**Goal**: Make the right-click context menu on the `MdiChild` titlebar
+actually move panels between layout kinds. Currently
+`AvaloniaWindowManager.MoveToLayout` throws `NotSupportedException` with
+"deferred to M2", and the `MdiChild.LayoutKindRequested` event has no
+subscriber — the menu items do nothing.
+
+**Depends on**: M1-T5 (WindowManager), M1-T3 (MdiChild), M1-T6 (DockManager).
+
+**Inputs to read**:
+
+- `DESIGN.md` §3 (Hybrid Layout Model) — the three `LayoutKind`s.
+- Existing `AvaloniaWindowManager.MoveToLayout` — replace the `throw`.
+- Existing `MdiChild.LayoutKindRequestedEvent` and the `MdiChildLayoutKindEventArgs`
+  with `TargetKind` and `SideHint`.
+
+**Deliverables**:
+
+1. **Implement** `AvaloniaWindowManager.MoveToLayout(string panelId, LayoutKind newKind)`:
+   - Look up `_layoutKinds[panelId]`. If equal to `newKind`, no-op.
+   - Find the existing view+VM pair from `_viewModels[panelId]` and
+     rebuild the view content via `_viewRegistry.BuildView(vm)` (the
+     existing view control is destroyed in the old host and a fresh
+     control is built for the new host — necessary because Avalonia
+     controls cannot have two parents).
+   - **From MDI to Dock**:
+     - Capture current geometry from `Canvas.GetLeft/Top` and `child.Width/Height`
+       and write into `panelState.ComponentState["__window"]` so a later
+       "back to MDI" restores it.
+     - Call `_mdiHost.Remove(panelId)` but **without** triggering
+       `OnPanelRemoved` (which would dispose the VM and fire `PanelClosed`).
+       To do this safely, add an internal overload
+       `MdiHost.RemoveWithoutDisposing(string id)` that returns the
+       MdiChild detached but doesn't raise `ChildRemoved`. The
+       `WindowManager` then handles VM lifetime itself.
+     - Call `_dockManager.AddDocument(panelId, panelState.Title, freshView)`
+       or `_dockManager.AddTool(panelId, panelState.Title, freshView, side)`
+       where `side` is decoded from the `MdiChildLayoutKindEventArgs.SideHint`
+       passed through to `MoveToLayout` — see point 3.
+   - **From Dock to MDI**:
+     - Call `_dockManager.Remove(panelId)`, but DocumentClosed event
+       already fires — for the cross-layout case we suppress it via a
+       short-lived `_movingPanels: HashSet<string>` guard that
+       `OnPanelRemoved` checks at the top and short-circuits.
+     - Build a new `MdiChild` and call `_mdiHost.Add(...)` using the
+       geometry from `panelState.ComponentState["__window"]` (or a default).
+   - **Between two dock kinds** (DockDocument ↔ DockTool):
+     - `_dockManager.Remove(panelId)` with the guard, then add to the
+       other kind.
+   - Update `_layoutKinds[panelId] = newKind`.
+   - Publish `WorkspaceSaveRequestedEvent`.
+
+2. **Add `MoveToLayout(panelId, newKind, sideHint)` overload** on
+   `IAvaloniaWindowManager` (optional `string? sideHint = null`):
+   - Only meaningful when `newKind == DockTool`; ignored otherwise.
+   - Maps `"left" → DockSide.Left`, `"right" → DockSide.Right`,
+     `"bottom" → DockSide.Bottom`, anything else → `DockSide.Left`.
+
+3. **Subscribe to `MdiChild.LayoutKindRequested` from the WindowManager**:
+   - When `SpawnMdiPanel` creates an `MdiChild`, attach a handler:
+     ```
+     child.LayoutKindRequested += (sender, e) =>
+         MoveToLayout(panelId, e.TargetKind, e.SideHint);
+     ```
+   - Remove the handler when the child is detached (in
+     `OnPanelRemoved` or the new `RemoveWithoutDisposing`).
+
+4. **Add `MdiHost.RemoveWithoutDisposing(string id)`**:
+   - Same as `Remove` but does NOT raise `ChildRemoved` and does NOT
+     remove the child's parent's reference to the VM (the caller owns
+     the VM lifecycle).
+   - Used only by `MoveToLayout` to detach the visual without firing
+     the panel-closed pipeline.
+
+5. **Tests** under `tests/DdsMonitor.Avalonia.Tests/`:
+   - `MoveToLayoutTests.cs`:
+     - Spawn a panel as MDI, call `MoveToLayout(id, DockDocument)`,
+       assert the dock manager's `AddDocument` was called, the MdiHost no
+       longer contains it, and the VM instance is the same reference as
+       before (use a recordable fake VM).
+     - Repeat for `Mdi → DockTool` with sideHint "right" — assert the
+       fake dock manager's `AddTool` received `DockSide.Right`.
+     - `DockDocument → Mdi`: after the move, the MDI host contains the
+       child at the geometry stored in `__window`.
+     - Same VM instance throughout (no `Dispose` calls on the fake VM
+       during the moves).
+     - Workspace save after a `MoveToLayout` writes the new `LayoutKind`
+       in the JSON.
+
+**Implementation notes**:
+
+- The "rebuild view from VM" step exists because Avalonia controls can
+  only have one logical parent. The `IAvaloniaViewRegistry.BuildView`
+  factory is idempotent for the same VM (it returns a new Control with
+  the same `DataContext`).
+- The guard set `_movingPanels` must be held only across the
+  `Remove → Add` window, not the whole `MoveToLayout`. Use
+  `try/finally` to ensure removal even if `Add` throws.
+
+**Acceptance criteria**:
+
+- [x] `dotnet build` succeeds with zero errors.
+- [x] All `MoveToLayoutTests` pass.
+- [x] Right-clicking an MDI child titlebar and selecting "Dock as tab"
+  moves it to a Dock.NET tab; the VM state is preserved (verifiable
+  manually: type into a SendSample text field, dock-as-tab, the text
+  remains).
+- [x] The reverse move (right-click a docked tab and selecting "Float
+  in MDI" — UI added in M1-T16 below) returns the panel to the MDI
+  area at the geometry it had before docking.
+- [x] Workspace save and reload of a mixed layout (some MDI, some
+  docked) round-trips correctly.
+
+**Out of scope**:
+
+- Drag-to-dock from MdiHost to Dock.NET (still deferred).
+
+---
+
+## M1-T15 — Live Dashboard Updates and Correct Menu Nesting
+
+**Goal**: Make the FeatureDemo Dashboard actually display live counts,
+and correctly nest the Devel menu items under a "Feature Demo" submenu.
+
+**Depends on**: M1-T10.
+
+**Inputs to read**:
+
+- Current `FeatureDemoDashboardViewModel.cs` — note that `Tick()`
+  replaces `_topicRows` with a new list and that the VM does not
+  implement `INotifyPropertyChanged`.
+- Current `FeatureDemoPlugin.cs` — note the menu registrations:
+  `menuRegistry.AddMenuItem("Devel", "_Feature Demo Toggle Publisher", …)`.
+- `DESIGN.md` §6 (Threading) for UI-thread rules.
+
+**Deliverables**:
+
+1. **Modify** `FeatureDemoDashboardViewModel.cs`:
+   - Implement `INotifyPropertyChanged`.
+   - Convert `TopicRows` from a replaced field into an
+     `ObservableCollection<TopicCountRow>` (existing instance, mutated in
+     place).
+   - In `Tick()`, iterate the five topic types: if `TopicRows.Count == 5`,
+     update existing rows in place via `TopicRows[i] = newRow`; if not
+     yet populated, clear and add the five rows.
+   - Make `PublisherStateLabel` raise `PropertyChanged` when
+     `_publisher.IsPublishing` changes — subscribe to a new
+     `event Action<bool>? PublishingChanged` on `DemoPublisherService`
+     that fires from `StartPublishing` and `StopPublishing`. The VM
+     subscribes in its constructor and unsubscribes on `Dispose`
+     (add `IDisposable` to the VM).
+   - Add `IDisposable` implementation: dispose the subscription.
+   - `Tick()` must be safe to call on a background thread — guard the
+     `ObservableCollection` mutations with an `IUiThreadInvoker.Post`
+     when not on the UI thread. The view's `DispatcherTimer` ticks
+     on the UI thread so this is defensive.
+
+2. **Modify** `DemoPublisherService.cs`:
+   - Add `event Action<bool>? PublishingChanged`.
+   - Fire `PublishingChanged?.Invoke(_publishing)` at the end of
+     `StartPublishing` and `StopPublishing`.
+
+3. **Fix `Tick()` alert harvesting**:
+   - The current code does `Samples.Skip(prev)` where `prev = RecentAlerts.Count`.
+     This is wrong because `RecentAlerts` is capped at 10, so after the
+     11th alert the skip count desynchronises.
+   - Track the last consumed `Ordinal` in a private field
+     `_lastAlertOrdinal = long.MinValue`. Each tick, walk
+     `topicSamples.Samples` and consume any whose `Ordinal > _lastAlertOrdinal`,
+     updating `_lastAlertOrdinal` to the last seen value.
+
+4. **Modify** `FeatureDemoPlugin.cs`:
+   - Replace:
+     ```csharp
+     menuRegistry.AddMenuItem("Devel", "_Feature Demo Toggle Publisher", …)
+     ```
+     with nested-menu registration so the path is
+     `Devel → _Feature Demo → _Toggle Publisher`.
+   - Use whichever overload `IMenuRegistry` provides for nesting (e.g.
+     `AddMenuItem("Devel", new[]{"_Feature Demo", "_Toggle Publisher"}, action)`,
+     or `AddNestedMenuItem(parentPath, leafLabel, action)` — read the
+     engine's `IMenuRegistry.cs` to find the correct API).
+   - If the engine has no nesting API, add one (`AddMenuItem(string parent,
+     IReadOnlyList<string> path, Func<Task>? onClick, Action? onClick = null)`)
+     and update existing call sites.
+
+5. **Tests**:
+   - `FeatureDemoDashboardViewModelTests.cs` (update existing):
+     - With a fake `ISampleStore` returning increasing counts on
+       successive `GetTopicCount` calls, call `Tick()` twice and assert
+       `PropertyChanged` fires for `TopicRows` (or row items, depending
+       on collection model) at least once.
+     - Toggle the publisher: assert `PropertyChanged` fires for
+       `PublisherStateLabel`.
+     - Replay 30 alerts through a fake sample store; assert
+       `RecentAlerts.Count == 10` and that the last alert in the list
+       is alert #30 (proves `_lastAlertOrdinal` correctness).
+
+**Implementation notes**:
+
+- An ObservableCollection of `TopicCountRow` records works because
+  records are immutable — replacing the item in the collection fires
+  the right notifications. Don't try to mutate the record in place.
+- The publisher's `PublishingChanged` event fires on a background thread
+  (from the publish loops' cancellation paths). The VM's handler must
+  marshal to the UI thread via `IUiThreadInvoker.Post`.
+
+**Acceptance criteria**:
+
+- [x] `dotnet build` succeeds with zero errors.
+- [x] Updated dashboard tests pass.
+- [x] Running the app + opening View → Feature Demo Dashboard shows
+  counts that increase at the spec'd rates within ~1 second of opening
+  the panel.
+- [x] Toggling the publisher updates the button label from "Publishing"
+  to "Stopped" without re-opening the panel.
+- [x] The Devel menu shows `Feature Demo ▶ Toggle Publisher` as a
+  proper nested submenu, not a flat item.
+
+**Out of scope**:
+
+- Visualising the published values graphically (deferred).
+
+---
+
+## M1-T16 — Wire Up All Shell Menu Items and Fix Plugin-Menu Routing
+
+**Goal**: Every menu item in `ShellWindow.axaml` has a working `Click`
+handler — either a real implementation (Theme, Reset Layout, Export/
+Import Layout, Exit, transport) or a placeholder dialog ("Coming in M*n*").
+Plugin-contributed menu items go to the correct top-level menu based on
+the `parent` argument given when they were registered, not all to
+"Plugins".
+
+**Depends on**: M1-T7 (Shell), M1-T8 (FileDialogService, ThemeService).
+
+**Inputs to read**:
+
+- Current `ShellWindow.axaml.cs` — note `RebuildPluginsMenu` reads
+  `_menuRegistry.GetTopLevelMenus()` and dumps everything under the
+  Plugins menu.
+- `DdsMonitor.Engine.Plugins.IMenuRegistry` — read the signature of
+  `GetTopLevelMenus()` and how nodes carry their parent.
+- `DESIGN.md` §3 (Hybrid Layout Model) and §7 (Visual Design Tokens).
+
+**Deliverables**:
+
+1. **Rewrite `RebuildPluginsMenu` as `RebuildPluginMenus`**:
+   - For each `MenuNode` from `_menuRegistry.GetTopLevelMenus()`:
+     - Read the node's parent path (top-level name such as "View",
+       "Devel", "Plugins"). If `IMenuRegistry` doesn't expose the parent,
+       extend it: add a `string? ParentMenu` field to `MenuNode` and
+       populate it from the `parent` argument passed to `AddMenuItem`.
+     - Map "View" → `ViewMenu`, "Devel" → the Devel `MenuItem` (give it
+       `x:Name="DevelMenu"` in XAML and update code-behind), "Plugins" →
+       `PluginsMenu`, "File" → ignore (File menu is static).
+     - Recursively build sub-items via the existing `BuildMenuItem`.
+   - Static items in each menu (Theme submenu, transport, etc.) must
+     not be removed during rebuild — clear only the plugin-contributed
+     items by tagging them on creation. Simplest approach: track a
+     `List<MenuItem> _pluginMenuItems` per parent and remove only those
+     before re-adding.
+
+2. **Wire the static File-menu items**:
+   - `TopicSourcesItem.Click`: spawn `SchemaSourcesViewModel` via
+     `IWindowManager.SpawnPanel(nameof(SchemaSourcesViewModel), null)`.
+   - `PluginManagerItem.Click`: open placeholder dialog
+     `await ShowComingInDialog("Plugin Manager", "M5")`.
+   - `ResetLayoutItem.Click`: open a confirmation dialog "Reset layout?
+     All open panels will be closed."; if confirmed,
+     `IWindowManager.ClearPanels()` then `IDockManager.Initialise(...)` again
+     with the same MDI host (this re-creates the default layout).
+   - `ExportLayoutItem.Click`: use `IFileDialogService.SaveFileAsync(
+     "Export Layout", "ddsmon-workspace.json", filters: [{ "JSON", ["json"] }])`,
+     then `IAvaloniaWindowManager.SaveWorkspace(path)`.
+   - `ImportLayoutItem.Click`: use `IFileDialogService.OpenFileAsync(...)`,
+     then `IWindowManager.ClearPanels()` and `IWindowManager.LoadWorkspace(path)`.
+   - `ExitItem.Click`: already wired in M1-T7. Confirm by inspection.
+
+3. **Wire the Devel menu items**:
+   - `SelfSendItem.Click` (toggle): call into `IDdsBridge` (or wherever
+     the existing self-send service lives — see
+     `Engine/Testing/SelfSendService.cs` for the contract) to toggle
+     `SelfSendEnabled`. Make `SelfSendItem` an `MenuItem` with
+     `IsCheckable=true` and bind/sync the `IsChecked` state.
+   - `Rate1HzItem`, `Rate10HzItem`, `Rate100HzItem`, `Rate1KHzItem`,
+     `Rate10KHzItem`: each calls
+     `selfSendService.SetRate(1)`, `(10)`, `(100)`, `(1000)`, `(10000)` Hz.
+     Implement as a radio-group via `MenuItem.ToggleType="Radio"` if
+     Avalonia supports it; otherwise visual mark via `IsChecked` toggling
+     in code-behind on each click.
+   - `PerfStatsItem.Click`: open placeholder dialog "Perf Stats — M5".
+
+4. **Wire the Theme submenu visual feedback**:
+   - When the user picks a theme, the corresponding `MenuItem` shows a
+     check-mark and the others don't.
+   - Subscribe to `IThemeService.ModeChanged` and update
+     `ThemeSystemItem.IsChecked`, `ThemeLightItem.IsChecked`,
+     `ThemeDarkItem.IsChecked` accordingly.
+   - All three must be `IsCheckable=true` (in XAML).
+
+5. **Add a `ShowComingInDialog` helper**:
+   - Either a small custom `Window` or use `MessageBoxManager` from
+     `MessageBox.Avalonia` if added as a package reference.
+   - Recommend: write a 30-line `ComingInDialog : Window` with a
+     `TextBlock` and a single OK button. No external package needed.
+
+6. **Wire the right-click "Float in MDI" item on dock tabs** (counterpart
+   to M1-T14's MDI titlebar context menu):
+   - In `DockManager`, after adding a Document or Tool, attach a
+     custom `ContextMenu` to the dockable's tab (Dock.NET supports a
+     `Document.TabContextMenu` or equivalent — verify via Dock.NET docs).
+   - Menu items: "Float in MDI" → `windowManager.MoveToLayout(id, LayoutKind.Mdi)`,
+     "Close" → `dockManager.Remove(id)`.
+   - If Dock.NET doesn't expose tab-level context menus in 11.2.x, add a
+     hook on the document's `Context` (the `Control`) — wrap the user
+     content in a `Border` that handles right-click. Document the
+     chosen approach in a code comment.
+
+7. **Tests**:
+   - `ShellMenuTests.cs`:
+     - With a fake `IMenuRegistry` registering items under "View",
+       "Devel", and "Plugins", assert each appears in the correct
+       top-level menu (not all in `PluginsMenu`).
+     - Click each File menu item: assert the right side effect occurs
+       (mock services).
+     - Theme submenu: pick Light, assert `IThemeService.SetMode(Light)`
+       was called and `ThemeLightItem.IsChecked == true`; the other two
+       become false.
+   - `ResetLayoutTests.cs`: after clicking Reset and confirming,
+     assert `IWindowManager.ClearPanels` and `IDockManager.Initialise`
+     were called in that order.
+
+**Implementation notes**:
+
+- The "MenuNode parent" capture in `IMenuRegistry` needs verification —
+  the engine's existing `MenuNode` may already expose this. If not, the
+  modification is a minimal addition.
+- The `DevelMenu` `x:Name` needs to be added in `ShellWindow.axaml`
+  (it currently has no `x:Name`).
+
+**Acceptance criteria**:
+
+- [x] `dotnet build` succeeds with zero errors.
+- [x] All shell menu and reset tests pass.
+- [x] Every menu item in the shell either performs a real action or
+  shows a "Coming in M*n*" dialog. None do nothing on click.
+- [x] FeatureDemoPlugin's "Feature Demo Dashboard" item appears under
+  the **View** menu, not under Plugins.
+- [x] Picking a Theme from the submenu updates the visual check-mark.
+- [x] Right-clicking a docked tab shows "Float in MDI" / "Close";
+  selecting "Float in MDI" returns the panel to the MDI area at its
+  last-known geometry.
+
+**Out of scope**:
+
+- Per-plugin enable/disable in the Plugin Manager (M5).
+- Perf-stats overlay (M5).
+
+---
+
+## M1-T17 — Live Bandwidth, Status Indicator, and Participant Indicator
+
+**Goal**: The shell's right-side status area shows live data: bandwidth
+in human-readable units, the running/paused dot in the correct token
+colour, and a participant summary button that opens NetworkConfig on
+click. Status updates are event-driven where possible (with a 1 Hz
+fallback timer for derived rates).
+
+**Depends on**: M1-T7 (Shell), M1-T8 (ThemeService).
+
+**Inputs to read**:
+
+- `DESIGN.md` §7 (Visual Design Tokens) — note the `Accent.Receiving`
+  and `Accent.Paused` resource keys.
+- Current `ShellWindow.axaml.cs` — note `BandwidthText.Text = FormatBandwidth(0)`
+  and `Brushes.Orange` / `Brushes.Green` hardcoded.
+- `IDdsBridge` interface — search for byte/bandwidth counters
+  (e.g. `TotalBytesReceived`, `BytesPerSecond`).
+- `Engine/IParticipantManager.cs` or similar — for the participant summary
+  data source.
+
+**Deliverables**:
+
+1. **Bandwidth source**:
+   - If `IDdsBridge` exposes `TotalBytesReceived` (a monotonic counter):
+     compute `bytesPerSecond = (currTotal - lastTotal) / interval` in
+     the 1 Hz tick.
+   - If `IDdsBridge` exposes a precomputed rate: use it directly.
+   - If neither: extend `IDdsBridge` with `long TotalBytesReceived { get; }`
+     and update the implementation to track it (sum `SampleData.SizeBytes`
+     for each received sample). This is a small Engine change — call it
+     out in commit message.
+
+2. **Status dot colour fix**:
+   - In the 1 Hz `OnStatusTick`:
+     ```
+     StatusDot.Fill = _ddsBridge.IsPaused
+         ? (IBrush)Application.Current!.FindResource("Accent.Paused")!
+         : (IBrush)Application.Current!.FindResource("Accent.Receiving")!;
+     ```
+   - Re-resolve the brush on every tick so theme changes take effect
+     immediately.
+
+3. **Bottom status bar `Background`**:
+   - Set the `Border DockPanel.Dock="Bottom"` Background to
+     `{DynamicResource Surface.Titlebar}` and add a 1 px top border
+     `BorderBrush="{DynamicResource Border.Subtle}" BorderThickness="0,1,0,0"`.
+
+4. **Add participant indicator button** in the status area:
+   - In `ShellWindow.axaml`, between the bandwidth `TextBlock` and the
+     right edge:
+     ```xml
+     <Button x:Name="ParticipantButton"
+             Content="Domain=0"
+             Background="Transparent"
+             BorderBrush="{DynamicResource Border.Subtle}"
+             BorderThickness="1"
+             Padding="6,2"
+             Margin="8,0,0,0"
+             ToolTip.Tip="Click to configure DDS participants"/>
+     ```
+   - In code-behind, on click:
+     `_windowManager.SpawnPanel(nameof(NetworkConfigViewModel), null)`.
+   - On the 1 Hz tick, update `ParticipantButton.Content` from the
+     participant manager:
+     ```
+     ParticipantButton.Content = $"Domain={string.Join(",", domainIds)}";
+     ```
+     Truncate to 30 chars with ellipsis if longer.
+
+5. **Update the 1 Hz tick handler** to do all of:
+   - Status text + dot (uses dynamic-resource brushes per #2).
+   - Bandwidth formatting using `FormatBandwidth`.
+   - Participant button content.
+
+6. **Subscribe to `IDdsBridge.PausedChanged` event** (if it exists) so
+   the dot/text update *immediately* on pause toggle, not 1 Hz later.
+   If the event doesn't exist, add it to the Engine (`event Action<bool>? IsPausedChanged`).
+
+7. **Tests**:
+   - `ShellStatusTests.cs`:
+     - With a fake bridge whose `TotalBytesReceived` grows by 1 MB per
+       call, after two ticks `BandwidthText.Text` ≈ "1.05 MB/s".
+     - Toggle paused: status dot's `Fill` switches between the two brush
+       resources.
+     - Click the participant button: `SpawnPanel(nameof(NetworkConfigViewModel))` called.
+     - Theme change at runtime → next tick re-resolves brushes and the
+       dot's fill changes accordingly.
+
+**Implementation notes**:
+
+- `FormatBandwidth` already exists in `ShellWindow.axaml.cs` and handles
+  the unit thresholds — reuse it.
+- The 1 Hz timer is `DispatcherTimer` on the UI thread — no marshalling
+  needed for the updates.
+
+**Acceptance criteria**:
+
+- [x] `dotnet build` succeeds with zero errors.
+- [x] All `ShellStatusTests` pass.
+- [x] Running the app with FeatureDemo on: BandwidthText shows a non-zero
+  rate within 2 seconds.
+- [x] Theme toggle changes the status dot colour without app restart.
+- [x] Status dot updates within 200 ms of Space being pressed
+  (event-driven if `PausedChanged` available; otherwise still 1 Hz max).
+- [x] Participant button shows `Domain=0` (or similar) and clicking it
+  opens NetworkConfig.
+
+**Out of scope**:
+
+- Per-domain throughput breakdown (M5 Perf Stats).
+- Multiple-participant editing UI (the existing NetworkConfig view
+  handles it).
+
+---
+
+## M1-T18 — MdiHost Geometry Correctness
+
+**Goal**: Fix four geometry bugs in `MdiHost` and `AvaloniaWindowManager`:
+the resize-from-left/top origin drift, the `ChildGeometryChanged` event
+not firing at the right moment, the missing X/Y capture on close, and the
+missing `IsMinimised` persistence.
+
+**Depends on**: M1-T4 (MdiHost), M1-T5 (WindowManager).
+
+**Inputs to read**:
+
+- Current `MdiHost.cs` — especially `OnChildResizeRequested`, which has
+  bugs in the Left and Top edge branches.
+- Current `AvaloniaWindowManager.OnPanelRemoved` — note it captures
+  width/height but not X/Y.
+- `DESIGN.md` §5 (Workspace Persistence) — the `__window` schema.
+
+**Deliverables**:
+
+1. **Fix `MdiHost.OnChildResizeRequested` Left/Top branches**:
+   - Current code (broken):
+     ```csharp
+     if (e.Edge.HasFlag(ResizeEdge.Left))
+     {
+         var proposed = width - e.DeltaX;
+         var clamped  = Math.Max(MinWidth, proposed);
+         width  = clamped;
+         left  += width != clamped ? 0 : e.DeltaX; // wrong: width == clamped here
+     }
+     ```
+   - Correct logic: when the user drags the left edge by `dx`:
+     - New proposed width = `oldWidth - dx`.
+     - If proposed >= MinWidth: width = proposed, left += dx.
+     - Else: width = MinWidth, left unchanged (or adjusted so right edge
+       stays put, but spec is "do not move origin when clamped").
+     - In code:
+       ```csharp
+       if (e.Edge.HasFlag(ResizeEdge.Left))
+       {
+           var proposed = width - e.DeltaX;
+           if (proposed >= MinWidth) { width = proposed; left += e.DeltaX; }
+           else                       { width = MinWidth;                  }
+       }
+       ```
+     - Same pattern for Top.
+
+2. **Fix `ChildGeometryChanged` timing**:
+   - Currently fires on **every pointer-move** of resize. It should fire
+     **once on pointer-release** for both drag and resize.
+   - Pattern: in the `OnChildDragRequested` / `OnChildResizeRequested`
+     handlers, set a `_pendingGeometryChange[childId] = true` flag.
+   - Subscribe each added child's `PointerReleased` (capture-released)
+     on the host side, and on release, if the pending flag is set, fire
+     `ChildGeometryChanged` with the final bounds and clear the flag.
+   - Alternative cleaner pattern: add `DragCompleted` and `ResizeCompleted`
+     routed events on `MdiChild` that fire on `PointerReleased` after a
+     drag/resize, and subscribe to those in `MdiHost`. The
+     `ChildGeometryChanged` event fires from the host's
+     `OnDragCompleted`/`OnResizeCompleted` once per gesture.
+
+3. **WindowManager: capture X/Y on close**:
+   - In `AvaloniaWindowManager.OnPanelRemoved`, when `child is not null`:
+     ```csharp
+     state.X = Canvas.GetLeft(child);
+     state.Y = Canvas.GetTop(child);
+     if (child.Width  > 0) state.Width  = child.Width;
+     if (child.Height > 0) state.Height = child.Height;
+     ```
+   - Then write all four into `__window`.
+
+4. **Persist `IsMinimised`**:
+   - Extend the `__window` dictionary in `OnPanelRemoved`:
+     ```csharp
+     state.ComponentState["__window"] = new Dictionary<string, object>(...)
+     {
+         ["X"] = x, ["Y"] = y, ["Width"] = w, ["Height"] = h,
+         ["IsMinimised"] = child?.IsMinimised ?? false,
+     };
+     ```
+   - Read it back in `SpawnPanel` when restoring from saved state:
+     ```csharp
+     if (geoDict.TryGetValue("IsMinimised", out var im) && ToBool(im))
+         _mdiHost.Minimise(panelState.PanelId);
+     ```
+   - Call `Minimise` *after* `Add` so the child is registered before
+     it's hidden.
+
+5. **Subscribe `AvaloniaWindowManager` to `MdiHost.ChildGeometryChanged`**:
+   - In `SetMdiHost`, subscribe and publish `WorkspaceSaveRequestedEvent`
+     on each event. The debounce handled by
+     `AvaloniaWorkspacePersistenceService` collapses these into a single
+     save.
+   - Also update the in-memory `PanelState.X/Y/Width/Height` so a
+     subsequent in-process workspace save reflects current geometry
+     (currently those values are stale until close).
+
+6. **Tests**:
+   - `MdiHostResizeTests.cs` (extends M1-T4 tests):
+     - Resize a child from the LEFT by +50 px (i.e. drag handle right
+       50 px shrinking the child): left += 50, width -= 50.
+     - Resize from the LEFT by -1000 px (would shrink below MinWidth):
+       width clamps to MinWidth, **left unchanged**.
+     - Same scenarios for the TOP edge.
+   - `MdiHostGeometryEventTests.cs`:
+     - Drag a child 50 px right: `ChildGeometryChanged` fires exactly
+       once on pointer release with the final bounds, not on each move.
+     - Resize a child 30 px wider: same — one event on release.
+   - `AvaloniaWindowManagerCloseTests.cs`:
+     - Drag a child to (200, 150), close it: the saved workspace JSON's
+       `__window` contains `X=200, Y=150`.
+     - Minimise a child, save workspace, reload: child is re-spawned in
+       minimised state (visible in the strip, not on the canvas).
+
+**Implementation notes**:
+
+- The "fire once on PointerReleased" requires that the host knows when
+  the gesture ends. The cleanest way is to add the two new routed events
+  on `MdiChild` (`DragCompleted`, `ResizeCompleted`) — the existing
+  `PointerReleased` handlers in `MdiChild` are the right place to raise
+  them.
+
+**Acceptance criteria**:
+
+- [x] `dotnet build` succeeds with zero errors.
+- [x] All four named test files pass.
+- [x] Visual smoke test: drag the left edge of an MDI child past its
+  minimum width — the child stops shrinking but does not drift right.
+- [x] Closing and reopening a panel restores its exact last-known
+  position, size, and minimise state.
+
+**Out of scope**:
+
+- Animated transitions on minimise/restore (still deferred).
+- Multi-monitor floating windows.
+
+---
+
+## M1-T19 — Visual Polish: Tokens, Strip, Empty Docks
+
+**Goal**: Three small visual fixes. The status indicator and minimised
+strip use design tokens correctly, and empty Dock.NET side docks
+collapse to zero width/height.
+
+**Depends on**: M1-T2 (Design Tokens), M1-T4 (MdiHost), M1-T6 (DockManager).
+
+**Inputs to read**:
+
+- Current `MdiHost.axaml` — note `Border` around the strip is always
+  visible at `Height=32`.
+- Current `DdsDockFactory.cs` — note empty side tool docks are added
+  with `VisibleDockables = CreateList<IDockable>()` (empty).
+- `DESIGN.md` §7 (Visual Design Tokens) — the token list.
+
+**Deliverables**:
+
+1. **MdiHost strip auto-hide**:
+   - Wrap the strip `Border` in a binding: `IsVisible="{Binding ElementName=PART_MinimisedStrip, Path=IsVisible}"` — the inner `ItemsControl` already toggles `IsVisible` based on item count. Now the outer `Border` follows.
+   - Alternative cleaner: set the outer Border's `IsVisible` from the
+     `UpdateStripVisibility()` method directly (track a template part for the Border too — `PART_MinimisedStripBorder`).
+
+2. **Dock.NET empty-side collapse**:
+   - Dock.NET 11.2's behaviour: a `ToolDock` with an empty
+     `VisibleDockables` collection should not occupy space when its
+     parent `ProportionalDock` recomputes. Verify by experiment — if it
+     does occupy space (which the audit suggests it does), add
+     `Proportion = 0` on creation and switch to `Proportion = 0.2` when
+     the first tool is added.
+   - In `DdsDockFactory.CreateLayout`, set:
+     ```csharp
+     LeftToolDock.Proportion   = 0;
+     RightToolDock.Proportion  = 0;
+     BottomToolDock.Proportion = 0;
+     ```
+   - In `DockManager.AddTool`, when adding the first tool to a side that
+     was previously empty: `targetDock.Proportion = side switch { Bottom => 0.25, _ => 0.2 }`.
+   - When removing the last tool: set `Proportion = 0` again.
+
+3. **Status dot uses dynamic resource** — covered by M1-T17 already, but
+   verify after T17 lands.
+
+4. **Audit `BlazorTypeDrawerAdapter` removal** — the legacy adapter from
+   v10 is presumably unused; verify it has been removed from the Avalonia
+   StandardPlugin csproj's compile items. If still present, delete it.
+   Add as part of this task.
+
+5. **Tests** (small):
+   - `MdiHostStripTests.cs`:
+     - Empty host: outer strip border has `IsVisible == false`.
+     - Minimise one child: outer strip border becomes visible.
+     - Restore: hidden again.
+   - `DockEmptyCollapseTests.cs`:
+     - Initialise dock with no tools: assert `LeftToolDock.Proportion == 0`.
+     - Add a tool: assert `LeftToolDock.Proportion > 0`.
+     - Remove the only tool: assert `LeftToolDock.Proportion == 0` again.
+
+**Acceptance criteria**:
+
+- [x] `dotnet build` succeeds with zero errors.
+- [x] Visual: launching the app shows no visible left/right/bottom
+  dock bars when no tools are docked.
+- [x] Minimised strip is invisible (not just empty) when no children are
+  minimised.
+- [x] All polish-related tests pass.
+
+**Out of scope**:
+
+- Custom dock-area chrome (Dock.NET's defaults are kept).
+
+---
+
+## M1-T20 — Dock.NET Layout Serialisation
+
+**Goal**: Persist and restore the full Dock.NET layout (splitter
+proportions, document/tool order, per-side membership) across app
+restarts. Current `DockManager.SerialiseLayout` stores only id/type/side,
+losing splitter proportions; `DeserialiseLayout` is a no-op stub.
+
+**Depends on**: M1-T6 (DockManager), M1-T18 (geometry capture established).
+
+**Inputs to read**:
+
+- Current `DockManager.cs` `SerialiseLayout` and `DeserialiseLayout`.
+- Dock.NET 11.2 documentation on `DockSerializer` / `IFactory.SaveLayout`
+  (the exact method name may vary by version — verify).
+- `DESIGN.md` §5 (Workspace Persistence) — the `DockLayout` field
+  contract.
+
+**Deliverables**:
+
+1. **Use Dock.NET's built-in serialiser** if it exists in 11.2.x:
+   - Add `Dock.Serializer.Newtonsoft` or `Dock.Serializer.SystemTextJson`
+     to the shell's `.csproj` (whichever is available — prefer
+     System.Text.Json to match the rest of the codebase).
+   - `SerialiseLayout()` returns
+     `_serializer.Serialize(dockControl.Layout)`.
+   - `DeserialiseLayout(json)`:
+     - Deserialise into an `IRootDock`.
+     - Assign to the live `DockControl.Layout`.
+     - **Re-bind document/tool content** — Dock.NET serialises
+       `Document.Title` / `Document.Id` but `Context` is typically not
+       serialisable. After deserialisation, walk the loaded layout and
+       for each `Document`/`Tool` with a known id, look up its
+       `Control` content via a callback the WindowManager provides:
+       ```csharp
+       _dockManager.RehydrateContent(panelId => GetContentForPanel(panelId));
+       ```
+
+2. **If Dock.NET's serialiser is unavailable or unsuitable**, fall back
+   to a manual DTO approach:
+   - Define a `DockLayoutDto`:
+     ```csharp
+     internal sealed record DockLayoutDto(
+         DockNodeDto Root,
+         double LeftProportion,
+         double RightProportion,
+         double BottomProportion);
+
+     internal abstract record DockNodeDto;
+     internal sealed record ProportionalDockDto(
+         string Orientation,
+         IReadOnlyList<DockNodeDto> Children,
+         IReadOnlyList<double> Proportions) : DockNodeDto;
+     internal sealed record DocumentDockDto(
+         IReadOnlyList<DockableDto> Documents,
+         string? ActiveId) : DockNodeDto;
+     internal sealed record ToolDockDto(
+         string Side,
+         IReadOnlyList<DockableDto> Tools,
+         string? ActiveId,
+         double Proportion) : DockNodeDto;
+     internal sealed record DockableDto(string Id, string Title);
+     ```
+   - `SerialiseLayout()` walks the Dock.NET layout root, builds the DTO,
+     and JSON-serialises.
+   - `DeserialiseLayout()` rebuilds the layout structure (recreating
+     `ProportionalDock`, `DocumentDock`, `ToolDock` instances with the
+     saved proportions and the central MDI workspace document at its
+     id) and asks the WindowManager to rehydrate content via a callback.
+
+3. **Update `AvaloniaWindowManager.LoadWorkspaceFromJson`** to:
+   - First spawn all panels (this populates the WindowManager's view +
+     VM map and creates contents).
+   - Then call `_dockManager.DeserialiseLayout(dockLayoutJson)`, passing
+     a callback `panelId => _viewRegistry.BuildView(_viewModels[panelId])`.
+   - Dock.NET binds the deserialised dockables to the rebuilt content.
+
+4. **Update `AvaloniaWindowManager.SaveWorkspaceToJson`**: the call
+   `_dockManager.SerialiseLayout()` returns full layout now; no other
+   changes needed.
+
+5. **Tests**:
+   - `DockSerialisationTests.cs`:
+     - Initialise a dock + add 2 documents to the centre and 1 tool to
+       the left + 1 to the bottom. Drag the left splitter to 0.3
+       proportion (programmatically via setting `Proportion`).
+     - `SerialiseLayout()` → re-Initialise a fresh `DockManager` →
+       `DeserialiseLayout(saved)` with a content-rehydrate callback.
+     - Assert: documents and tools are in their original positions,
+       `LeftToolDock.Proportion == 0.3`, the central MDI workspace is
+       still present and non-closable.
+   - `WorkspaceFullRoundtripTests.cs`:
+     - Spawn 3 MDI panels + 2 docked tabs + 1 left tool, with various
+       text-field values in fake VMs.
+     - `SaveWorkspaceToJson()` → discard the WindowManager → fresh DI
+       graph → `LoadWorkspaceFromJson(saved)`.
+     - Assert: identical panel set, identical geometries, identical
+       `LayoutKind`s, identical dock proportions, VM text fields restored.
+
+**Implementation notes**:
+
+- The chosen approach (built-in vs manual DTO) is up to the agent based
+  on what Dock.NET 11.2 provides. Document the choice in a code comment.
+- Content rehydration is the trickiest part: Dock.NET keeps a
+  `Document.Context` reference to the live `Control`. After
+  deserialisation, those references are null — the WindowManager must
+  populate them by id.
+
+**Acceptance criteria**:
+
+- [x] `dotnet build` succeeds with zero errors.
+- [x] Both serialisation test files pass.
+- [x] Manual: open the app, dock a tool to the left, drag the splitter
+  to ~30%, close the app, reopen — the tool is still docked with the
+  same proportion.
+- [x] Blazor-format workspace files (no `DockLayout` key) still load
+  with the default dock layout — backward-compat test from M1-T5 still
+  passes.
+
+**Out of scope**:
+
+- Floating Dock.NET windows persistence (out-of-process float feature).
+
+---
+
 ## Milestones M2–M7
 
 Detailed task lists for milestones M2 through M7 will be written when each
