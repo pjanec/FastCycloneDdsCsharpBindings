@@ -49,7 +49,7 @@
     <MakeDir Directories="$(CycloneDdsGeneratedDir)" Condition="!Exists('$(CycloneDdsGeneratedDir)')" />
     
     <Message Text="Running CycloneDDS Code Generator ($(MSBuildProjectName))" Importance="high" />
-    <Exec Command="dotnet &quot;$(CodeGenAssembly)&quot; &quot;$(SourcePath)&quot; &quot;$(CycloneDdsGeneratedDir)&quot; &quot;@(ReferencePath)&quot;" />
+    <Exec Command="dotnet &quot;$(CodeGenAssembly)&quot; &quot;$(SourcePath)&quot; &quot;$(CycloneDdsGeneratedDir)&quot; @(ReferencePath)" />
     
     <Touch Files="$(CycloneDdsStampFile)" AlwaysCreate="true" />
   </Target>

@@ -21,7 +21,7 @@
   <!-- 2. Properties for generation -->
   <PropertyGroup>
     <!-- FIX: Use the framework-aware IntermediateOutputPath -->
-    <CycloneDdsGeneratedDir>$(IntermediateOutputPath)CycloneDdsGenerated\</CycloneDdsGeneratedDir>
+    <CycloneDdsGeneratedDir>$(IntermediateOutputPath)CycloneDdsGenerated</CycloneDdsGeneratedDir>
     <CycloneDdsStampFile>$(CycloneDdsGeneratedDir)codegen.stamp</CycloneDdsStampFile>
     <CycloneDdsCodeGenPath>$(MSBuildThisFileDirectory)..\tools\CycloneDDS.CodeGen.dll</CycloneDdsCodeGenPath>
   </PropertyGroup>
