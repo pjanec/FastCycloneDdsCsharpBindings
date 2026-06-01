@@ -61,7 +61,7 @@
           DependsOnTargets="CycloneDdsGenerate"
           Condition="'$(CycloneDdsDisableCodeGen)' != 'true'">
     <ItemGroup>
-      <Compile Include="$(CycloneDdsGeneratedDir)**\*.cs" Exclude="@(Compile)" />
+      <Compile Include="$(CycloneDdsGeneratedDir)\**\*.cs" Exclude="@(Compile)" />
     </ItemGroup>
   </Target>
 
