@@ -27,7 +27,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <CycloneDdsSourceFiles Include="**\*.cs" Exclude="$(CycloneDdsGeneratedDir)**\*.cs;obj\**;bin\**" />
+    <CycloneDdsSourceFiles Include="**\*.cs" Exclude="$(CycloneDdsGeneratedDir)\**\*.cs;obj\**;bin\**" />
   </ItemGroup>
 
   <!-- 3. The main generation target -->
@@ -71,7 +71,7 @@
           AfterTargets="CycloneDdsGenerate"
           Condition="'$(CycloneDdsDisableCodeGen)' != 'true'">
     <ItemGroup>
-      <GeneratedIdlFiles Include="$(CycloneDdsGeneratedDir)*.idl" />
+      <GeneratedIdlFiles Include="$(CycloneDdsGeneratedDir)\*.idl" />
     </ItemGroup>
 
     <ItemGroup>
