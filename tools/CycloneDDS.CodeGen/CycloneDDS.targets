@@ -44,12 +44,13 @@
           
     <PropertyGroup>
       <SourcePath>$(MSBuildProjectDirectory)</SourcePath>
+      <FlatReferences>@(ReferencePath)</FlatReferences>
     </PropertyGroup>
     
     <MakeDir Directories="$(CycloneDdsGeneratedDir)" Condition="!Exists('$(CycloneDdsGeneratedDir)')" />
     
     <Message Text="Running CycloneDDS Code Generator ($(MSBuildProjectName))" Importance="high" />
-    <Exec Command="dotnet &quot;$(CodeGenAssembly)&quot; &quot;$(SourcePath)&quot; &quot;$(CycloneDdsGeneratedDir.TrimEnd('\'))&quot; @(ReferencePath->'&quot;%(Identity)&quot;', ' ')" />
+    <Exec Command="dotnet &quot;$(CodeGenAssembly)&quot; &quot;$(SourcePath)&quot; &quot;$(CycloneDdsGeneratedDir.TrimEnd('\'))&quot; &quot;$(FlatReferences)&quot;" />
     
     <Touch Files="$(CycloneDdsStampFile)" AlwaysCreate="true" />
   </Target>

@@ -40,6 +40,7 @@
 
     <PropertyGroup>
       <SourcePath>$(MSBuildProjectDirectory)</SourcePath>
+      <FlatReferences>@(ReferencePath)</FlatReferences>
       <!-- Optimized for Design-Time Builds: Skip execution, just include existing files -->
       <RunCycloneDdsCodeGen Condition="'$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' == 'true'">true</RunCycloneDdsCodeGen>
     </PropertyGroup>
@@ -49,7 +50,7 @@
     <!-- FEATURE: Extended console output showing the current project name -->
     <Message Text="Running CycloneDDS Code Generator ($(MSBuildProjectName))" Importance="high" Condition="'$(RunCycloneDdsCodeGen)' == 'true'" />
 
-    <Exec Command="dotnet &quot;$(CycloneDdsCodeGenPath)&quot; &quot;$(SourcePath)&quot; &quot;$(CycloneDdsGeneratedDir.TrimEnd('\'))&quot; @(ReferencePath->'&quot;%(Identity)&quot;', ' ')"
+    <Exec Command="dotnet &quot;$(CycloneDdsCodeGenPath)&quot; &quot;$(SourcePath)&quot; &quot;$(CycloneDdsGeneratedDir.TrimEnd('\'))&quot; &quot;$(FlatReferences)&quot;"
           Condition="'$(RunCycloneDdsCodeGen)' == 'true'" />
 
     <Touch Files="$(CycloneDdsStampFile)" AlwaysCreate="true" Condition="'$(RunCycloneDdsCodeGen)' == 'true'" />
