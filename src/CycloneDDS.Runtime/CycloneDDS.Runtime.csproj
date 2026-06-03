@@ -15,8 +15,11 @@
     <!-- Runtime: Native Assets -->
     <None Include="..\..\artifacts\native\win-x64\ddsc.dll" Pack="true" PackagePath="runtimes/win-x64/native" />
     
-    <!-- Build: Targets -->
+    <!-- Build: Targets (buildTransitive → imported by direct AND transitive consumers) -->
     <None Include="..\..\build\targets\CycloneDDS.targets" Pack="true" PackagePath="buildTransitive/CycloneDDS.NET.targets" />
+    <!-- Build: direct-reference marker (build/ → imported ONLY by direct consumers).
+         Enables the code generator only for projects that directly reference the package. -->
+    <None Include="..\..\build\props\CycloneDDS.props" Pack="true" PackagePath="build/CycloneDDS.NET.props" />
 
     <!-- Tools: Native Assets (Explicitly selected) -->
     <None Include="..\..\artifacts\native\win-x64\idlc.exe" Pack="true" PackagePath="tools/" />

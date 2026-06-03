@@ -1,0 +1,19 @@
+<Project>
+
+  <!-- ================================================================= -->
+  <!-- CycloneDDS.NET — direct-reference marker.                         -->
+  <!--                                                                   -->
+  <!-- NuGet imports this file ONLY for a project with a DIRECT          -->
+  <!-- PackageReference to CycloneDDS.NET (build/ assets do not flow     -->
+  <!-- transitively, unlike buildTransitive/). It flips on the code      -->
+  <!-- generator for exactly those projects. Transitive-only consumers   -->
+  <!-- never import this, so they inherit the targets but skip the       -->
+  <!-- (expensive) generator run. See build/targets/CycloneDDS.targets   -->
+  <!-- for how CycloneDdsCodeGenEnabled gates the codegen targets.       -->
+  <!-- ================================================================= -->
+
+  <PropertyGroup>
+    <CycloneDdsCodeGenEnabled Condition="'$(CycloneDdsCodeGenEnabled)' == ''">true</CycloneDdsCodeGenEnabled>
+  </PropertyGroup>
+
+</Project>

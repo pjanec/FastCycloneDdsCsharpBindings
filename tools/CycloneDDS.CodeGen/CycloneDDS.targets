@@ -11,6 +11,11 @@
   <!-- ================================================================= -->
 
   <PropertyGroup>
+    <!-- In-repo projects that import this shim are the ones that author DDS types
+         (or otherwise want codegen). The package's build/ props is not in play here,
+         so enable codegen explicitly to preserve the in-repo build behavior. -->
+    <CycloneDdsCodeGenEnabled Condition="'$(CycloneDdsCodeGenEnabled)' == ''">true</CycloneDdsCodeGenEnabled>
+
     <!-- Legacy flat layout used by the bindings' own projects. Kept so
          the cross-project IDL discovery (ProjectReference -> obj\Generated)
          in the canonical CopyReferencedIdlFiles target keeps resolving. -->
