@@ -30,13 +30,22 @@ namespace CycloneDDS.CodeGen
                 sb.AppendLine($"#define {guard}");
                 sb.AppendLine();
                 
-                // 1. Generate #include directives
-                var dependencies = GetFileDependencies(fileGroup, registry);
+                // 1. Generate #include directives.
+                //    GetFileDependencies mirrors exactly what MapType emits as a scoped
+                //    type reference, so every scoped name in the body gets a matching
+                //    #include. Anything resolved only by file-name convention (i.e. the
+                //    type registry had no entry, typically because the defining assembly
+                //    was built without [assembly: DdsIdlMapping]) is reported in 'unresolved'
+                //    so we can fail fast below instead of letting idlc emit a cryptic error.
+                var unresolved = new List<UnresolvedTypeReference>();
+                var dependencies = GetFileDependencies(fileGroup, registry, unresolved);
+                ValidateDependencies(fileName, unresolved, outputDir);
+
                 foreach (var depFile in dependencies.OrderBy(f => f))
                 {
                     sb.AppendLine($"#include \"{depFile}.idl\"");
                 }
-                
+
                 if (dependencies.Any())
                     sb.AppendLine();
                 
@@ -121,28 +130,191 @@ namespace CycloneDDS.CodeGen
             return false;
         }
 
-        private HashSet<string> GetFileDependencies(IEnumerable<IdlTypeDefinition> types, GlobalTypeRegistry registry)
+        /// <summary>
+        /// Computes the set of IDL files that must be <c>#include</c>d by the given type group.
+        ///
+        /// This MUST stay consistent with <see cref="MapType"/>: every field type that MapType
+        /// renders as a scoped (<c>Foo::Bar</c>) reference needs a matching include, otherwise
+        /// idlc fails later with "Scoped name ... cannot be resolved". The include and the type
+        /// name used to be derived independently (name from the Roslyn FQN, include only on a
+        /// registry hit) — when those two paths disagreed the generator silently produced an
+        /// un-includable IDL. They now share this single resolution path.
+        /// </summary>
+        /// <param name="unresolved">
+        /// When provided, collects references that could only be resolved by the file-name
+        /// convention (no registry / no <c>[assembly: DdsIdlMapping]</c>). The caller validates
+        /// these so the failure is actionable rather than a cryptic idlc error.
+        /// </param>
+        private HashSet<string> GetFileDependencies(
+            IEnumerable<IdlTypeDefinition> types,
+            GlobalTypeRegistry registry,
+            List<UnresolvedTypeReference>? unresolved = null)
         {
             var dependencies = new HashSet<string>();
-            
+
             foreach (var type in types)
             {
                 if (type.TypeInfo == null) continue;
                 foreach (var field in type.TypeInfo.Fields)
                 {
-                    string fieldType = StripGenerics(field.TypeName);
-                    
-                    if (registry.TryGetDefinition(fieldType, out var dep) && dep != null)
+                    foreach (var referenced in ReferencedUserTypeNames(field.TypeName))
                     {
-                        // Don't include self-references
-                        if (dep.TargetIdlFile != type.TargetIdlFile)
+                        if (registry.TryGetDefinition(referenced, out var dep) && dep != null)
                         {
-                            dependencies.Add(dep.TargetIdlFile);
+                            // Known type — use its authoritative target file. Skip self-references.
+                            if (dep.TargetIdlFile != type.TargetIdlFile)
+                                dependencies.Add(dep.TargetIdlFile);
+                        }
+                        else
+                        {
+                            // MapType WILL emit a scoped reference to this type, so an include is
+                            // mandatory. The registry didn't know it; fall back to the file-name
+                            // convention (<SimpleName>.idl) and flag it for validation.
+                            string simple = SimpleName(referenced);
+                            if (!string.Equals(simple, type.TypeInfo.Name, StringComparison.Ordinal))
+                            {
+                                dependencies.Add(simple);
+                                unresolved?.Add(new UnresolvedTypeReference(
+                                    referenced, simple, type.TypeInfo.Name, field.Name));
+                            }
                         }
                     }
                 }
             }
             return dependencies;
+        }
+
+        /// <summary>
+        /// Fail-fast guard: every reference that could only be resolved by naming convention
+        /// must have an actual <c>&lt;file&gt;.idl</c> in the output dir, or idlc will fail.
+        /// If the file IS present we self-heal (emit the include) but warn, because the missing
+        /// registry entry points at a real problem in the dependency's build.
+        /// </summary>
+        private void ValidateDependencies(string fileName, List<UnresolvedTypeReference> unresolved, string outputDir)
+        {
+            foreach (var u in unresolved)
+            {
+                string scoped = u.TypeFullName.Replace(".", "::");
+                if (File.Exists(Path.Combine(outputDir, $"{u.IdlFile}.idl")))
+                {
+                    Console.Error.WriteLine(
+                        $"WARNING [{fileName}.idl]: type '{u.TypeFullName}' (referenced by " +
+                        $"{u.OwnerType}.{u.FieldName}) has no IDL mapping in the type registry. " +
+                        $"Including '{u.IdlFile}.idl' by file-name convention. The assembly defining " +
+                        $"'{u.TypeFullName}' was likely built without [assembly: DdsIdlMapping] " +
+                        $"(its CycloneDDS codegen did not run — e.g. a stale obj/.../CycloneDdsGenerated). " +
+                        $"Rebuild that assembly so this resolves deterministically.");
+                }
+                else
+                {
+                    throw new InvalidOperationException(
+                        $"Cannot resolve IDL dependency for type '{u.TypeFullName}', referenced by " +
+                        $"'{u.OwnerType}.{u.FieldName}'. The generated IDL emits this as '{scoped}', but " +
+                        $"no '{u.IdlFile}.idl' exists in '{outputDir}' and the type is absent from the " +
+                        $"registry. Likely causes: (1) the assembly defining '{u.TypeFullName}' was built " +
+                        $"without [assembly: DdsIdlMapping] (CycloneDDS codegen didn't run there — check for " +
+                        $"a stale obj/.../CycloneDdsGenerated folder), or (2) a missing reference to that " +
+                        $"assembly. Without a fix, idlc fails with \"Scoped name '{scoped}' cannot be resolved\".");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Yields the fully-qualified names of user-defined types a field references, after
+        /// unwrapping the same wrappers <see cref="MapType"/> unwraps (Nullable, List&lt;&gt;,
+        /// BoundedSeq&lt;&gt;, arrays). Built-in/primitive types yield nothing — they never need
+        /// an include. This is the include-side mirror of MapType's scoped-name emission.
+        /// </summary>
+        private IEnumerable<string> ReferencedUserTypeNames(string? typeName)
+        {
+            if (string.IsNullOrWhiteSpace(typeName)) yield break;
+            typeName = typeName!.Trim().TrimEnd('?');
+
+            // Nullable<T>
+            if (typeName.StartsWith("Nullable<") || typeName.StartsWith("System.Nullable<"))
+            {
+                foreach (var inner in ReferencedUserTypeNames(ExtractGenericArg(typeName))) yield return inner;
+                yield break;
+            }
+
+            // List<T> / BoundedSeq<T>
+            if (typeName.StartsWith("List<") || typeName.StartsWith("System.Collections.Generic.List<") ||
+                typeName.Contains("BoundedSeq<"))
+            {
+                foreach (var inner in ReferencedUserTypeNames(ExtractGenericArg(typeName))) yield return inner;
+                yield break;
+            }
+
+            // T[]
+            if (typeName.EndsWith("[]"))
+            {
+                foreach (var inner in ReferencedUserTypeNames(typeName.Substring(0, typeName.Length - 2))) yield return inner;
+                yield break;
+            }
+
+            // Everything MapType maps to a primitive / inline IDL type needs no include.
+            if (IsBuiltinIdlType(typeName)) yield break;
+
+            // Anything left is a user-defined struct/enum/union → MapType emits a scoped name.
+            yield return typeName;
+        }
+
+        private static string ExtractGenericArg(string typeName)
+        {
+            int start = typeName.IndexOf('<') + 1;
+            int end = typeName.LastIndexOf('>');
+            return (start > 0 && end > start) ? typeName.Substring(start, end - start).Trim() : typeName;
+        }
+
+        private static string SimpleName(string fullName)
+        {
+            int lastDot = fullName.LastIndexOf('.');
+            return lastDot >= 0 ? fullName.Substring(lastDot + 1) : fullName;
+        }
+
+        /// <summary>
+        /// True for every type <see cref="MapType"/> renders as a built-in/inline IDL type
+        /// (primitive, FixedString, Guid/DateTime/TimeSpan, System.Numerics vectors, string).
+        /// Keep this list in lock-step with MapType's special cases.
+        /// </summary>
+        private static bool IsBuiltinIdlType(string typeName)
+        {
+            if (typeName.Contains("FixedString32") || typeName.Contains("FixedString64") ||
+                typeName.Contains("FixedString128") || typeName.Contains("FixedString256"))
+                return true;
+
+            switch (typeName)
+            {
+                // Primitives
+                case "byte": case "System.Byte":
+                case "sbyte": case "System.SByte":
+                case "short": case "System.Int16":
+                case "ushort": case "System.UInt16":
+                case "int": case "System.Int32":
+                case "uint": case "System.UInt32":
+                case "long": case "System.Int64":
+                case "ulong": case "System.UInt64":
+                case "float": case "System.Single":
+                case "double": case "System.Double":
+                case "bool": case "System.Boolean":
+                case "char": case "System.Char":
+                // Standard value types
+                case "Guid": case "System.Guid":
+                case "DateTime": case "System.DateTime":
+                case "DateTimeOffset": case "System.DateTimeOffset":
+                case "TimeSpan": case "System.TimeSpan":
+                // System.Numerics
+                case "Vector2": case "System.Numerics.Vector2":
+                case "Vector3": case "System.Numerics.Vector3":
+                case "Vector4": case "System.Numerics.Vector4":
+                case "Quaternion": case "System.Numerics.Quaternion":
+                case "Matrix4x4": case "System.Numerics.Matrix4x4":
+                // Managed string
+                case "string": case "System.String":
+                    return true;
+                default:
+                    return false;
+            }
         }
 
         private void EmitModuleHierarchy(StringBuilder sb, string modulePath, IEnumerable<IdlTypeDefinition> types, GlobalTypeRegistry registry)
@@ -625,5 +797,29 @@ namespace CycloneDDS.CodeGen
         }
     }
 
+    /// <summary>
+    /// A field's reference to a user-defined type that the IDL emitter could resolve only by
+    /// file-name convention (it was absent from the type registry). Surfaced by
+    /// <see cref="IdlEmitter.GetFileDependencies"/> for fail-fast validation.
+    /// </summary>
+    internal sealed class UnresolvedTypeReference
+    {
+        public UnresolvedTypeReference(string typeFullName, string idlFile, string ownerType, string fieldName)
+        {
+            TypeFullName = typeFullName;
+            IdlFile = idlFile;
+            OwnerType = ownerType;
+            FieldName = fieldName;
+        }
+
+        /// <summary>Fully-qualified C# name of the referenced type (e.g. Fdp.Toolkit.Diagnostics.Gizmos.PipelineTarget).</summary>
+        public string TypeFullName { get; }
+        /// <summary>IDL file name (without extension) assumed by the &lt;SimpleName&gt;.idl convention.</summary>
+        public string IdlFile { get; }
+        /// <summary>Name of the type whose field made the reference.</summary>
+        public string OwnerType { get; }
+        /// <summary>Name of the referencing field.</summary>
+        public string FieldName { get; }
+    }
 
 }
