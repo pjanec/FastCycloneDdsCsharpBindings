@@ -70,6 +70,47 @@
     <CycloneDdsSourceFiles Include="**\*.cs" Exclude="$(CycloneDdsGeneratedDir)\**\*.cs;obj\**;bin\**" />
   </ItemGroup>
 
+  <!-- Second-level gate: even among projects that opt in (direct package reference), only
+       run the generator when the project actually declares something it would emit. The
+       generator's discovery rule is "type is [DdsTopic]/[DdsStruct]/[DdsUnion] OR is an enum"
+       (enums always get IDL + a DdsIdlMapping, which is how enum-only contract assemblies
+       like GizmoMap.Contracts feed downstream topics). So we skip only when a project has
+       NEITHER — a fast in-process source scan, no extra dotnet launch. This mirrors the
+       generator exactly, so it can never under-generate. -->
+  <UsingTask TaskName="CycloneDdsDetectSchema"
+             TaskFactory="RoslynCodeTaskFactory"
+             AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <Sources ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="true" />
+      <HasSchema ParameterType="System.Boolean" Output="true" />
+    </ParameterGroup>
+    <Task>
+      <Code Type="Fragment" Language="cs"><![CDATA[
+        HasSchema = false;
+        var rxDds = new System.Text.RegularExpressions.Regex(
+            @"^\s*\[\s*Dds(Topic|Struct|Union)\b",
+            System.Text.RegularExpressions.RegexOptions.Multiline);
+        var rxEnum = new System.Text.RegularExpressions.Regex(
+            @"^\s*((public|internal|private|protected|file|static|sealed|partial|new)\s+)*enum\s+\w",
+            System.Text.RegularExpressions.RegexOptions.Multiline);
+        if (Sources != null)
+        {
+            foreach (var item in Sources)
+            {
+                try
+                {
+                    var path = item.ItemSpec;
+                    if (!System.IO.File.Exists(path)) continue;
+                    var text = System.IO.File.ReadAllText(path);
+                    if (rxDds.IsMatch(text) || rxEnum.IsMatch(text)) { HasSchema = true; break; }
+                }
+                catch { }
+            }
+        }
+      ]]></Code>
+    </Task>
+  </UsingTask>
+
   <!-- 1. Copy IDL files from referenced assemblies / project references.
           Union of both discovery strategies: the assembly-output scan
           covers NuGet/assembly references; the obj\Generated scan covers
@@ -115,14 +156,24 @@
           Inputs="@(CycloneDdsSourceFiles);@(ReferencePath);$(CycloneDdsCodeGenPath)"
           Outputs="$(CycloneDdsStampFile)">
 
+    <!-- Detection runs INSIDE the body (not as a Condition on a dependency): a false target
+         Condition skips its DependsOnTargets too, so a property set by a dependency can't gate
+         the same target. Scan the sources for [Dds*]/enum; if absent, skip the expensive run. -->
+    <CycloneDdsDetectSchema Sources="@(CycloneDdsSourceFiles)">
+      <Output TaskParameter="HasSchema" PropertyName="CycloneDdsHasSchema" />
+    </CycloneDdsDetectSchema>
+
     <PropertyGroup>
       <SourcePath>$(MSBuildProjectDirectory)</SourcePath>
       <FlatReferences>@(ReferencePath)</FlatReferences>
-      <!-- Optimized for Design-Time Builds: skip execution, just include existing files. -->
-      <RunCycloneDdsCodeGen Condition="'$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' == 'true'">true</RunCycloneDdsCodeGen>
+      <!-- Run only for a real build that actually declares DDS types/enums. -->
+      <RunCycloneDdsCodeGen Condition="'$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' == 'true' AND '$(CycloneDdsHasSchema)' == 'true'">true</RunCycloneDdsCodeGen>
     </PropertyGroup>
 
-    <MakeDir Directories="$(CycloneDdsGeneratedDir)" Condition="!Exists('$(CycloneDdsGeneratedDir)')" />
+    <Message Condition="'$(CycloneDdsHasSchema)' != 'true'" Importance="normal"
+             Text="CycloneDDS: $(MSBuildProjectName) declares no DDS types or enums — skipping code generation." />
+
+    <MakeDir Directories="$(CycloneDdsGeneratedDir)" Condition="'$(RunCycloneDdsCodeGen)' == 'true' AND !Exists('$(CycloneDdsGeneratedDir)')" />
 
     <Message Text="Running CycloneDDS Code Generator ($(MSBuildProjectName))" Importance="high" Condition="'$(RunCycloneDdsCodeGen)' == 'true'" />
 
