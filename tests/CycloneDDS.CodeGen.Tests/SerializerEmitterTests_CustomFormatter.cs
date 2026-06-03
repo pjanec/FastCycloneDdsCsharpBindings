@@ -49,8 +49,10 @@ namespace CycloneDDS.CodeGen.Tests
             var emitter = new SerializerEmitter();
             var code = emitter.EmitSerializer(type, new GlobalTypeRegistry());
 
-            // The generated ToString() should use C# string interpolation with format specifiers.
-            Assert.Contains("public override string ToString() => $\"{Site:D}:{App:D}:{Entity:X8}\";", code);
+            // The generated ToString() interpolates the fields with their format specifiers.
+            // (Wrapped in string.Create(InvariantCulture, …) so float/double render with '.'
+            // regardless of OS locale — assert the stable interpolation literal, not the wrapper.)
+            Assert.Contains("$\"{Site:D}:{App:D}:{Entity:X8}\"", code);
         }
 
         [Fact]
@@ -76,9 +78,11 @@ namespace CycloneDDS.CodeGen.Tests
             Assert.Contains("TokenType.Number", code);
             Assert.Contains("TokenType.Keyword", code);
             Assert.Contains("TokenType.Punctuation", code);
-            Assert.Contains("this.Site.ToString(\"D\")", code);
-            Assert.Contains("this.App.ToString(\"D\")", code);
-            Assert.Contains("this.Entity.ToString(\"X8\")", code);
+            // Field tokens use String.Format(InvariantCulture, "{0:fmt}", this.Field) for
+            // locale-independent rendering — assert the format spec + field pairing.
+            Assert.Contains("\"{0:D}\", this.Site", code);
+            Assert.Contains("\"{0:D}\", this.App", code);
+            Assert.Contains("\"{0:X8}\", this.Entity", code);
         }
 
         [Fact]
@@ -124,8 +128,8 @@ namespace CycloneDDS.CodeGen.Tests
             var emitter = new SerializerEmitter();
             var code = emitter.EmitSerializer(type, new GlobalTypeRegistry());
 
-            // Empty format string should call ToString() without arguments
-            Assert.Contains("this.Value.ToString()", code);
+            // Empty format string → "{0}" (no format specifier) under InvariantCulture.
+            Assert.Contains("\"{0}\", this.Value", code);
         }
 
         [Fact]
