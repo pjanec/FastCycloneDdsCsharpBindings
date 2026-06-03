@@ -1,53 +1,110 @@
 <Project>
 
-  <!-- 1. Copy IDL files from referenced assemblies -->
-  <!-- FIX: Relies on compiled output folders instead of hardcoded obj\Generated -->
-  <Target Name="CopyReferencedIdlFiles" DependsOnTargets="ResolveReferences">
-    <ItemGroup>
-      <ReferenceDirs Include="@(ReferencePath->'%(RootDir)%(Directory)')" />
-      <ReferenceDirs Include="@(ReferenceCopyLocalPaths->'%(RootDir)%(Directory)')" />
-      <PotentialIdlFiles Include="%(ReferenceDirs.Identity)*.idl" />
-    </ItemGroup>
+  <!-- ================================================================= -->
+  <!-- CycloneDDS.NET MSBuild integration — SINGLE SOURCE OF TRUTH.      -->
+  <!--                                                                   -->
+  <!-- This file is shipped in the NuGet package (packed as              -->
+  <!-- buildTransitive/CycloneDDS.NET.targets) AND used for in-repo      -->
+  <!-- builds via a thin shim at tools/CycloneDDS.CodeGen/CycloneDDS     -->
+  <!-- .targets that sets a few properties and <Import>s this file.      -->
+  <!--                                                                   -->
+  <!-- Do NOT fork this logic again. Environment differences belong in   -->
+  <!-- the overridable properties below, not in a second copy.           -->
+  <!-- ================================================================= -->
 
-    <Message Text="Copying referenced IDL files from: @(ReferenceDirs)" Importance="normal" />
-    <Message Text="Found IDL files: @(PotentialIdlFiles)" Importance="normal" />
-
-    <Copy SourceFiles="@(PotentialIdlFiles)"
-          DestinationFolder="$(CycloneDdsGeneratedDir)"
-          SkipUnchangedFiles="true"
-          Condition="'@(PotentialIdlFiles)' != ''" />
-  </Target>
-
-  <!-- 2. Properties for generation -->
+  <!-- 0. Configurable knobs. Defaults target the NuGet-consumer case;   -->
+  <!--    the in-repo shim overrides what it needs BEFORE importing.     -->
   <PropertyGroup>
-    <!-- FIX: Use the framework-aware IntermediateOutputPath -->
-    <CycloneDdsGeneratedDir>$(IntermediateOutputPath)CycloneDdsGenerated</CycloneDdsGeneratedDir>
-    <CycloneDdsStampFile>$(CycloneDdsGeneratedDir)codegen.stamp</CycloneDdsStampFile>
-    <CycloneDdsCodeGenPath>$(MSBuildThisFileDirectory)..\tools\CycloneDDS.CodeGen.dll</CycloneDdsCodeGenPath>
+    <!-- Where generated .cs/.idl land. Framework-aware by default so a
+         multi-targeting project doesn't share one folder across TFMs.
+         The in-repo shim overrides this to the legacy flat obj\Generated
+         so cross-project IDL discovery (below) keeps working. -->
+    <CycloneDdsGeneratedDir Condition="'$(CycloneDdsGeneratedDir)' == ''">$(IntermediateOutputPath)CycloneDdsGenerated</CycloneDdsGeneratedDir>
+
+    <!-- The incremental stamp MUST live INSIDE the generated dir so its
+         lifetime is tied to the generated content: 'Clean' (and any wipe
+         of the folder) removes the stamp with it, forcing a full regen.
+
+         The historical bug was a MISSING SEPARATOR here
+         ('$(CycloneDdsGeneratedDir)codegen.stamp'), which placed the stamp
+         as a SIBLING of the folder ('...\CycloneDdsGeneratedcodegen.stamp').
+         When the folder was cleaned but that orphaned stamp survived, the
+         next build saw an up-to-date stamp, SKIPPED codegen, and then
+         compiled with NO generated files — silently producing an assembly
+         missing its [assembly: DdsIdlMapping(...)] metadata. Downstream
+         projects then couldn't emit '#include' for that type and idlc
+         failed with "Scoped name ... cannot be resolved". -->
+    <CycloneDdsStampFile>$(CycloneDdsGeneratedDir)\codegen.stamp</CycloneDdsStampFile>
+
+    <!-- The code-generator assembly. Default = packaged location
+         (buildTransitive/ -> ../tools/). The in-repo shim points this at
+         the freshly built tool under tools\CycloneDDS.CodeGen\bin\... -->
+    <CycloneDdsCodeGenPath Condition="'$(CycloneDdsCodeGenPath)' == ''">$(MSBuildThisFileDirectory)..\tools\CycloneDDS.CodeGen.dll</CycloneDdsCodeGenPath>
+
+    <!-- When 'true', build the generator from source (CycloneDdsCodeGenProject)
+         before running it. The in-repo shim sets this; consumers never do
+         (the tool is prebuilt inside the package). -->
+    <CycloneDdsBuildToolFromSource Condition="'$(CycloneDdsBuildToolFromSource)' == ''">false</CycloneDdsBuildToolFromSource>
+    <CycloneDdsCodeGenProject Condition="'$(CycloneDdsCodeGenProject)' == ''">$(MSBuildThisFileDirectory)..\..\tools\CycloneDDS.CodeGen\CycloneDDS.CodeGen.csproj</CycloneDdsCodeGenProject>
   </PropertyGroup>
 
   <ItemGroup>
     <CycloneDdsSourceFiles Include="**\*.cs" Exclude="$(CycloneDdsGeneratedDir)\**\*.cs;obj\**;bin\**" />
   </ItemGroup>
 
-  <!-- 3. The main generation target -->
+  <!-- 1. Copy IDL files from referenced assemblies / project references.
+          Union of both discovery strategies: the assembly-output scan
+          covers NuGet/assembly references; the obj\Generated scan covers
+          not-yet-packed sibling projects in the same repo (no-op for
+          consumers, whose references have no obj\Generated). -->
+  <Target Name="CopyReferencedIdlFiles" DependsOnTargets="ResolveReferences">
+    <ItemGroup>
+      <ReferenceDirs Include="@(ReferencePath->'%(RootDir)%(Directory)')" />
+      <ReferenceDirs Include="@(ReferenceCopyLocalPaths->'%(RootDir)%(Directory)')" />
+      <PotentialIdlFiles Include="%(ReferenceDirs.Identity)*.idl" />
+
+      <ProjectReferenceIdlDirs Include="@(ProjectReference->'%(RootDir)%(Directory)obj\Generated')"
+                               Condition="Exists('%(ProjectReference.RootDir)%(ProjectReference.Directory)obj\Generated')" />
+    </ItemGroup>
+
+    <CreateItem Include="@(ProjectReferenceIdlDirs->'%(Identity)\*.idl')">
+      <Output TaskParameter="Include" ItemName="ProjectReferenceIdlFiles" />
+    </CreateItem>
+
+    <Message Text="Copying referenced IDL files from: @(ReferenceDirs)" Importance="normal" />
+    <Message Text="Found IDL files: @(PotentialIdlFiles);@(ProjectReferenceIdlFiles)" Importance="normal" />
+
+    <Copy SourceFiles="@(PotentialIdlFiles);@(ProjectReferenceIdlFiles)"
+          DestinationFolder="$(CycloneDdsGeneratedDir)"
+          SkipUnchangedFiles="true"
+          Condition="'@(PotentialIdlFiles)@(ProjectReferenceIdlFiles)' != ''" />
+  </Target>
+
+  <!-- 2. (in-repo only) Build the generator from source before running it. -->
+  <Target Name="BuildCycloneDDSCodeGen"
+          Condition="'$(CycloneDdsBuildToolFromSource)' == 'true' AND '$(CycloneDdsDisableCodeGen)' != 'true'">
+    <MSBuild Projects="$(CycloneDdsCodeGenProject)"
+             Targets="Build"
+             Properties="Configuration=$(Configuration)" />
+  </Target>
+
+  <!-- 3. The main generation target. -->
   <Target Name="CycloneDdsGenerate"
           BeforeTargets="CoreCompile"
           Condition="'$(CycloneDdsDisableCodeGen)' != 'true'"
-          DependsOnTargets="CopyReferencedIdlFiles"
+          DependsOnTargets="BuildCycloneDDSCodeGen;CopyReferencedIdlFiles"
           Inputs="@(CycloneDdsSourceFiles);@(ReferencePath);$(CycloneDdsCodeGenPath)"
           Outputs="$(CycloneDdsStampFile)">
 
     <PropertyGroup>
       <SourcePath>$(MSBuildProjectDirectory)</SourcePath>
       <FlatReferences>@(ReferencePath)</FlatReferences>
-      <!-- Optimized for Design-Time Builds: Skip execution, just include existing files -->
+      <!-- Optimized for Design-Time Builds: skip execution, just include existing files. -->
       <RunCycloneDdsCodeGen Condition="'$(DesignTimeBuild)' != 'true' AND '$(BuildingProject)' == 'true'">true</RunCycloneDdsCodeGen>
     </PropertyGroup>
 
     <MakeDir Directories="$(CycloneDdsGeneratedDir)" Condition="!Exists('$(CycloneDdsGeneratedDir)')" />
 
-    <!-- FEATURE: Extended console output showing the current project name -->
     <Message Text="Running CycloneDDS Code Generator ($(MSBuildProjectName))" Importance="high" Condition="'$(RunCycloneDdsCodeGen)' == 'true'" />
 
     <Exec Command="dotnet &quot;$(CycloneDdsCodeGenPath)&quot; &quot;$(SourcePath)&quot; &quot;$(CycloneDdsGeneratedDir.TrimEnd('\'))&quot; &quot;$(FlatReferences)&quot;"
@@ -56,7 +113,7 @@
     <Touch Files="$(CycloneDdsStampFile)" AlwaysCreate="true" Condition="'$(RunCycloneDdsCodeGen)' == 'true'" />
   </Target>
 
-  <!-- 4. Inject Generated C# files into compilation -->
+  <!-- 4. Inject generated C# files into compilation. -->
   <Target Name="IncludeCycloneDdsGeneratedFiles"
           BeforeTargets="CoreCompile"
           DependsOnTargets="CycloneDdsGenerate"
@@ -66,7 +123,7 @@
     </ItemGroup>
   </Target>
 
-  <!-- 5. Package Generated IDL files so consuming projects can reference them -->
+  <!-- 5. Package generated IDL files so consuming projects can reference them. -->
   <Target Name="IncludeIdlFilesInOutput"
           BeforeTargets="GetCopyToOutputDirectoryItems;AssignTargetPaths"
           AfterTargets="CycloneDdsGenerate"
@@ -86,7 +143,7 @@
     <Copy SourceFiles="@(GeneratedIdlFiles)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" />
   </Target>
 
-  <!-- 6. Clean target -->
+  <!-- 6. Clean target — removes the generated dir AND the stamp inside it. -->
   <Target Name="CycloneDDSClean" AfterTargets="Clean">
     <RemoveDir Directories="$(CycloneDdsGeneratedDir)" />
   </Target>
