@@ -148,7 +148,9 @@
              Properties="Configuration=$(Configuration)" />
   </Target>
 
-  <!-- 3. The main generation target. -->
+  <!-- 3. The main generation target. The generated .idl are copied to OutputPath in this
+          target's body (see below) so a referencing project can find them; that copy is
+          order-independent, unlike the old AfterTargets approach which raced AssignTargetPaths. -->
   <Target Name="CycloneDdsGenerate"
           BeforeTargets="CoreCompile"
           Condition="'$(CycloneDdsCodeGenActive)' == 'true'"
@@ -181,6 +183,20 @@
           Condition="'$(RunCycloneDdsCodeGen)' == 'true'" />
 
     <Touch Files="$(CycloneDdsStampFile)" AlwaysCreate="true" Condition="'$(RunCycloneDdsCodeGen)' == 'true'" />
+
+    <!-- Copy the just-generated .idl into this project's output IN THE SAME TARGET RUN.
+         A separate AfterTargets step (IncludeIdlFilesInOutput) raced AssignTargetPaths and on a
+         clean build copied nothing, so the .idl never reached bin and a referencing project's
+         CopyReferencedIdlFiles (which scans @(ReferencePath) = referenced bin dirs) couldn't
+         find them — idlc then failed with "Can't open include file". Doing it here is
+         order-independent and deterministic. -->
+    <ItemGroup Condition="'$(RunCycloneDdsCodeGen)' == 'true'">
+      <_CycloneDdsGeneratedIdl Include="$(CycloneDdsGeneratedDir)\*.idl" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_CycloneDdsGeneratedIdl)"
+          DestinationFolder="$(OutputPath)"
+          SkipUnchangedFiles="true"
+          Condition="'@(_CycloneDdsGeneratedIdl)' != ''" />
   </Target>
 
   <!-- 4. Inject generated C# files into compilation. -->
