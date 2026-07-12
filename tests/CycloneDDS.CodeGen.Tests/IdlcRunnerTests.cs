@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
 using Xunit;
 using CycloneDDS.CodeGen;
 using CycloneDDS.Compiler.Common;
@@ -67,9 +68,11 @@ exit /b 0
         [Fact]
         public void FindIdlc_ChecksCurrentDirectory()
         {
-            // Create a dummy idlc in the current directory (where tests run)
+            // Create a dummy idlc in the current directory (where tests run).
+            // The executable name is platform-specific (idlc.exe on Windows, idlc elsewhere).
             var currentDir = AppDomain.CurrentDomain.BaseDirectory;
-            var dummyIdlc = Path.Combine(currentDir, "idlc.exe");
+            var idlcName = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "idlc.exe" : "idlc";
+            var dummyIdlc = Path.Combine(currentDir, idlcName);
             
             // Only run this test if idlc doesn't already exist there (to avoid messing up environment)
             if (!File.Exists(dummyIdlc))
@@ -91,6 +94,12 @@ exit /b 0
         [Fact]
         public void RunIdlc_ExecutesProcess_AndFindsFiles()
         {
+            // The mock idlc is a Windows batch file, so this plumbing test only
+            // runs on Windows. Real idlc invocation is exercised on Linux by the
+            // integration tests that point at the built native idlc.
+            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                return;
+
             // Setup
             var idlPath = Path.Combine(_tempDir, "TestTopic.idl");
             File.WriteAllText(idlPath, "struct TestTopic {};");

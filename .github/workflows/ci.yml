@@ -9,9 +9,64 @@ on:
   workflow_dispatch:
 
 jobs:
+  # ---------------------------------------------------------------------------
+  # Linux: build the native CycloneDDS libraries + idlc, then build and test the
+  # managed code against them. Building the managed solution exercises the
+  # build-time IDL code generator (idlc) on Linux end-to-end, and the runtime
+  # tests exercise the DllImport("ddsc") -> libddsc.so path. The native artifacts
+  # are uploaded for the Windows pack job to fold into the cross-platform package.
+  # ---------------------------------------------------------------------------
+  linux-build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0 # Required for Nerdbank.GitVersioning to determine version
+        submodules: recursive
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: 8.0.x
+
+    - name: Install native build prerequisites
+      run: sudo apt-get update && sudo apt-get install -y cmake build-essential patchelf
+
+    - name: Display Tools Versions
+      run: |
+        dotnet --version
+        cmake --version
+        gcc --version
+
+    - name: Build Native (linux-x64)
+      shell: bash
+      run: build/native-linux.sh Release
+
+    - name: Build Managed Code
+      run: dotnet build CycloneDDS.NET.Core.slnf -c Release
+
+    - name: Run Runtime Tests
+      run: dotnet test tests/CycloneDDS.Runtime.Tests/CycloneDDS.Runtime.Tests.csproj -c Release --no-build --logger "console;verbosity=normal"
+
+    - name: Upload linux-x64 Native Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: native-linux-x64
+        path: artifacts/native/linux-x64/*
+        if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # Windows: full build, test and pack via the existing pack.ps1 pipeline
+  # (builds win-x64 native, builds core, runs runtime tests, packs both the
+  # CycloneDDS.NET and DdsMonitor packages, builds the examples). The linux-x64
+  # native artifacts produced above are downloaded first so the packed NuGet
+  # carries both win-x64 and linux-x64 runtime assets.
+  # ---------------------------------------------------------------------------
   build:
     runs-on: windows-latest
-    
+    needs: [ linux-build ]
+
     env:
       # This ensures the build script can find CMake if not in default path (though it usually is on runners)
       CMAKE_GENERATOR: "Visual Studio 17 2022"
@@ -31,6 +86,12 @@ jobs:
       run: |
         dotnet --version
         cmake --version
+
+    - name: Download linux-x64 Native Artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: native-linux-x64
+        path: artifacts/native/linux-x64/
 
     - name: Build, Test, and Pack
       shell: pwsh

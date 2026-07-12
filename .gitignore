@@ -57,6 +57,7 @@ nunit-*.xml
 cyclone-compiled/
 cyclone-compiled-debug/
 build/native/
+build/native-linux/
 test-extract/
 test-output/
 **/Generated/*
