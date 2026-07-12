@@ -401,11 +401,20 @@ namespace CycloneDDS.Runtime.Interop
             public long LastPublicationHandle;
         }
 
+        // NOTE: status is passed BY VALUE, matching the C signature
+        //   void (*)(dds_entity_t, const dds_..._matched_status_t status, void *arg)
+        // These 24-byte structs are >16 bytes, so the Windows x64 ABI passes them by an
+        // implicit pointer (which a `ref` parameter happened to match) while the Linux
+        // System V ABI passes them by value on the stack. Declaring the parameter `ref`
+        // therefore worked only on Windows; on Linux it shifted `arg` into the wrong
+        // register, so GCHandle.FromIntPtr(arg) threw and the callback was silently
+        // dropped. Declaring it by value lets the .NET marshaller emit the correct
+        // per-platform ABI on both.
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        public delegate void DdsOnPublicationMatched(int writer, ref DdsPublicationMatchedStatus status, IntPtr arg);
+        public delegate void DdsOnPublicationMatched(int writer, DdsPublicationMatchedStatus status, IntPtr arg);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        public delegate void DdsOnSubscriptionMatched(int reader, ref DdsSubscriptionMatchedStatus status, IntPtr arg);
+        public delegate void DdsOnSubscriptionMatched(int reader, DdsSubscriptionMatchedStatus status, IntPtr arg);
 
         [DllImport(DLL_NAME)]
         public extern static void dds_lset_publication_matched(IntPtr listener, DdsOnPublicationMatched callback);

@@ -28,7 +28,13 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v3
       with:
-        dotnet-version: 8.0.x
+        # net8.0 is the target framework, but the code uses C# 13 language
+        # features (e.g. ref structs in async methods), which require the .NET 10
+        # SDK's compiler. Install both: the 10.0 SDK builds, the 8.0 runtime runs
+        # the net8.0 test assemblies.
+        dotnet-version: |
+          8.0.x
+          10.0.x
 
     - name: Install native build prerequisites
       run: sudo apt-get update && sudo apt-get install -y cmake build-essential patchelf
@@ -80,7 +86,13 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v3
       with:
-        dotnet-version: 8.0.x
+        # net8.0 is the target framework, but the code uses C# 13 language
+        # features (e.g. ref structs in async methods), which require the .NET 10
+        # SDK's compiler. Install both: the 10.0 SDK builds, the 8.0 runtime runs
+        # the net8.0 test assemblies.
+        dotnet-version: |
+          8.0.x
+          10.0.x
 
     - name: Display Tools Versions
       run: |

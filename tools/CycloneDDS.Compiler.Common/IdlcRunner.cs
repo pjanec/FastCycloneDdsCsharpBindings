@@ -136,11 +136,15 @@ namespace CycloneDDS.Compiler.Common
             {
                 // NuGet packages do not preserve the Unix execute bit, so an idlc
                 // restored from the package may not be runnable. Restore it (best effort).
+                // The inner OperatingSystem guard is what the CA1416 analyzer recognizes.
                 try
                 {
-                    var mode = File.GetUnixFileMode(idlcPath);
-                    File.SetUnixFileMode(idlcPath,
-                        mode | UnixFileMode.UserExecute | UnixFileMode.GroupExecute | UnixFileMode.OtherExecute);
+                    if (!OperatingSystem.IsWindows())
+                    {
+                        var mode = File.GetUnixFileMode(idlcPath);
+                        File.SetUnixFileMode(idlcPath,
+                            mode | UnixFileMode.UserExecute | UnixFileMode.GroupExecute | UnixFileMode.OtherExecute);
+                    }
                 }
                 catch { /* best effort — may already be executable, or FS may not support it */ }
 

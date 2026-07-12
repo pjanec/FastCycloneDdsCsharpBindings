@@ -330,7 +330,7 @@ namespace CycloneDDS.Runtime
         }
 
         // [MonoPInvokeCallback(typeof(DdsApi.DdsOnPublicationMatched))]
-        private static void OnPublicationMatched(int writer, ref DdsApi.DdsPublicationMatchedStatus status, IntPtr arg)
+        private static void OnPublicationMatched(int writer, DdsApi.DdsPublicationMatchedStatus status, IntPtr arg)
         {
              if (arg == IntPtr.Zero) return;
              try

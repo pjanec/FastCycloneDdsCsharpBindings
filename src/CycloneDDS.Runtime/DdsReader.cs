@@ -261,7 +261,7 @@ namespace CycloneDDS.Runtime
              }
         }
         
-        private static void OnSubscriptionMatched(int reader, ref DdsApi.DdsSubscriptionMatchedStatus status, IntPtr arg)
+        private static void OnSubscriptionMatched(int reader, DdsApi.DdsSubscriptionMatchedStatus status, IntPtr arg)
         {
              if (arg == IntPtr.Zero) return;
              try
