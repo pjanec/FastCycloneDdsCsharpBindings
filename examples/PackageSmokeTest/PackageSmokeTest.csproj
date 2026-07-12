@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Package smoke test.
+
+    Unlike the other examples/tests (which use ProjectReferences), this project
+    consumes CycloneDDS.NET as a real NuGet *package* from a local feed. That
+    exercises the packaged experience end to end:
+      - native asset resolution  (runtimes/<rid>/native/libddsc.so | ddsc.dll)
+      - build integration        (buildTransitive/ targets + build/ props)
+      - the bundled IDL compiler (tools/idlc | idlc.exe) run during code-gen
+    It declares a [DdsTopic] so code generation actually runs, then does a
+    publish/subscribe round-trip and asserts the payload.
+
+    Not part of any solution filter. Build it explicitly after packing, passing
+    the packed version via the SmokePkgVersion property (see RELEASE-GUIDE.md).
+    The local feed is configured in the adjacent nuget.config.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <!-- The generated serializer for DDS types uses unsafe fixed-buffer code. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <IsPackable>false</IsPackable>
+    <!-- Never run the in-repo code-gen shim here; the package supplies it. -->
+    <CycloneDdsBuildToolFromSource>false</CycloneDdsBuildToolFromSource>
+    <!-- Version of the locally packed CycloneDDS.NET to consume. Override on the
+         command line with -p:SmokePkgVersion=<x>; defaults to the latest
+         prerelease available in the configured feeds. -->
+    <SmokePkgVersion Condition="'$(SmokePkgVersion)' == ''">*-*</SmokePkgVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CycloneDDS.NET" Version="$(SmokePkgVersion)" />
+  </ItemGroup>
+
+</Project>

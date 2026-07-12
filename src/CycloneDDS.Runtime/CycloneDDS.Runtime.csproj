@@ -13,7 +13,7 @@
 
   <ItemGroup>
     <!-- Runtime: Native Assets — Windows -->
-    <None Include="..\..\artifacts\native\win-x64\ddsc.dll" Pack="true" PackagePath="runtimes/win-x64/native" />
+    <None Include="..\..\artifacts\native\win-x64\ddsc.dll" Pack="true" PackagePath="runtimes/win-x64/native" Condition="Exists('..\..\artifacts\native\win-x64\ddsc.dll')" />
 
     <!-- Runtime: Native Assets — Linux. DllImport("ddsc") resolves to libddsc.so
          from runtimes/linux-x64/native at load time on Linux. Exists-guarded so a
@@ -31,11 +31,11 @@
     <None Include="..\..\build\props\CycloneDDS.props" Pack="true" PackagePath="build/CycloneDDS.NET.props" />
 
     <!-- Tools: Native Assets (Explicitly selected) -->
-    <None Include="..\..\artifacts\native\win-x64\idlc.exe" Pack="true" PackagePath="tools/" />
-    <None Include="..\..\artifacts\native\win-x64\cycloneddsidl.dll" Pack="true" PackagePath="tools/" />
-    <None Include="..\..\artifacts\native\win-x64\cycloneddsidlc.dll" Pack="true" PackagePath="tools/" />
-    <None Include="..\..\artifacts\native\win-x64\cycloneddsidljson.dll" Pack="true" PackagePath="tools/" />
-    <None Include="..\..\artifacts\native\win-x64\ddsc.dll" Pack="true" PackagePath="tools/" />
+    <None Include="..\..\artifacts\native\win-x64\idlc.exe" Pack="true" PackagePath="tools/" Condition="Exists('..\..\artifacts\native\win-x64\idlc.exe')" />
+    <None Include="..\..\artifacts\native\win-x64\cycloneddsidl.dll" Pack="true" PackagePath="tools/" Condition="Exists('..\..\artifacts\native\win-x64\cycloneddsidl.dll')" />
+    <None Include="..\..\artifacts\native\win-x64\cycloneddsidlc.dll" Pack="true" PackagePath="tools/" Condition="Exists('..\..\artifacts\native\win-x64\cycloneddsidlc.dll')" />
+    <None Include="..\..\artifacts\native\win-x64\cycloneddsidljson.dll" Pack="true" PackagePath="tools/" Condition="Exists('..\..\artifacts\native\win-x64\cycloneddsidljson.dll')" />
+    <None Include="..\..\artifacts\native\win-x64\ddsc.dll" Pack="true" PackagePath="tools/" Condition="Exists('..\..\artifacts\native\win-x64\ddsc.dll')" />
 
     <!-- Tools: Native Assets — Linux (idlc + its .so dependencies, flat in tools/).
          The .so globs are skipped silently when the linux-x64 artifacts are absent;
@@ -54,7 +54,7 @@
     <None Include="..\..\tools\CycloneDDS.CodeGen\bin\$(Configuration)\net8.0\CycloneDDS.Schema.pdb" Pack="true" PackagePath="tools/" />
 
     <!-- Tools: CodeGen -->
-    <None Include="..\..\tools\CycloneDDS.CodeGen\bin\$(Configuration)\net8.0\CycloneDDS.CodeGen.exe" Pack="true" PackagePath="tools/" />
+    <None Include="..\..\tools\CycloneDDS.CodeGen\bin\$(Configuration)\net8.0\CycloneDDS.CodeGen.exe" Pack="true" PackagePath="tools/" Condition="Exists('..\..\tools\CycloneDDS.CodeGen\bin\$(Configuration)\net8.0\CycloneDDS.CodeGen.exe')" />
     <None Include="..\..\tools\CycloneDDS.CodeGen\bin\$(Configuration)\net8.0\CycloneDDS.CodeGen.dll" Pack="true" PackagePath="tools/" />
     <None Include="..\..\tools\CycloneDDS.CodeGen\bin\$(Configuration)\net8.0\CycloneDDS.CodeGen.pdb" Pack="true" PackagePath="tools/" />
     <None Include="..\..\tools\CycloneDDS.CodeGen\bin\$(Configuration)\net8.0\CycloneDDS.CodeGen.deps.json" Pack="true" PackagePath="tools/" />
@@ -63,7 +63,7 @@
     <None Include="..\..\tools\CycloneDDS.CodeGen\bin\$(Configuration)\net8.0\Microsoft.CodeAnalysis.CSharp.dll" Pack="true" PackagePath="tools/" />
 
     <!-- Tools: IdlImporter -->
-    <None Include="..\..\tools\CycloneDDS.IdlImporter\bin\$(Configuration)\net8.0\CycloneDDS.IdlImporter.exe" Pack="true" PackagePath="tools/" />
+    <None Include="..\..\tools\CycloneDDS.IdlImporter\bin\$(Configuration)\net8.0\CycloneDDS.IdlImporter.exe" Pack="true" PackagePath="tools/" Condition="Exists('..\..\tools\CycloneDDS.IdlImporter\bin\$(Configuration)\net8.0\CycloneDDS.IdlImporter.exe')" />
     <None Include="..\..\tools\CycloneDDS.IdlImporter\bin\$(Configuration)\net8.0\CycloneDDS.IdlImporter.dll" Pack="true" PackagePath="tools/" />
     <None Include="..\..\tools\CycloneDDS.IdlImporter\bin\$(Configuration)\net8.0\CycloneDDS.IdlImporter.pdb" Pack="true" PackagePath="tools/" />
     <None Include="..\..\tools\CycloneDDS.IdlImporter\bin\$(Configuration)\net8.0\CycloneDDS.IdlImporter.deps.json" Pack="true" PackagePath="tools/" />
