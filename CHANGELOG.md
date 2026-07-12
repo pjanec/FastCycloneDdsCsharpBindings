@@ -8,6 +8,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## unreleased
 nothing yet
 
+## 0.3.0
+
+### Added
+- **Linux x64 support.** The package now ships native assets for `linux-x64`
+  (`libddsc.so`) alongside `win-x64`, and bundles the Linux `idlc` plus its
+  `.so` dependencies under `tools/`. A new `build/native-linux.sh` compiles the
+  native CycloneDDS libraries and `idlc` and rewrites their RPATH to `$ORIGIN`
+  so they resolve in the flat NuGet `tools/` layout. `IdlcRunner` is now
+  platform-aware — it locates `idlc`/`idlc.exe` under the correct RID, sets
+  `LD_LIBRARY_PATH`, and restores the Unix execute bit that NuGet does not
+  preserve — and the MSBuild native-asset copies are guarded by
+  `IsOSPlatform`. The target framework remains `net8.0`.
+
+### Fixed
+- **DDS matched-status events never fired on Linux.** The publication- and
+  subscription-matched listener callbacks passed their 24-byte status struct by
+  `ref`, which matches the Windows x64 ABI but not the Linux System V ABI (where
+  structs larger than 16 bytes are passed by value on the stack), so `arg` was
+  read from the wrong register and every callback was silently dropped. The
+  status is now passed by value, letting the marshaller emit the correct ABI on
+  both platforms, so `PublicationMatched`, `SubscriptionMatched` and
+  `WaitForReaderAsync` work on Linux.
+- **Mis-cased project references.** Several `ProjectReference` paths used
+  `..\..\Src\...` (capital `S`), which resolved only on case-insensitive
+  (Windows) filesystems; corrected to `src` so the solution builds on Linux.
+
+### Changed
+- CI builds native libraries on both Windows and Linux and produces a single
+  cross-platform package. It installs both the .NET 8 and .NET 10 SDKs: the code
+  uses C# 13 language features that require the newer compiler, while the target
+  framework stays `net8.0`.
+- Package description updated from "Win64" to "Windows x64, Linux x64".
+
 ## 0.2.3
 
 ### Fixed
