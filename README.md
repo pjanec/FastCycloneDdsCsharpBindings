@@ -19,11 +19,16 @@ dotnet add package CycloneDDS.NET
 ```
  
 This single package includes:
-- **Runtime Library:** High-performance managed bindings.
-- **Native Assets:** Pre-compiled `ddsc.dll` and `idlc.exe` (Windows x64).
+- **Runtime Library:** High-performance managed bindings (targets `net8.0`; runs on .NET 8 and later).
+- **Native Assets:** Pre-compiled native runtime and IDL compiler for both **Windows x64** (`ddsc.dll`, `idlc.exe`) and **Linux x64** (`libddsc.so`, `idlc`). NuGet selects the correct runtime asset per platform automatically.
 - **Build Tools:** Automatic C# code generation during build.
- 
-**Important:** This package relies on native libraries that require the [Visual C++ Redistributable for Visual Studio 2022](https://aka.ms/vs/17/release/vc_redist.x64.exe) to be installed on the target system.
+
+### Supported platforms
+
+| Platform | Native runtime | Target requirement |
+| :--- | :--- | :--- |
+| Windows x64 | `ddsc.dll` | [Visual C++ Redistributable for Visual Studio 2022](https://aka.ms/vs/17/release/vc_redist.x64.exe) installed on the target machine. |
+| Linux x64 | `libddsc.so` | A glibc-based distribution (e.g. Ubuntu/Debian). No extra runtime install needed. |
 
 ### Working with Source Code
 
@@ -35,16 +40,22 @@ If you want to build the project from source or contribute:
     cd CycloneDds.NET
     ```
 
-2.  **Build and Test** (One-Stop Script):
-    Run the developer workflow script. This will automatically check for native artifacts (building them if missing), build the solution, and run all tests.
-    ```powershell
-    .\build\build-and-test.ps1
+2.  **Build the native libraries** for your platform:
+    -   **Windows** (PowerShell): `.\build\native-win.ps1`
+    -   **Linux** (bash): `build/native-linux.sh Release`
+
+    Then build and test the managed solution:
+    ```bash
+    dotnet build CycloneDDS.NET.Core.slnf -c Release
+    dotnet test  CycloneDDS.NET.Core.slnf -c Release
     ```
+    On Windows you can instead run the one-stop script `.\build\build-and-test.ps1`, which builds the native artifacts (if missing), builds the solution, and runs the tests.
 
 3.  **Requirements:**
-    -   .NET 8.0 SDK
-    -   Visual Studio 2022 (C++ Desktop Development workload) for native compilation.
-    -   CMake 3.16+ in your PATH.
+    -   **.NET SDK:** the solution targets `net8.0`, but building requires the **.NET 10 SDK** (the code uses C# 13 language features). Produced binaries still run on .NET 8+.
+    -   **CMake 3.16+** on your `PATH`.
+    -   **Windows:** Visual Studio 2022 with the *C++ Desktop Development* workload (for native compilation).
+    -   **Linux:** a C toolchain and `patchelf` — e.g. `sudo apt-get install -y cmake build-essential patchelf`.
 
 ## Key Features
 
@@ -558,7 +569,8 @@ To run it:
 The `CycloneDDS.NET` package bundles these internal components:
 
 *   **Managed Libraries:** `CycloneDDS.Core`, `CycloneDDS.Schema`, `CycloneDDS.CodeGen`, `CycloneDDS.Runtime`
-*   **Native Assets:** `ddsc.dll` (Cyclone DDS), `idlc.exe` (IDL Compiler), `cycloneddsidljson.dll` (IDL JSON plugin)
+*   **Native Assets (Windows x64):** `ddsc.dll` (Cyclone DDS), `idlc.exe` (IDL Compiler), `cycloneddsidljson.dll` (IDL JSON plugin)
+*   **Native Assets (Linux x64):** `libddsc.so` (Cyclone DDS), `idlc` (IDL Compiler), `libcycloneddsidljson.so` (IDL JSON plugin)
 
 ## Performance Characteristics
 
