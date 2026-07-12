@@ -220,7 +220,19 @@ Expand-Archive artifacts/nuget/CycloneDDS.NET.1.0.0.nupkg -DestinationPath temp_
 # - ThirdPartyNotices.txt is present
 # - Native binaries are in runtimes/ folder
 # - Build tools are in build/ or buildTransitive/ folder
+# - lib/net8.0/ has *.dll AND matching *.pdb for Runtime, Core and Schema
+#   (SourceLink debugging), and a .snupkg was produced alongside the .nupkg
 ```
+
+**Debugging support (SourceLink).** The package embeds SourceLink so consumers can
+step into the library sources straight from GitHub. Symbols ship two ways: the
+`lib/net8.0/*.pdb` travel inside the `.nupkg` (Visual Studio loads them directly),
+and a `.snupkg` is published to the NuGet symbol server. Verify with the
+[`sourcelink`](https://www.nuget.org/packages/sourcelink) tool, e.g.
+`sourcelink print-urls lib\net8.0\CycloneDDS.Runtime.pdb` should list
+`https://raw.githubusercontent.com/pjanec/CycloneDds.NET/<commit>/...` URLs.
+Publish **both** the `.nupkg` and the `.snupkg` (see below). SourceLink URLs only
+resolve for commits pushed to GitHub, so publish from a CI build on `main`/a tag.
 
 **Key Things to Check:**
 - [ ] Package version is correct (no `-alpha` suffix for stable)

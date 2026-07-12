@@ -83,6 +83,14 @@
   <ItemGroup>
     <None Include="$(OutputPath)\CycloneDDS.Core.dll" Pack="true" PackagePath="lib\$(TargetFramework)" Visible="false" />
     <None Include="$(OutputPath)\CycloneDDS.Schema.dll" Pack="true" PackagePath="lib\$(TargetFramework)" Visible="false" />
+    <!-- Ship the SourceLink-enabled PDBs next to their DLLs so consumers can debug
+         into CycloneDDS.Core / CycloneDDS.Schema too (not just CycloneDDS.Runtime).
+         These are manually-packed project-reference outputs, so their symbols are
+         not auto-collected into the symbol package. -->
+    <None Include="$(OutputPath)\CycloneDDS.Core.pdb" Pack="true" PackagePath="lib\$(TargetFramework)" Visible="false"
+          Condition="Exists('$(OutputPath)\CycloneDDS.Core.pdb')" />
+    <None Include="$(OutputPath)\CycloneDDS.Schema.pdb" Pack="true" PackagePath="lib\$(TargetFramework)" Visible="false"
+          Condition="Exists('$(OutputPath)\CycloneDDS.Schema.pdb')" />
   </ItemGroup>
 
   <ItemGroup>
