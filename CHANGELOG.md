@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## unreleased
 nothing yet
 
-## 0.3.0
+## 0.3.1
 
 ### Added
 - **Linux x64 support.** The package now ships native assets for `linux-x64`
