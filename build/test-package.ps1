@@ -63,9 +63,14 @@ Write-Host "`n[2/2] Testing the ddsmonitor global tool $monVer ..."
 dotnet tool uninstall --global CycloneDDS.NET.DdsMonitor 2>$null | Out-Null
 dotnet tool install --global --add-source $Feed --version $monVer CycloneDDS.NET.DdsMonitor | Out-Null
 
+# Invoke by absolute path: the global-tools dir may not be on PATH in this session
+# (e.g. right after `dotnet tool install --global` in CI).
+$toolExe = Join-Path $env:USERPROFILE ".dotnet\tools\ddsmonitor.exe"
+if (-not (Test-Path $toolExe)) { $toolExe = "ddsmonitor" }
+
 $out = [System.IO.Path]::GetTempFileName()
 $err = [System.IO.Path]::GetTempFileName()
-$proc = Start-Process -FilePath "ddsmonitor" -ArgumentList "--NoBrowser true" `
+$proc = Start-Process -FilePath $toolExe -ArgumentList "--NoBrowser true" `
     -RedirectStandardOutput $out -RedirectStandardError $err -PassThru -NoNewWindow
 
 $ok = $false; $port = $null
