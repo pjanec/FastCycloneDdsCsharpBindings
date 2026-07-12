@@ -245,13 +245,42 @@ resolve for commits pushed to GitHub, so publish from a CI build on `main`/a tag
 
 ## Publishing to NuGet.org
 
-### Option A: Automatic Publishing (CI/CD)
+### Option A: Automatic Publishing (CI/CD) — recommended
 
-If CI is configured to auto-publish on tags:
+CI publishes to NuGet.org automatically when you push a **version tag** (`vX.Y.Z`),
+but only after the cross-platform package has passed the Windows and Linux
+verification jobs. The `publish` job pushes both `CycloneDDS.NET` and
+`CycloneDDS.NET.DdsMonitor` (plus their `.snupkg` symbols).
 
-1. **Wait for CI to complete** after pushing the tag
-2. **Verify on NuGet.org** that the new version appears
-3. **Create a GitHub Release** with release notes
+**One-time setup — store the NuGet API key as a repository secret:**
+
+1. Create an API key at <https://www.nuget.org/account/apikeys> with **"Push new
+   packages and package versions"**. Scope the *Package glob* to `CycloneDDS.NET*`
+   so it covers both packages. (For the very first push of a brand-new package id,
+   a key scoped to *all* packages / your account may be required until the id
+   exists.)
+2. In GitHub: **Repo → Settings → Secrets and variables → Actions → New repository
+   secret**. Name it exactly **`NUGET_API_KEY`** and paste the key. GitHub encrypts
+   it and masks it in logs; the workflow reads it as `secrets.NUGET_API_KEY`. You
+   never commit the key.
+
+**Releasing:**
+
+1. Make sure `main` is green and at the commit you want to ship.
+2. Check the version NBGV will produce for that commit:
+   ```bash
+   nbgv get-version            # e.g. 0.3.2  (dotnet tool install -g nbgv)
+   ```
+   The published version is `version.json` base + git height — the tag name does
+   **not** set it, so name the tag to match (e.g. `v0.3.2`).
+3. **Create a GitHub Release** with tag `vX.Y.Z` targeting that commit (or
+   `git tag v0.3.2 && git push origin v0.3.2`). The tag push runs CI; on success
+   the `publish` job pushes to NuGet.org.
+4. **Verify on NuGet.org** that the new version (and the DdsMonitor tool) appear.
+
+> The tag is added to `publicReleaseRefSpec` in `version.json`, so a tag build gets
+> a clean version (no `-gSHA` prerelease suffix). SourceLink URLs resolve because
+> the tagged commit is on GitHub.
 
 ### Option B: Manual Publishing
 

@@ -8,6 +8,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## unreleased
 nothing yet
 
+## 0.3.2
+
+### Fixed
+- **SourceLink symbols for the whole library.** `CycloneDDS.Core` and
+  `CycloneDDS.Schema` now ship their SourceLink-enabled PDBs in `lib/net8.0`
+  (previously only `CycloneDDS.Runtime` did), so consumers can step into all three
+  assemblies straight from the package.
+
+### Added
+- **Automatic NuGet publish on a version tag.** Pushing a `vX.Y.Z` tag (e.g. via a
+  GitHub Release) builds and verifies the cross-platform package on Windows and
+  Linux, then publishes it — and the `ddsmonitor` tool — to NuGet.org. Requires the
+  `NUGET_API_KEY` repository secret.
+- **CI now verifies the packaged output on both platforms** before publishing (a
+  Windows smoke test + a Linux job that consumes the finished package), and uploads
+  the `win-x64` native as a workflow artifact.
+- **`examples/PackageSmokeTest`** and **`build/test-package.{sh,ps1}`** for
+  smoke-testing the package (and the `ddsmonitor` tool) locally on either OS.
+
+### Changed
+- Packing now succeeds on Linux too (Windows-only pack entries are `Exists`-guarded),
+  so a per-platform package can be built locally on either OS.
+- CI builds set `ContinuousIntegrationBuild` for deterministic PDBs with normalized
+  SourceLink source paths.
+
 ## 0.3.1
 
 ### Added
