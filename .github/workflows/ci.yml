@@ -109,6 +109,14 @@ jobs:
       shell: pwsh
       run: .\build\pack.ps1
 
+    - name: Upload win-x64 Native Artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: native-win-x64
+        path: artifacts/native/win-x64/*
+        if-no-files-found: warn
+
     - name: Upload NuGet Packages
       uses: actions/upload-artifact@v4
       if: always()
