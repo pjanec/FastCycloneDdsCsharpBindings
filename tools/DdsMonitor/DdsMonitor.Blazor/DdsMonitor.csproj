@@ -27,6 +27,40 @@
     <ProjectReference Include="..\DdsMonitor.Plugins.FeatureDemo\DdsMonitor.Plugins.FeatureDemo.csproj" ReferenceOutputAssembly="false" Private="false" SkipGetTargetFrameworkProperties="true" />
   </ItemGroup>
 
+  <!-- Bundle BOTH platforms' ddsc native into the global-tool payload so the tool
+       runs whether installed on Windows or Linux. Native libs sit flat in the tool's
+       app-base directory, so DllImport("ddsc") resolves ddsc.dll on Windows and
+       libddsc.so on Linux automatically. The transitive Content copy from
+       CycloneDDS.Core already stages the *pack host* platform's native (win-x64 .dll
+       on Windows, linux-x64 .so on Linux); these entries add the *other* platform's,
+       via the identical Content + CopyToOutputDirectory mechanism. Guarded by host OS
+       (so we never duplicate the transitive copy) and Exists-guarded (so a
+       single-platform local pack still succeeds). The CI pack job stages both native
+       artifact sets on the Windows runner before packing. Forward slashes so the
+       Exists() conditions resolve on Linux too. -->
+  <ItemGroup>
+    <!-- Packing on Windows → add the linux-x64 runtime library. -->
+    <Content Include="$(MSBuildThisFileDirectory)../../../artifacts/native/linux-x64/libddsc.so"
+             Pack="false"
+             Condition="$([MSBuild]::IsOSPlatform('Windows')) AND Exists('$(MSBuildThisFileDirectory)../../../artifacts/native/linux-x64/libddsc.so')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>libddsc.so</Link>
+    </Content>
+    <Content Include="$(MSBuildThisFileDirectory)../../../artifacts/native/linux-x64/libddsc.so.0"
+             Pack="false"
+             Condition="$([MSBuild]::IsOSPlatform('Windows')) AND Exists('$(MSBuildThisFileDirectory)../../../artifacts/native/linux-x64/libddsc.so.0')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>libddsc.so.0</Link>
+    </Content>
+    <!-- Packing on Linux → add the win-x64 runtime library. -->
+    <Content Include="$(MSBuildThisFileDirectory)../../../artifacts/native/win-x64/ddsc.dll"
+             Pack="false"
+             Condition="$([MSBuild]::IsOSPlatform('Linux')) AND Exists('$(MSBuildThisFileDirectory)../../../artifacts/native/win-x64/ddsc.dll')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>ddsc.dll</Link>
+    </Content>
+  </ItemGroup>
+
   <!--
     Copy plugin DLLs into the host's OUTPUT plugins folder after each build.
     Ensures discovery regardless of working directory (dotnet run from project dir vs output dir / VS F5).

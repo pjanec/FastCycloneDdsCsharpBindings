@@ -20,6 +20,12 @@ nothing yet
   `LD_LIBRARY_PATH`, and restores the Unix execute bit that NuGet does not
   preserve — and the MSBuild native-asset copies are guarded by
   `IsOSPlatform`. The target framework remains `net8.0`.
+- **`ddsmonitor` global tool runs on Linux.** Its tool payload now bundles both
+  the win-x64 (`ddsc.dll`) and linux-x64 (`libddsc.so`) native runtime, so
+  `dotnet tool install -g CycloneDDS.NET.DdsMonitor` works on either OS.
+  Previously the tool carried only the pack host's native and would fail with a
+  `DllNotFoundException` on the other platform. The bundled `IdlImporter` also
+  works on Linux via the platform-aware `idlc` shipped in the package's `tools/`.
 
 ### Fixed
 - **DDS matched-status events never fired on Linux.** The publication- and
