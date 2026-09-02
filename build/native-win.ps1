@@ -38,6 +38,52 @@ if (!(Get-Command cmake -ErrorAction SilentlyContinue)) {
     exit 1
 }
 
+# ===================================================================================
+# Locate OpenSSL (required: ENABLE_SSL=ON / ENABLE_SECURITY=ON below).
+#
+# The GitHub windows-latest image ships OpenSSL 3.x preinstalled under
+# "C:\Program Files\OpenSSL", which is what CMake's FindOpenSSL was already
+# picking up. We resolve it here and pass -DOPENSSL_ROOT_DIR explicitly so that a
+# missing or relocated install fails HERE, with an actionable message, instead of
+# surfacing as an obscure compile error several minutes into the build.
+#
+# Do NOT reintroduce a "vcpkg install openssl" step to satisfy this. Without a
+# vcpkg toolchain file CMake never looks inside the vcpkg tree, so that step built
+# OpenSSL from source for ~6 minutes every CI run and then had its output ignored
+# in favour of the preinstalled copy.
+# ===================================================================================
+$opensslCandidates = @()
+if ($env:OPENSSL_ROOT_DIR) { $opensslCandidates += $env:OPENSSL_ROOT_DIR }
+$opensslCandidates += @(
+    "C:\Program Files\OpenSSL",
+    "C:\Program Files\OpenSSL-Win64",
+    "C:\OpenSSL-Win64"
+)
+
+$OpenSslRoot = $null
+foreach ($candidate in $opensslCandidates) {
+    if (Test-Path (Join-Path $candidate "include\openssl\ssl.h")) {
+        $OpenSslRoot = (Resolve-Path $candidate).Path
+        break
+    }
+}
+
+if (-not $OpenSslRoot) {
+    throw @"
+OpenSSL was not found, but this build requires it (ENABLE_SSL=ON, ENABLE_SECURITY=ON).
+
+Searched:
+  $($opensslCandidates -join "`n  ")
+
+Install the OpenSSL 3.x development files with one of:
+  winget install ShiningLight.OpenSSL.Prod
+  choco install openssl
+...or point OPENSSL_ROOT_DIR at an existing installation.
+"@
+}
+
+Write-Host "Using OpenSSL at: $OpenSslRoot" -ForegroundColor Green
+
 # Configure CMake
 Write-Host "`n[1/3] Configuring CMake..." -ForegroundColor Yellow
 Push-Location $BuildDir
@@ -62,9 +108,11 @@ try {
         "-DBUILD_IDLC=ON",
         "-DBUILD_TESTING=OFF",
         "-DBUILD_EXAMPLES=OFF",
-        "-DENABLE_SSL=OFF",
+        "-DENABLE_SSL=ON",
         "-DENABLE_SHM=OFF",
-        "-DENABLE_SECURITY=OFF"
+        "-DENABLE_SECURITY=ON",
+        # Forward slashes: CMake treats backslashes in -D values as escapes.
+        "-DOPENSSL_ROOT_DIR=$($OpenSslRoot -replace '\\', '/')"
     )
 
     foreach ($gen in $cmakeGenerators) {
@@ -128,7 +176,15 @@ $RequiredFiles = @(
     "idlc.exe",
     "cycloneddsidl.dll",
     "cycloneddsidlc.dll",
-    "cycloneddsidljson.dll"
+    "cycloneddsidljson.dll",
+
+    # DDS Security plugins (ENABLE_SECURITY=ON). ddsc dlopen()s these by bare
+    # name when a <Security> section is present in the domain configuration, so
+    # they have to ship with the package - without them every secure participant
+    # fails with "Could not load authentication library".
+    "dds_security_auth.dll",
+    "dds_security_ac.dll",
+    "dds_security_crypto.dll"
 )
 
 # Copy required files from bin/
@@ -139,6 +195,30 @@ foreach ($file in $RequiredFiles) {
         Write-Host "  [+] Copied $file" -ForegroundColor Green
     } else {
         Write-Warning "  [-] Missing $file in output!"
+    }
+}
+
+# ===================================================================================
+# OpenSSL runtime DLLs.
+#
+# ENABLE_SSL=ON links OpenSSL into ddsc ITSELF (TCP+TLS), not merely into the
+# security plugins, so ddsc.dll carries hard import-table entries for
+# libcrypto-3-x64.dll / libssl-3-x64.dll and will not LOAD at all without them.
+# Windows ships no system OpenSSL, so the package has to carry these.
+#
+# Globbed rather than hard-coded: the "-3" infix tracks the OpenSSL major version
+# and would change on an eventual OpenSSL 4.
+# ===================================================================================
+$OpenSslBin = Join-Path $OpenSslRoot "bin"
+
+foreach ($pattern in @("libcrypto-*.dll", "libssl-*.dll")) {
+    $found = @(Get-ChildItem -Path $OpenSslBin -Filter $pattern -File -ErrorAction SilentlyContinue)
+    if ($found.Count -eq 0) {
+        throw "No file matching '$pattern' in $OpenSslBin. ddsc.dll imports the OpenSSL runtime DLLs and cannot load without them."
+    }
+    foreach ($dll in $found) {
+        Copy-Item -Path $dll.FullName -Destination $ArtifactsDir -Force
+        Write-Host "  [+] Copied $($dll.Name) (OpenSSL runtime)" -ForegroundColor Green
     }
 }
 

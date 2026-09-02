@@ -37,7 +37,7 @@ jobs:
           10.0.x
 
     - name: Install native build prerequisites
-      run: sudo apt-get update && sudo apt-get install -y cmake build-essential patchelf
+      run: sudo apt-get update && sudo apt-get install -y cmake build-essential patchelf libssl-dev
 
     - name: Display Tools Versions
       run: |
@@ -93,6 +93,14 @@ jobs:
         dotnet-version: |
           8.0.x
           10.0.x
+    
+    # NOTE: there is deliberately no OpenSSL install step. The windows-latest image
+    # already ships OpenSSL 3.x under "C:\Program Files\OpenSSL", which is what
+    # CMake's FindOpenSSL resolves to (build/native-win.ps1 now pins it via
+    # -DOPENSSL_ROOT_DIR and fails fast if it is absent). The previous
+    # "vcpkg install openssl:x64-windows-static-md" step built OpenSSL from source
+    # for ~6 minutes on every run and its output was then ignored, because no vcpkg
+    # toolchain file was ever passed to CMake.
 
     - name: Display Tools Versions
       run: |
@@ -105,9 +113,29 @@ jobs:
         name: native-linux-x64
         path: artifacts/native/linux-x64/
 
+    # The native build (CycloneDDS + idlc, ~2 min) only depends on the pinned
+    # submodule revision, the build script, and the image's toolchain — none of which
+    # change between managed-code commits, so it is cached rather than repeated.
+    - name: Resolve native cache key
+      id: native-key
+      shell: pwsh
+      run: |
+        # Gitlink SHA of the cyclonedds submodule: changes exactly when the native
+        # sources do, which is exactly when the cache must miss.
+        "submodule=$(git rev-parse HEAD:cyclonedds)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+    - name: Cache native win-x64 build
+      id: native-cache
+      uses: actions/cache@v4
+      with:
+        path: artifacts/native/win-x64
+        # ImageVersion is set by the hosted runner; including it invalidates the
+        # cache when the image's MSVC/OpenSSL move under us.
+        key: native-win-x64-${{ env.ImageVersion }}-${{ steps.native-key.outputs.submodule }}-${{ hashFiles('build/native-win.ps1') }}
+
     - name: Build, Test, and Pack
       shell: pwsh
-      run: .\build\pack.ps1
+      run: .\build\pack.ps1 ${{ steps.native-cache.outputs.cache-hit == 'true' && '-SkipNativeBuild' || '' }}
 
     - name: Smoke-test the packed package (Windows)
       shell: pwsh

@@ -27,8 +27,19 @@ This single package includes:
 
 | Platform | Native runtime | Target requirement |
 | :--- | :--- | :--- |
-| Windows x64 | `ddsc.dll` | [Visual C++ Redistributable for Visual Studio 2022](https://aka.ms/vs/17/release/vc_redist.x64.exe) installed on the target machine. |
-| Linux x64 | `libddsc.so` | A glibc-based distribution (e.g. Ubuntu/Debian). No extra runtime install needed. |
+| Windows x64 | `ddsc.dll` | [Visual C++ Redistributable for Visual Studio 2022](https://aka.ms/vs/17/release/vc_redist.x64.exe) installed on the target machine. OpenSSL is bundled. |
+| Linux x64 | `libddsc.so` | A glibc-based distribution (e.g. Ubuntu/Debian) with OpenSSL 3.x (`libssl3`), which is preinstalled on all current mainstream distributions. |
+
+> **On OpenSSL.** The native runtime is built with DDS Security and TCP+TLS enabled, so
+> `ddsc.dll` / `libddsc.so` import `libssl` and `libcrypto` directly and will not load
+> without them. Windows has no system-provided OpenSSL, so the package bundles
+> `libcrypto-3-x64.dll` and `libssl-3-x64.dll` (Apache-2.0 — see `ThirdPartyNotices.txt`)
+> and places them next to your application automatically. On Linux they come from the
+> distribution and nothing is bundled.
+>
+> The DDS Security plugins (`dds_security_auth`, `dds_security_ac`,
+> `dds_security_crypto`) ship alongside them, and are loaded only when your domain
+> configuration contains a `<Security>` section.
 
 ### Working with Source Code
 
@@ -54,8 +65,8 @@ If you want to build the project from source or contribute:
 3.  **Requirements:**
     -   **.NET SDK:** the solution targets `net8.0`, but building requires the **.NET 10 SDK** (the code uses C# 13 language features). Produced binaries still run on .NET 8+.
     -   **CMake 3.16+** on your `PATH`.
-    -   **Windows:** Visual Studio 2022 with the *C++ Desktop Development* workload (for native compilation).
-    -   **Linux:** a C toolchain and `patchelf` — e.g. `sudo apt-get install -y cmake build-essential patchelf`.
+    -   **Windows:** Visual Studio 2022 with the *C++ Desktop Development* workload (for native compilation), plus the OpenSSL 3.x development files — `winget install ShiningLight.OpenSSL.Prod`. `build\native-win.ps1` looks in `C:\Program Files\OpenSSL`, `C:\Program Files\OpenSSL-Win64` and `C:\OpenSSL-Win64`; set `OPENSSL_ROOT_DIR` to override.
+    -   **Linux:** a C toolchain, `patchelf` and the OpenSSL headers — e.g. `sudo apt-get install -y cmake build-essential patchelf libssl-dev`.
 
 ## Key Features
 

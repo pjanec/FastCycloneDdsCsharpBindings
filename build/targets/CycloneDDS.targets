@@ -63,6 +63,11 @@
          The in-repo shim sets it for the bindings' own projects. -->
     <CycloneDdsCodeGenActive>false</CycloneDdsCodeGenActive>
     <CycloneDdsCodeGenActive Condition="'$(CycloneDdsCodeGenEnabled)' == 'true' AND '$(CycloneDdsDisableCodeGen)' != 'true'">true</CycloneDdsCodeGenActive>
+
+    <!-- Where the win-x64 native files live. Default = packaged location
+         (buildTransitive/ -> ../runtimes/win-x64/native/). The in-repo shim points
+         this at the staged native artifacts instead. See target 6. -->
+    <CycloneDdsWinNativeDir Condition="'$(CycloneDdsWinNativeDir)' == ''">$(MSBuildThisFileDirectory)..\runtimes\win-x64\native\</CycloneDdsWinNativeDir>
   </PropertyGroup>
 
   <!-- Conditioned so the **\*.cs glob is not even evaluated for projects that don't run codegen. -->
@@ -229,7 +234,50 @@
     <Copy SourceFiles="@(GeneratedIdlFiles)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" />
   </Target>
 
-  <!-- 6. Clean target — removes the generated dir AND the stamp inside it. -->
+  <!-- 6. Stage the Windows native files that the OS loader can only find in the
+          APPLICATION directory. Two problems, one copy:
+
+          a) The DDS Security plugins. ddsc loads these with
+             LoadLibrary("dds_security_auth.dll") — a BARE name, so Windows searches the
+             executable's own directory. NuGet only lays native assets out under
+             $(OutDir)runtimes\win-x64\native\, which LoadLibrary does not consult, so
+             without this copy every participant created against a <Security>
+             configuration fails with "Could not load authentication library".
+
+          b) The OpenSSL runtime DLLs those plugins import. A plain LoadLibrary resolves
+             a module's imports relative to the EXECUTABLE's directory, not the module's
+             own, so the plugins cannot reach the copy in runtimes\win-x64\native\.
+             (That copy is still required — it is the one ddsc.dll itself binds against,
+             since the .NET host loads ddsc with LOAD_WITH_ALTERED_SEARCH_PATH, which
+             searches ddsc.dll's own directory first. Hence both copies.)
+
+          Linux needs no counterpart: dlopen() resolves the bare soname through the
+          DT_RUNPATH of the caller (libddsc.so), which build/native-linux.sh patches to
+          $ORIGIN, and libssl/libcrypto come from the distribution.
+
+          Modelled on target 5 rather than a plain AfterTargets="Build" copy: routing the
+          files through @(Content) means Publish honours them too, not just Build. -->
+  <Target Name="IncludeCycloneDdsWindowsNativeInOutput"
+          BeforeTargets="GetCopyToOutputDirectoryItems;AssignTargetPaths"
+          Condition="'$(CycloneDdsStageWinNative)' != 'false' AND
+                     ($(RuntimeIdentifier.StartsWith('win')) OR
+                      ('$(RuntimeIdentifier)' == '' AND '$(OS)' == 'Windows_NT'))">
+    <ItemGroup>
+      <CycloneDdsWinNativeFiles Include="$(CycloneDdsWinNativeDir)dds_security_*.dll" />
+      <CycloneDdsWinNativeFiles Include="$(CycloneDdsWinNativeDir)libcrypto-*.dll" />
+      <CycloneDdsWinNativeFiles Include="$(CycloneDdsWinNativeDir)libssl-*.dll" />
+
+      <!-- Flat Link: these must land directly in the output dir, not in a subfolder
+           mirroring their source path. -->
+      <Content Include="@(CycloneDdsWinNativeFiles)">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        <Visible>false</Visible>
+        <Link>%(Filename)%(Extension)</Link>
+      </Content>
+    </ItemGroup>
+  </Target>
+
+  <!-- 7. Clean target — removes the generated dir AND the stamp inside it. -->
   <Target Name="CycloneDDSClean" AfterTargets="Clean">
     <RemoveDir Directories="$(CycloneDdsGeneratedDir)" />
   </Target>

@@ -24,6 +24,36 @@
     <None Include="..\..\artifacts\native\linux-x64\libddsc.so.0" Pack="true" PackagePath="runtimes/linux-x64/native"
           Condition="Exists('..\..\artifacts\native\linux-x64\libddsc.so.0')" />
 
+    <!-- Runtime: DDS Security plugins. ddsc dlopen()s these by bare name when the
+         domain configuration carries a <Security> section; they are NOT reached
+         through DllImport, so the two platforms need different handling:
+
+           Linux   - dlopen() resolves the bare soname against the DT_RUNPATH of the
+                     caller (libddsc.so), which the native build patches to $ORIGIN.
+                     Shipping them in the same runtimes/ directory as libddsc.so is
+                     therefore sufficient.
+           Windows - LoadLibrary() searches the EXECUTABLE's directory, never the
+                     runtimes\win-x64\native subfolder that NuGet lays out. They are
+                     staged next to the app by IncludeCycloneDdsWindowsNativeInOutput
+                     in build/targets/CycloneDDS.targets; they are packed here so that
+                     target has something to copy.
+
+         Globs, so a platform-partial local pack silently omits what it doesn't have. -->
+    <None Include="..\..\artifacts\native\win-x64\dds_security_*.dll" Pack="true" PackagePath="runtimes/win-x64/native" />
+    <None Include="..\..\artifacts\native\linux-x64\libdds_security_*.so" Pack="true" PackagePath="runtimes/linux-x64/native" />
+
+    <!-- Runtime: OpenSSL — Windows only. ENABLE_SSL=ON links OpenSSL into ddsc itself
+         (TCP+TLS), so ddsc.dll has hard import-table entries for these and will not
+         load without them; Windows provides no system OpenSSL. This copy is what
+         ddsc.dll binds against, because the .NET host loads it with
+         LOAD_WITH_ALTERED_SEARCH_PATH — which searches ddsc.dll's OWN directory first.
+         The security plugins need a second copy in the application directory; see
+         IncludeCycloneDdsWindowsNativeInOutput in build/targets/CycloneDDS.targets.
+         Linux resolves libssl/libcrypto from the distribution, so nothing is bundled
+         there. -->
+    <None Include="..\..\artifacts\native\win-x64\libcrypto-*.dll" Pack="true" PackagePath="runtimes/win-x64/native" />
+    <None Include="..\..\artifacts\native\win-x64\libssl-*.dll" Pack="true" PackagePath="runtimes/win-x64/native" />
+
     <!-- Build: Targets (buildTransitive → imported by direct AND transitive consumers) -->
     <None Include="..\..\build\targets\CycloneDDS.targets" Pack="true" PackagePath="buildTransitive/CycloneDDS.NET.targets" />
     <!-- Build: direct-reference marker (build/ → imported ONLY by direct consumers).
@@ -36,13 +66,17 @@
     <None Include="..\..\artifacts\native\win-x64\cycloneddsidlc.dll" Pack="true" PackagePath="tools/" Condition="Exists('..\..\artifacts\native\win-x64\cycloneddsidlc.dll')" />
     <None Include="..\..\artifacts\native\win-x64\cycloneddsidljson.dll" Pack="true" PackagePath="tools/" Condition="Exists('..\..\artifacts\native\win-x64\cycloneddsidljson.dll')" />
     <None Include="..\..\artifacts\native\win-x64\ddsc.dll" Pack="true" PackagePath="tools/" Condition="Exists('..\..\artifacts\native\win-x64\ddsc.dll')" />
+    <!-- tools/ carries its own flat copy of ddsc.dll, which imports OpenSSL. -->
+    <None Include="..\..\artifacts\native\win-x64\libcrypto-*.dll" Pack="true" PackagePath="tools/" />
+    <None Include="..\..\artifacts\native\win-x64\libssl-*.dll" Pack="true" PackagePath="tools/" />
 
     <!-- Tools: Native Assets — Linux (idlc + its .so dependencies, flat in tools/).
          The .so globs are skipped silently when the linux-x64 artifacts are absent;
          idlc is Exists-guarded for the same reason. -->
     <None Include="..\..\artifacts\native\linux-x64\idlc" Pack="true" PackagePath="tools/"
           Condition="Exists('..\..\artifacts\native\linux-x64\idlc')" />
-    <None Include="..\..\artifacts\native\linux-x64\*.so" Pack="true" PackagePath="tools/" />
+    <None Include="..\..\artifacts\native\linux-x64\*.so" Pack="true" PackagePath="tools/"
+          Exclude="..\..\artifacts\native\linux-x64\libdds_security_*.so" />
     <None Include="..\..\artifacts\native\linux-x64\*.so.0" Pack="true" PackagePath="tools/" />
 
     <!-- Tools: Shared Managed Libraries -->

@@ -21,3 +21,22 @@ The full license text is available in the cyclonedds subdirectory of this
 repository or at the URLs above.
 
 ================================================================================
+
+OpenSSL
+https://www.openssl.org/
+
+Redistributed in binary form on Windows only, as libcrypto-3-x64.dll and
+libssl-3-x64.dll under runtimes/win-x64/native/ and tools/. The Cyclone DDS
+runtime links OpenSSL for DDS Security and TCP+TLS support. On Linux the
+equivalent libraries are provided by the operating system and are not
+redistributed here.
+
+Licensed under the Apache License, Version 2.0:
+http://www.apache.org/licenses/LICENSE-2.0
+
+SPDX-License-Identifier: Apache-2.0
+
+Copyright (c) 1998-2024 The OpenSSL Project Authors
+Copyright (c) 1995-1998 Eric A. Young, Tim J. Hudson
+
+================================================================================
